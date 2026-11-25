@@ -26,8 +26,8 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000000b', 'b@test');
 
 select pg_temp.check((select count(*) from workspaces) = 4, 'signup creates Fashion + Macro for each user');
-select pg_temp.check((select count(*) from categories c join workspaces w on w.id = c.workspace_id where w.kind = 'fashion') = 10, 'Fashion workspaces get 5 seed categories');
-select pg_temp.check((select count(*) from categories c join workspaces w on w.id = c.workspace_id where w.kind = 'macro') = 0, 'Macro starts with no categories');
+select pg_temp.check((select count(*) from categories c join workspaces w on w.id = c.workspace_id where w.kind = 'fashion') = 20, 'Fashion workspaces get the first 10 spec categories');
+select pg_temp.check((select count(*) from categories c join workspaces w on w.id = c.workspace_id where w.kind = 'macro') = 80, 'Macro workspaces get all 40 spec categories');
 
 -- User A works in Fashion
 select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');

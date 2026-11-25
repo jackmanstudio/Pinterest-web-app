@@ -3,11 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import { STATUS_LABELS, WORKSPACE_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { publishBlockers } from "@/lib/workflow/checks";
+import { recommendBoard } from "@/lib/publishing/boards";
 import { ACTION_LABELS, type WorkflowAction } from "@/lib/workflow/transitions";
 import { SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 
-interface Board { board_id: string; name: string }
+interface Board { board_id: string; name: string; description?: string | null }
 interface PinterestInfo {
   ready: boolean;
   env: "sandbox" | "production";
@@ -60,7 +61,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
           username: s.connection?.username ?? null,
           active: s.connection?.status === "active",
           scopes: s.connection?.scopes ?? [],
-          boards: (s.boards ?? []).map((b: Board) => ({ board_id: b.board_id, name: b.name })),
+          boards: (s.boards ?? []).map((b: Board) => ({ board_id: b.board_id, name: b.name, description: b.description ?? null })),
         });
       })
       .catch(() => {});
@@ -137,6 +138,7 @@ function PinCard({ kind, store, draft, pin, onChanged }: { kind: WorkspaceKind; 
   }, [store, draft]);
 
   const board = pin.boards.find((b) => b.board_id === boardId);
+  const suggested = recommendBoard(pin.boards, { title: draft.title, tags: draft.tags, category: draft.idea });
   const blockers =
     draft.status === "approved"
       ? store.mode === "demo"
@@ -248,9 +250,15 @@ function PinCard({ kind, store, draft, pin, onChanged }: { kind: WorkspaceKind; 
           <select id={`board-${draft.id}`} className="rounded-md border border-zinc-300 px-2 py-1" value={boardId} onChange={(e) => setBoardId(e.target.value)} disabled={pin.boards.length === 0}>
             <option value="">{pin.boards.length ? "Choose a board…" : "No boards synced"}</option>
             {pin.boards.map((b) => (
-              <option key={b.board_id} value={b.board_id}>{b.name}</option>
+              <option key={b.board_id} value={b.board_id}>{b.name}{suggested?.board.board_id === b.board_id ? " (suggested)" : ""}</option>
             ))}
           </select>
+          {suggested && suggested.board.board_id !== boardId && (
+            <p className="text-xs text-zinc-600">
+              Suggested: <strong>{suggested.board.name}</strong> ({suggested.reason}).{" "}
+              <button className="underline" onClick={() => setBoardId(suggested.board.board_id)}>Use it</button>
+            </p>
+          )}
           {blockers.length > 0 && (
             <ul className="list-disc rounded-md bg-zinc-50 p-2 pl-6 text-xs text-zinc-700">
               {blockers.map((b) => (

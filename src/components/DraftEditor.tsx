@@ -1,6 +1,9 @@
 "use client";
 import { LIMITS, parseList } from "@/lib/drafts/validation";
+import type { QualityContext } from "@/lib/drafts/quality";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
+import { CopyButton, pinAsText } from "./CopyButton";
+import { QualityPanel } from "./QualityPanel";
 
 const IMAGE_LABEL: Record<ImageStatus, string> = {
   not_generated: "No image yet",
@@ -45,9 +48,11 @@ interface Props {
   footer?: React.ReactNode;
   /** Optional image area (preview + generate button) for saved drafts. */
   media?: React.ReactNode;
+  /** Brand rules and link used by the quality check. */
+  quality?: QualityContext;
 }
 
-export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media }: Props) {
+export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality }: Props) {
   const set = <K extends keyof DraftContent>(k: K, v: DraftContent[K]) => onChange({ ...draft, [k]: v });
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
@@ -59,7 +64,10 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
         <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
           Pin {index + 1} · {draft.angle || "Custom"}
         </span>
-        <SourceBadge source={source} />
+        <span className="flex items-center gap-2">
+          <CopyButton text={pinAsText({ ...draft, link: quality?.link })} label="Copy whole pin" />
+          <SourceBadge source={source} />
+        </span>
       </div>
 
       <label className="text-xs font-medium text-zinc-700" htmlFor={id("concept")}>Concept</label>
@@ -67,17 +75,20 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
 
       <div className="flex items-baseline justify-between">
         <label className="text-xs font-medium text-zinc-700" htmlFor={id("title")}>Title</label>
-        <Counter value={draft.title} max={LIMITS.title} />
+        <span className="flex gap-2"><CopyButton text={draft.title} /><Counter value={draft.title} max={LIMITS.title} /></span>
       </div>
       <input id={id("title")} className={input} value={draft.title} onChange={(e) => set("title", e.target.value)} />
 
       <div className="flex items-baseline justify-between">
         <label className="text-xs font-medium text-zinc-700" htmlFor={id("desc")}>Description</label>
-        <Counter value={draft.description} max={LIMITS.description} />
+        <span className="flex gap-2"><CopyButton text={draft.description} /><Counter value={draft.description} max={LIMITS.description} /></span>
       </div>
       <textarea id={id("desc")} className={input} rows={4} value={draft.description} onChange={(e) => set("description", e.target.value)} />
 
-      <label className="text-xs font-medium text-zinc-700" htmlFor={id("tags")}>Tags (comma separated, max {LIMITS.tags})</label>
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-medium text-zinc-700" htmlFor={id("tags")}>Tags (comma separated, max {LIMITS.tags})</label>
+        <CopyButton text={draft.tags.join(", ")} />
+      </div>
       <input
         id={id("tags")}
         className={input}
@@ -87,17 +98,22 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
 
       <div className="flex items-baseline justify-between">
         <label className="text-xs font-medium text-zinc-700" htmlFor={id("alt")}>Alt text</label>
-        <Counter value={draft.alt_text} max={LIMITS.alt_text} />
+        <span className="flex gap-2"><CopyButton text={draft.alt_text} /><Counter value={draft.alt_text} max={LIMITS.alt_text} /></span>
       </div>
       <textarea id={id("alt")} className={input} rows={2} value={draft.alt_text} onChange={(e) => set("alt_text", e.target.value)} />
 
-      <label className="text-xs font-medium text-zinc-700" htmlFor={id("img")}>Image prompt</label>
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-medium text-zinc-700" htmlFor={id("img")}>Image prompt</label>
+        <CopyButton text={draft.image_prompt} />
+      </div>
       <textarea id={id("img")} className={input} rows={3} value={draft.image_prompt} onChange={(e) => set("image_prompt", e.target.value)} />
 
       <p className="text-xs text-zinc-600">
         <span className="font-medium">Image status:</span> {IMAGE_LABEL[imageStatus]}
       </p>
       {media}
+
+      <QualityPanel draft={draft} ctx={quality} />
 
       {errors.length > 0 && (
         <ul className="rounded-md bg-red-50 p-2 text-xs text-red-700" role="alert">

@@ -46,11 +46,19 @@ export function draftsUserPrompt(req: GenerateRequest): string {
     b.audience && `Audience: ${b.audience}`,
     b.focus_keywords.length && `Focus keywords: ${b.focus_keywords.join(", ")}`,
     b.banned_words.length && `Banned words: ${b.banned_words.join(", ")}`,
+    b.image_style && `Preferred image style (use it in every image prompt): ${b.image_style}`,
+    b.cta && `Preferred call to action (adapt it naturally at the end of descriptions): ${b.cta}`,
+    b.region && `Target market/region (pick keywords people there search for): ${b.region}`,
   ]
     .filter(Boolean)
     .join("\n");
+  const language = (req.language || b.language || "").trim();
+  const lang =
+    language && !/^english$/i.test(language)
+      ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English.\n`
+      : "";
   return `Workspace: ${req.workspace}
-${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}
+${lang}${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}
 Pin idea: ${req.idea}
 
 Angles (one draft each, set "angle" to the angle label):

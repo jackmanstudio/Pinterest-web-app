@@ -90,6 +90,7 @@ const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("add_ideas"), workspace: z.enum(WORKSPACE_KINDS), ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
   z.object({ action: z.literal("delete_idea"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
   z.object({ action: z.literal("run_now"), workspace: z.enum(WORKSPACE_KINDS) }),
+  z.object({ action: z.literal("pause"), workspace: z.enum(WORKSPACE_KINDS) }),
 ]);
 
 export async function POST(request: Request) {
@@ -121,6 +122,15 @@ export async function POST(request: Request) {
         });
       }
       return NextResponse.json({ ok: true });
+    }
+    if (b.action === "pause") {
+      // Emergency stop: turning off also clears the consent, so it must be re-typed to resume.
+      const res = await ctx.db.from("autopilot_settings").update({ enabled: false, consent_text: null }).eq("workspace_id", workspaceId).eq("enabled", true).select("workspace_id");
+      if (res.error) throw new Error(res.error.message);
+      if (res.data?.length) {
+        await audit(getAdminSupabase(), { workspaceId, actorId: ctx.user.id, action: "autopilot_paused", draftId: workspaceId, details: { via: "pause_all" } });
+      }
+      return NextResponse.json({ ok: true, paused: Boolean(res.data?.length) });
     }
     if (b.action === "add_ideas") {
       const res = await ctx.db.from("autopilot_ideas").insert(b.ideas.map((idea) => ({ workspace_id: workspaceId, idea })));

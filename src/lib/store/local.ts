@@ -1,11 +1,12 @@
-import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { defaultCategories } from "@/lib/categories/taxonomy";
+import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 
-/** Starter taxonomy. Macro is intentionally empty until the user defines it. */
+/** Starter taxonomy from the spec: Macro gets all 40 categories, Fashion the first ten. */
 export const DEFAULT_CATEGORIES: Record<WorkspaceKind, string[]> = {
-  fashion: ["Outfit ideas", "Seasonal trends", "Accessories", "Styling tips", "Capsule wardrobe"],
-  macro: [],
+  fashion: defaultCategories("fashion"),
+  macro: defaultCategories("macro"),
 };
 
 interface WorkspaceData {
@@ -14,6 +15,7 @@ interface WorkspaceData {
   categories: Category[];
   drafts: PinDraft[];
   audit?: (AuditEvent & { draft_id: string })[];
+  versions?: DraftVersion[];
 }
 
 export interface KeyValue {
@@ -116,6 +118,8 @@ export class LocalStore implements Store {
         scheduled_for: null,
         published_at: null,
         external_pin_id: null,
+        archived_at: null,
+        duplicate_of: n.duplicate_of ?? null,
         created_at: now,
         updated_at: now,
       };
@@ -129,9 +133,21 @@ export class LocalStore implements Store {
     const i = d.drafts.findIndex((p) => p.id === id);
     if (i < 0) throw new Error("Draft not found in this workspace");
     const cur = d.drafts[i];
-    if (cur.status === "scheduled" || cur.status === "published") throw new Error(`This pin is ${cur.status} and is locked; cancel the schedule first`);
     // Same rule as the database: editing approved content withdraws the approval.
-    const withdraw = cur.status === "approved" ? { status: "draft" as const, approved_at: null } : {};
+    if (patch.archived_at && !cur.archived_at && cur.status === "scheduled") throw new Error("Cancel the schedule before archiving this pin");
+    const textKeys = ["title", "description", "tags", "alt_text", "concept", "image_prompt", "link"] as const;
+    const textChanged = textKeys.some((k) => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(cur[k]));
+    if (textChanged && (cur.status === "scheduled" || cur.status === "published")) throw new Error(`This pin is ${cur.status} and is locked; cancel the schedule first`);
+    if (textChanged) {
+      const v: DraftVersion = {
+        id: uuid(), draft_id: id, title: cur.title, description: cur.description, tags: cur.tags, alt_text: cur.alt_text,
+        concept: cur.concept, image_prompt: cur.image_prompt, link: cur.link, changed_by: "you", created_at: new Date().toISOString(),
+      };
+      const others = (d.versions ?? []).filter((x) => x.draft_id !== id);
+      const mine = [v, ...(d.versions ?? []).filter((x) => x.draft_id === id)].slice(0, 30);
+      d.versions = [...others, ...mine];
+    }
+    const withdraw = textChanged && cur.status === "approved" ? { status: "draft" as const, approved_at: null } : {};
     d.drafts[i] = { ...cur, ...patch, ...withdraw, updated_at: new Date().toISOString() };
     this.write(d);
     return d.drafts[i];
@@ -176,9 +192,35 @@ export class LocalStore implements Store {
   async audit(workspaceId: string, draftId: string) {
     return (this.byId(workspaceId).audit ?? []).filter((e) => e.draft_id === draftId).reverse();
   }
+  async renameWorkspace(workspaceId: string, name: string) {
+    const d = this.byId(workspaceId);
+    const n = name.trim();
+    if (!n || n.length > 40) throw new Error("Name must be 1-40 characters");
+    d.workspace = { ...d.workspace, name: n };
+    this.write(d);
+    return d.workspace;
+  }
+  async duplicateDraft(workspaceId: string, id: string) {
+    const src = await this.getDraft(workspaceId, id);
+    const [copy] = await this.saveDrafts(workspaceId, [
+      {
+        angle: src.angle, concept: src.concept, title: src.title, description: src.description, tags: src.tags, alt_text: src.alt_text,
+        image_prompt: src.image_prompt, idea: src.idea, batch_id: uuid(), category_id: src.category_id,
+        source: src.source === "demo" ? "demo" : "manual", link: src.link, duplicate_of: src.id,
+      },
+    ]);
+    return copy;
+  }
+  async listVersions(workspaceId: string, draftId: string) {
+    return (this.byId(workspaceId).versions ?? []).filter((v) => v.draft_id === draftId);
+  }
+  async listActivity(workspaceId: string, limit = 200) {
+    return [...(this.byId(workspaceId).audit ?? [])].reverse().slice(0, limit).map((e) => ({ ...e, target_type: "pin_draft" }));
+  }
   async deleteDraft(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);
     d.drafts = d.drafts.filter((p) => p.id !== id);
+    d.versions = (d.versions ?? []).filter((v) => v.draft_id !== id);
     this.write(d);
   }
 

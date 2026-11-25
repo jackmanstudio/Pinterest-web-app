@@ -47,17 +47,22 @@ export function AppHeader() {
             </Link>
           ))}
         </nav>
-        <nav className="flex gap-1" aria-label="Sections">
+        <nav className="flex flex-wrap gap-1" aria-label="Sections">
           {tab(`/w/${kind}`, "Studio", inWorkspace && section === "")}
-          {tab(`/w/${kind}/drafts`, "Saved drafts", section === "drafts")}
+          {tab(`/w/${kind}/drafts`, "Pin library", section === "drafts")}
+          {tab(`/w/${kind}/calendar`, "Calendar", section === "calendar")}
           {tab(`/w/${kind}/publish`, "Review & publish", section === "publish")}
           {tab(`/w/${kind}/autopilot`, "Autopilot", section === "autopilot")}
           {tab(`/w/${kind}/settings`, "Brand & categories", section === "settings")}
           {tab(`/w/${kind}/analytics`, "Analytics", section === "analytics")}
           {tab(`/w/${kind}/usage`, "Usage & cost", section === "usage")}
           {tab(`/w/${kind}/pinterest`, "Pinterest", section === "pinterest")}
+          {tab(`/w/${kind}/tools`, "Tools", section === "tools")}
         </nav>
         <div className="ml-auto flex items-center gap-3">
+          <Link href="/overview" className={`text-sm ${path === "/overview" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
+            All accounts
+          </Link>
           <Link href="/account" className={`text-sm ${path === "/account" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
             Account &amp; data
           </Link>

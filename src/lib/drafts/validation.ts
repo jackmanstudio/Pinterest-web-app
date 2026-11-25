@@ -25,12 +25,17 @@ const BrandSchema = z.object({
   website_url: z.string().max(300),
   focus_keywords: z.array(z.string().max(60)).max(30),
   banned_words: z.array(z.string().max(60)).max(50),
+  image_style: z.string().max(120).optional(),
+  cta: z.string().max(120).optional(),
+  language: z.string().max(40).optional(),
+  region: z.string().max(60).optional(),
 });
 
 export const GenerateRequestSchema = z.object({
   workspace: z.enum(WORKSPACE_KINDS),
   idea: z.string().trim().min(3, "Describe the pin idea in a few words").max(LIMITS.idea),
-  category: z.string().max(80).optional(),
+  category: z.string().max(170).optional(),
+  language: z.string().max(40).optional(),
   brand: BrandSchema,
 });
 

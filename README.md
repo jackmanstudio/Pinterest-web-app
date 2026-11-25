@@ -14,6 +14,8 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
 | Autopilot | **Built, not yet tested live.** Off by default. Turns queued ideas into pins and publishes them to Pinterest automatically within a daily limit and the AI budget. Needs Supabase, AI keys, Pinterest with publishing, and an hourly scheduler. |
 | Production hardening | **Built.** Rate limits, security headers, structured logs, `/api/health`, data export and account deletion, CI. Rate limits are in-memory (one server instance); swap in Redis/Upstash for multi-instance hosting. |
+| Spec v1.8 content tools | **Built and tested (unit + database tests).** 40-category taxonomy with automatic/manual/custom category, multi-language output, copy buttons, explainable quality score and proofreader, pin library search/filters/archive/duplicate/version history/rewrite one pin, CSV import/export, content calendar, destination link checker, UTM builder, board suggestion, activity log, all-accounts overview with pause-all. |
+| More than two accounts | **Not built yet.** The database has exactly two workspaces (Fashion, Macro) per user; adding a third needs a schema change. |
 | Competitor tracking | **Not available.** Pinterest v5 has no API for other accounts' analytics, so this is intentionally not built. |
 | Pinterest API v5 | **OAuth, sync and approval-based publishing built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Publishing is off until `PINTEREST_ENABLE_PUBLISHING=true`, and every publish needs approval plus confirmation. |
 
@@ -104,6 +106,17 @@ In Studio, type a title and press **Make 5 complete pins**. The app writes 5 dis
 - **Image prompts** (`src/lib/ai/image/prompt.ts`): every image prompt names the pin title, adds a premium editorial aesthetic, a different art direction per pin (flat lay, street style, cinematic, colour-block studio, seasonal set), lighting and composition cues, keeps the overlay area calm, and lists what to avoid (text, collages, distorted hands, stock-photo clichés).
 - **Destination link**: Studio has a link box (defaults to the brand website); Autopilot has its own. Pinterest sends clicks there.
 - **Trend finder**: chips under the Studio box. Live Pinterest Trends if fetched; otherwise seasonal calendar ideas, labelled as such.
+
+## Spec v1.8 tools (this build)
+
+- **Categories:** Macro starts with all 40 spec categories, Fashion with the first ten (migration `0008` adds any missing ones to existing accounts). In the Studio choose **Automatic** (the category is detected from the title and shown), **Choose** or **Custom** (optionally saved to that account only).
+- **Language:** pick the output language per batch, or a default per account in Brand settings. English is used when nothing is chosen.
+- **Brand profile:** display name, preferred image style, default call to action, language and market/region are used in every generation.
+- **Quality check:** each pin gets an explainable 0-100 score (SEO, proofreading, accessibility, brand safety, destination). It checks text only and is not a promise of reach.
+- **Pin library:** search, filter by status/category/date, archive, intentional duplicates, near-duplicate warnings across the library, image download, rewrite one pin without touching the other four, and version history with restore (last 30 versions, written by a database trigger).
+- **Calendar:** month/week/day views of published, scheduled and drafted pins, plus seasonal ideas for next month (labelled as calendar ideas, not trend data).
+- **Tools:** destination link checker (public addresses only, follows up to 5 redirects, compares page title with the pin), UTM builder that keeps existing parameters, CSV import with a validation preview and partial import, activity log.
+- **All accounts:** health numbers and prioritised next steps for every workspace, and one button to pause Autopilot everywhere.
 
 ## Autopilot (opt-in automatic publishing)
 

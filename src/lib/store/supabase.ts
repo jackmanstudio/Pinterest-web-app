@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
-import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 
 const DRAFT_COLUMNS =
-  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, created_at, updated_at";
+  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, archived_at, duplicate_of, created_at, updated_at";
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -24,7 +24,7 @@ export class SupabaseStore implements Store {
   async getBrand(workspaceId: string): Promise<BrandSettings> {
     const res = await this.db
       .from("brand_settings")
-      .select("brand_name, voice, audience, website_url, focus_keywords, banned_words, pin_template")
+      .select("brand_name, voice, audience, website_url, focus_keywords, banned_words, image_style, cta, language, region, pin_template")
       .eq("workspace_id", workspaceId)
       .maybeSingle();
     if (res.error) throw new Error(res.error.message);
@@ -106,6 +106,41 @@ export class SupabaseStore implements Store {
         .eq("target_id", draftId)
         .order("created_at", { ascending: false })
         .limit(50),
+    );
+  }
+  async renameWorkspace(workspaceId: string, name: string): Promise<Workspace> {
+    return check(await this.db.from("workspaces").update({ name: name.trim() }).eq("id", workspaceId).select("id, kind, name").single());
+  }
+  async duplicateDraft(workspaceId: string, id: string): Promise<PinDraft> {
+    const d = await this.getDraft(workspaceId, id);
+    const [copy] = await this.saveDrafts(workspaceId, [
+      {
+        angle: d.angle, concept: d.concept, title: d.title, description: d.description, tags: d.tags, alt_text: d.alt_text,
+        image_prompt: d.image_prompt, idea: d.idea, batch_id: crypto.randomUUID(), category_id: d.category_id,
+        source: d.source === "demo" ? "demo" : "manual", link: d.link, duplicate_of: d.id,
+      },
+    ]);
+    return copy;
+  }
+  async listVersions(workspaceId: string, draftId: string): Promise<DraftVersion[]> {
+    return check(
+      await this.db
+        .from("pin_draft_versions")
+        .select("id, draft_id, title, description, tags, alt_text, concept, image_prompt, link, changed_by, created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("draft_id", draftId)
+        .order("created_at", { ascending: false })
+        .limit(30),
+    );
+  }
+  async listActivity(workspaceId: string, limit = 200): Promise<AuditEvent[]> {
+    return check(
+      await this.db
+        .from("audit_events")
+        .select("id, action, target_type, target_id, details, created_at")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit),
     );
   }
   async deleteDraft(workspaceId: string, id: string) {

@@ -5,6 +5,10 @@ import type { BrandSettings, Category, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
 import { PinDesign } from "./PinDesign";
+import { defaultCategories } from "@/lib/categories/taxonomy";
+
+import { LANGUAGES } from "@/lib/brand/languages";
+const IMAGE_STYLES = ["Editorial photography", "Lifestyle photography", "Flat lay", "Studio product shot", "Illustration", "Minimal still life", "Moody film photography"];
 
 export function Settings({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
@@ -15,6 +19,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   const [newCat, setNewCat] = useState("");
   const [newParent, setNewParent] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
     if (!store || !workspace) return;
@@ -24,6 +29,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         setKw(b.focus_keywords.join(", "));
         setBanned(b.banned_words.join(", "));
         setCategories(c);
+        setDisplayName(workspace.name);
       })
       .catch((e: Error) => setMsg({ text: e.message, ok: false }));
   }, [store, workspace]);
@@ -47,6 +53,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
     try {
       const next = { ...brand!, focus_keywords: parseList(kw), banned_words: parseList(banned) };
       await store!.saveBrand(workspace!.id, next);
+      if (displayName.trim() && displayName.trim() !== workspace!.name) await store!.renameWorkspace(workspace!.id, displayName);
       setBrand(next);
       setMsg({ text: `${WORKSPACE_LABELS[kind]} brand settings saved.`, ok: true });
     } catch (e) {
@@ -59,6 +66,19 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       const c = await store!.addCategory(workspace!.id, newCat, newParent || null);
       setCategories([...categories, c]);
       setNewCat("");
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    }
+  }
+
+  /** Adds any of the spec's starter categories that are missing (keeps the user's own). */
+  async function restoreDefaults() {
+    try {
+      const have = new Set(categories.filter((c) => !c.parent_id).map((c) => c.name.toLowerCase()));
+      const added = [];
+      for (const name of defaultCategories(kind)) if (!have.has(name.toLowerCase())) added.push(await store!.addCategory(workspace!.id, name));
+      setCategories([...categories, ...added]);
+      setMsg({ text: added.length ? `Added ${added.length} starter categories.` : "All starter categories are already there.", ok: true });
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
@@ -78,6 +98,10 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h1 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} brand settings</h1>
         <p className="text-sm text-zinc-600">Used only for {WORKSPACE_LABELS[kind]} generations. The other workspace has its own settings.</p>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Account display name
+          <input className={input} value={displayName} maxLength={40} onChange={(e) => setDisplayName(e.target.value)} />
+        </label>
         {field("brand_name", "Brand name")}
         {field("voice", "Brand voice", true)}
         {field("audience", "Target audience", true)}
@@ -90,6 +114,28 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
           Banned words (comma separated)
           <input className={input} value={banned} onChange={(e) => setBanned(e.target.value)} />
         </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Preferred image style
+          <input className={input} list="image-styles" placeholder="e.g. Editorial photography" maxLength={120} value={brand.image_style ?? ""} onChange={(e) => setBrand({ ...brand, image_style: e.target.value })} />
+          <datalist id="image-styles">{IMAGE_STYLES.map((s) => <option key={s} value={s} />)}</datalist>
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+          Default call to action
+          <input className={input} placeholder="e.g. Save this for your next trip" maxLength={120} value={brand.cta ?? ""} onChange={(e) => setBrand({ ...brand, cta: e.target.value })} />
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+            Pin language
+            <select className={input} value={brand.language ?? ""} onChange={(e) => setBrand({ ...brand, language: e.target.value })}>
+              <option value="">English (default)</option>
+              {LANGUAGES.filter((l) => l !== "English").map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+            SEO market / region
+            <input className={input} placeholder="e.g. United States" maxLength={60} value={brand.region ?? ""} onChange={(e) => setBrand({ ...brand, region: e.target.value })} />
+          </label>
+        </div>
         <button onClick={saveBrand} className="self-start rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white">Save brand settings</button>
         {msg && <p className={`text-sm ${msg.ok ? "text-emerald-700" : "text-red-700"}`} role="status">{msg.text}</p>}
       </section>
@@ -97,7 +143,11 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} categories</h2>
         {categories.length === 0 && <p className="text-sm text-zinc-600">No categories yet. Add the ones this workspace uses.</p>}
-        <ul className="flex flex-col divide-y divide-zinc-100">
+        <div className="flex items-center justify-between text-xs text-zinc-500">
+          <span>{categories.filter((c) => !c.parent_id).length} categories · {categories.filter((c) => c.parent_id).length} sub-categories</span>
+          <button onClick={restoreDefaults} className="underline hover:text-zinc-900">Add missing starter categories</button>
+        </div>
+        <ul className="flex max-h-[28rem] flex-col divide-y divide-zinc-100 overflow-y-auto pr-1">
           {categories
             .filter((c) => !c.parent_id)
             .map((c) => (

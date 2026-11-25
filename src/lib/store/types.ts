@@ -1,7 +1,7 @@
 import type { WorkflowAction } from "@/lib/workflow/transitions";
-import type { AuditEvent, BrandSettings, Category, DraftContent, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
+import type { AuditEvent, BrandSettings, Category, DraftContent, DraftVersion, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
 
-export type DraftPatch = Partial<DraftContent> & { link?: string | null };
+export type DraftPatch = Partial<DraftContent> & { link?: string | null; archived_at?: string | null };
 
 export interface TransitionOptions {
   boardId?: string;
@@ -17,6 +17,8 @@ export interface NewDraft extends DraftContent {
   source: ContentSource;
   /** Destination URL (blog post, product page). */
   link?: string | null;
+  /** Set when this draft is an intentional copy of another. */
+  duplicate_of?: string | null;
 }
 
 /**
@@ -49,4 +51,12 @@ export interface Store {
   uploadLogo(workspaceId: string, file: File): Promise<string>;
   /** A URL the browser can display for a stored logo value. */
   logoUrl(logo: string | null): Promise<string | null>;
+  /** Renames the workspace's display name (e.g. "Macro" → "Home & Life"). */
+  renameWorkspace(workspaceId: string, name: string): Promise<Workspace>;
+  /** Copies a draft (text, link, category) as a new draft linked to the original. */
+  duplicateDraft(workspaceId: string, id: string): Promise<PinDraft>;
+  /** Earlier versions of a draft's text, newest first. */
+  listVersions(workspaceId: string, draftId: string): Promise<DraftVersion[]>;
+  /** Workspace activity log (workflow, publishing, autopilot), newest first. */
+  listActivity(workspaceId: string, limit?: number): Promise<AuditEvent[]>;
 }

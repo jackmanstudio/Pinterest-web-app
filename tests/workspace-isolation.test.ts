@@ -42,9 +42,9 @@ describe("LocalStore workspace isolation", () => {
     expect((await store.listDrafts(f.id))[0].title).toBe("t");
   });
 
-  it("seeds Fashion categories and leaves Macro empty", async () => {
-    expect(await store.listCategories((await store.getWorkspace("fashion")).id)).toHaveLength(5);
-    expect(await store.listCategories((await store.getWorkspace("macro")).id)).toHaveLength(0);
+  it("seeds the spec taxonomy: 10 Fashion, 40 Macro categories", async () => {
+    expect(await store.listCategories((await store.getWorkspace("fashion")).id)).toHaveLength(10);
+    expect(await store.listCategories((await store.getWorkspace("macro")).id)).toHaveLength(40);
   });
 
   it("supports sub-categories inside one workspace only", async () => {

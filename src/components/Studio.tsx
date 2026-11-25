@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
+import type { BrandSettings, Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
+import { detectCategory } from "@/lib/categories/taxonomy";
+import { LANGUAGES } from "@/lib/brand/languages";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { generateDraftImage, runPool } from "@/lib/client/pinImages";
 import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
@@ -51,6 +53,11 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   // ?idea=… pre-fills the box (used by "Make new versions" on Analytics).
   const [idea, setIdea] = useState(() => (typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("idea") ?? "").slice(0, 500)));
   const [categoryId, setCategoryId] = useState<string>("");
+  const [catMode, setCatMode] = useState<"auto" | "manual" | "custom">("auto");
+  const [customCat, setCustomCat] = useState("");
+  const [saveCustom, setSaveCustom] = useState(true);
+  const [language, setLanguage] = useState("");
+  const [brand, setBrand] = useState<BrandSettings | null>(null);
   const [busy, setBusy] = useState<"idle" | "generating" | "saving" | "auto">("idle");
   const [auto, setAuto] = useState<AutoRun | null>(null);
   const [link, setLink] = useState("");
@@ -61,20 +68,48 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   useEffect(() => {
     if (!store || !workspace) return;
     store.listCategories(workspace.id).then(setCategories).catch((e: Error) => setError({ message: e.message, retryable: false }));
-    store.getBrand(workspace.id).then((b) => setLink((l) => l || b.website_url)).catch(() => {});
+    store
+      .getBrand(workspace.id)
+      .then((b) => {
+        setBrand(b);
+        setLink((l) => l || b.website_url);
+        setLanguage((l) => l || b.language || "");
+      })
+      .catch(() => {});
   }, [store, workspace]);
 
-  async function requestDrafts(): Promise<Batch["result"]> {
+  const detected = useMemo(() => (idea.trim().length >= 3 ? detectCategory(idea, categories) : null), [idea, categories]);
+  const pathOf = (c: Category | undefined) => {
+    if (!c) return undefined;
+    const parent = c.parent_id ? categories.find((p) => p.id === c.parent_id) : null;
+    return parent ? `${parent.name} › ${c.name}` : c.name;
+  };
+
+  /** Applies the category mode: automatic (detected), manual (picked) or custom (typed, optionally saved). */
+  async function resolveCategory(): Promise<{ id: string | null; label?: string }> {
+    if (catMode === "auto") return detected ? { id: detected.category.id, label: pathOf(detected.category) } : { id: null };
+    if (catMode === "manual") {
+      const c = categories.find((x) => x.id === categoryId);
+      return { id: c?.id ?? null, label: pathOf(c) };
+    }
+    const name = customCat.trim().slice(0, 80);
+    if (!name) return { id: null };
+    const existing = categories.find((c) => !c.parent_id && c.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { id: existing.id, label: existing.name };
+    if (!saveCustom) return { id: null, label: name };
+    const created = await store!.addCategory(workspace!.id, name);
+    setCategories((all) => [...all, created]);
+    return { id: created.id, label: created.name };
+  }
+
+  async function requestDrafts(category?: string): Promise<Batch["result"]> {
     const brand = await store!.getBrand(workspace!.id);
-    const cat = categories.find((c) => c.id === categoryId);
-    const parent = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) : null;
-    const category = cat ? (parent ? `${parent.name} › ${cat.name}` : cat.name) : undefined;
     let res: Response;
     try {
       res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea, category, brand }),
+        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand }),
       });
     } catch {
       throw new GenerateError("Could not reach the server. Check your connection and retry.", true);
@@ -91,11 +126,12 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     setNotice(null);
     setAuto(null);
     try {
-      const result = await requestDrafts();
+      const cat = await resolveCategory();
+      const result = await requestDrafts(cat.label);
       setBatch({
         id: crypto.randomUUID(),
         idea: idea.trim(),
-        categoryId: categoryId || null,
+        categoryId: cat.id,
         result,
         drafts: result.drafts,
         selected: result.drafts.map(() => true),
@@ -124,12 +160,13 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     };
     update({});
     try {
-      const result = await requestDrafts();
+      const cat = await resolveCategory();
+      const result = await requestDrafts(cat.label);
       update({ phase: "saving", result });
       const batchId = crypto.randomUUID();
       const saved = await store.saveDrafts(
         workspace.id,
-        result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: categoryId || null, source: result.source, link: cleanLink })),
+        result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: cat.id, source: result.source, link: cleanLink })),
       );
       update({ phase: "images", drafts: saved });
       setIdea("");
@@ -218,16 +255,6 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             maxLength={500}
             onChange={(e) => setIdea(e.target.value)}
           />
-          <label className="sr-only" htmlFor="category">Category</label>
-          <select id="category" className="rounded-md border border-zinc-300 px-3 py-2" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            <option value="">No category</option>
-            {categories
-              .filter((c) => !c.parent_id)
-              .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
-              .map((c) => (
-                <option key={c.id} value={c.id}>{c.parent_id ? `   ${categories.find((p) => p.id === c.parent_id)?.name} › ${c.name}` : c.name}</option>
-              ))}
-          </select>
           <button
             type="submit"
             disabled={busy !== "idle" || idea.trim().length < 3}
@@ -236,6 +263,58 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             {busy === "auto" ? "Making pins…" : "Make 5 complete pins"}
           </button>
         </form>
+        <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+          <span className="font-medium">Category</span>
+          <div className="flex rounded-md bg-zinc-100 p-0.5" role="radiogroup" aria-label="Category mode">
+            {(["auto", "manual", "custom"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={catMode === m}
+                onClick={() => setCatMode(m)}
+                className={`rounded px-2.5 py-1 text-xs font-medium ${catMode === m ? "bg-white shadow-sm" : "text-zinc-600"}`}
+              >
+                {m === "auto" ? "Automatic" : m === "manual" ? "Choose" : "Custom"}
+              </button>
+            ))}
+          </div>
+          {catMode === "auto" && (
+            <span className="text-xs text-zinc-600" aria-live="polite">
+              {idea.trim().length < 3
+                ? "Type a title and the best category is picked for you."
+                : detected
+                  ? <>Detected: <strong>{pathOf(detected.category)}</strong> (matched “{detected.matched.slice(0, 3).join("”, “")}”). <button type="button" className="underline" onClick={() => { setCategoryId(detected.category.id); setCatMode("manual"); }}>Change</button></>
+                  : "No clear match; pins will be made without a category. Use Choose or Custom to set one."}
+            </span>
+          )}
+          {catMode === "manual" && (
+            <select id="category" aria-label="Category" className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+              <option value="">No category</option>
+              {categories
+                .filter((c) => !c.parent_id)
+                .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
+                .map((c) => (
+                  <option key={c.id} value={c.id}>{c.parent_id ? `   ${pathOf(c)}` : c.name}</option>
+                ))}
+            </select>
+          )}
+          {catMode === "custom" && (
+            <>
+              <input aria-label="Custom category" className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" placeholder="e.g. Eid outfits" maxLength={80} value={customCat} onChange={(e) => setCustomCat(e.target.value)} />
+              <label className="flex items-center gap-1.5 text-xs">
+                <input type="checkbox" checked={saveCustom} onChange={(e) => setSaveCustom(e.target.checked)} /> Save to {WORKSPACE_LABELS[kind]} categories
+              </label>
+            </>
+          )}
+          <label className="flex items-center gap-2 sm:ml-auto">
+            <span className="font-medium">Language</span>
+            <select className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="">English</option>
+              {LANGUAGES.filter((l) => l !== "English").map((l) => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </label>
+        </div>
         <label className="mt-3 flex flex-col gap-1 text-sm text-zinc-700 sm:flex-row sm:items-center sm:gap-3">
           <span className="font-medium">Link on these pins</span>
           <input
@@ -297,7 +376,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
                 Review &amp; approve →
               </Link>
               <Link href={`/w/${kind}/drafts`} className="rounded-md px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
-                Edit in Saved drafts
+                Edit in Pin library
               </Link>
             </div>
           )}
@@ -330,6 +409,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
                 index={i}
                 draft={d}
                 source={batch.result.source}
+                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, link: normalizeLink(link) || null }}
                 onChange={(nd) => setBatch({ ...batch, drafts: batch.drafts.map((x, j) => (j === i ? nd : x)) })}
                 footer={
                   <label className="flex items-center gap-2 text-sm">
