@@ -3,7 +3,8 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { PIN_ANGLES } from "@/lib/drafts/angles";
 import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { ProviderError, type TextProvider } from "./types";
+import { z } from "zod";
+import { ProviderError, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
 const SYSTEM = `You write Pinterest pin copy for a content studio.
 For each request you produce exactly five pin drafts, one per creative angle, in the order given.
@@ -13,6 +14,25 @@ Descriptions read naturally, include relevant search keywords, and end with a so
 Alt text literally describes what the image shows for screen-reader users.
 The image prompt describes a vertical 2:3 image a designer or image model could produce.
 Never use any word from the brand's banned list. Do not invent facts, prices, or claims about products.`;
+
+const InsightsSchema = z.object({
+  insights: z
+    .array(
+      z.object({
+        title: z.string(),
+        detail: z.string(),
+        evidence: z.string(),
+        action: z.string(),
+      }),
+    )
+    .max(6),
+});
+
+const INSIGHTS_SYSTEM = `You analyse Pinterest analytics for a content studio.
+Use ONLY the JSON data provided. Never invent metrics, benchmarks, competitor figures or trends that are not in the data.
+Every number you mention must appear in the data exactly (you may round to 1 decimal or show a rate as a percentage).
+In "evidence", name the metric(s) and value(s) you relied on. If the data is too thin to conclude anything, return fewer insights or none.
+Actions must be concrete next steps for pin content (topics, formats, timing) grounded in the evidence.`;
 
 export class AnthropicTextProvider implements TextProvider {
   readonly name = "Claude (Anthropic)";
@@ -24,6 +44,37 @@ export class AnthropicTextProvider implements TextProvider {
     private readonly model: string,
   ) {
     this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 90_000 });
+  }
+
+  async generateInsights(input: InsightsInput): Promise<InsightsOutput> {
+    try {
+      const response = await this.client.beta.messages.parse({
+        model: this.model,
+        max_tokens: 16000,
+        system: INSIGHTS_SYSTEM,
+        messages: [
+          {
+            role: "user",
+            content: `Workspace: ${input.workspace}\nDate range (UTC): ${input.dateRange.start} to ${input.dateRange.end}\n\nData:\n${JSON.stringify(input.data)}`,
+          },
+        ],
+        output_config: { effort: "medium", format: betaZodOutputFormat(InsightsSchema) },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      });
+      if (response.stop_reason === "refusal") throw new ProviderError("The AI provider declined this request.", 422);
+      if (!response.parsed_output) throw new ProviderError("The AI response was incomplete. Please retry.", 502, true);
+      return {
+        insights: response.parsed_output.insights,
+        model: response.model,
+        usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
+      };
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("The AI provider is rate limiting requests. Retry shortly.", 429, true);
+      if (err instanceof Anthropic.APIError) throw new ProviderError(`The AI provider returned an error (${err.status ?? "network"}).`, 502, true);
+      throw err;
+    }
   }
 
   async generateDrafts(req: GenerateRequest): Promise<GenerateResponse> {

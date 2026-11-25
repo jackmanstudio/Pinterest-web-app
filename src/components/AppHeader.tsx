@@ -51,6 +51,7 @@ export function AppHeader() {
           {tab(`/w/${kind}/drafts`, "Saved drafts", section === "drafts")}
           {tab(`/w/${kind}/publish`, "Review & publish", section === "publish")}
           {tab(`/w/${kind}/settings`, "Brand & categories", section === "settings")}
+          {tab(`/w/${kind}/analytics`, "Analytics", section === "analytics")}
           {tab(`/w/${kind}/usage`, "Usage & cost", section === "usage")}
           {tab(`/w/${kind}/pinterest`, "Pinterest", section === "pinterest")}
         </nav>

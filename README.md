@@ -61,6 +61,15 @@ npm run dev                  # http://localhost:3000
 
 To enable publishing: set `PINTEREST_ENABLE_PUBLISHING=true` and `CRON_SECRET`, run migration `0004`, then reconnect each workspace so Pinterest grants the write scopes.
 
+## Phase 5 (this build)
+
+- **Analytics** page per workspace: account overview (impressions, saves, pin clicks, outbound clicks, engagement rate), impressions-per-day chart with hover and table view, top pins by saves, and stats for pins published from the studio
+- Every number comes from a stored snapshot of an official Pinterest v5 response (`/user_account/analytics`, `/user_account/analytics/top_pins`, `/pins/{id}/analytics`) and is shown with its endpoint, UTC date range, fetch time and Sandbox/Production. 7/30/90-day ranges (Pinterest's max is 90 days back)
+- **Pinterest Trends** (`/trends/keywords/{region}/top/{type}`), shown only if Pinterest grants your app access
+- **Growth insights agent** (Claude): reads only the stored snapshots, cites evidence, and any insight quoting a number not in the data is discarded automatically. It is disabled without a real AI key, and it's counted in usage/budget
+- **Competitor tracking** is explicitly marked unavailable: there's no authorised data source
+- Demo mode can preview the layout with clearly labelled SAMPLE data; it's never stored or sent to AI
+
 ## Connect Pinterest
 
 Verified against the official Pinterest v5 docs and OpenAPI spec (Nov 2026).
@@ -101,5 +110,4 @@ npm run build
 ## Next phases
 
 2. Real image generation, usage/cost tracking and budget caps
-5. Analytics and agents (verified data only)
 6. Production hardening
