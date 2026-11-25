@@ -65,14 +65,14 @@ export function StatusSummary({ dark = false }: { dark?: boolean }) {
     { label: "Image AI", value: s.image.source === "ai" ? "Live" : s.image.source === "demo" ? "Demo" : "Off", tone: s.image.source === "ai" ? "ok" : s.image.source === "demo" ? "demo" : "off", title: s.image.provider },
     { label: "Pinterest", value: s.pinterest.configured ? (s.pinterest.env === "sandbox" ? "Sandbox" : "Ready") : "Not set", tone: s.pinterest.configured ? "ok" : "off" },
   ];
-  const dot = { ok: "bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400", demo: "bg-amber-400 shadow-[0_0_6px] shadow-amber-400", off: "bg-zinc-400" };
+  const dot = { ok: "bg-emerald-400", demo: "bg-amber-400", off: "bg-zinc-500" };
   return (
     <ul className={`flex flex-col gap-1.5 text-xs ${dark ? "" : "px-3"}`} aria-label="Integration status">
       {rows.map((r) => (
         <li key={r.label} className="flex items-center gap-1.5" title={r.title}>
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot[r.tone]}`} aria-hidden />
-          <span className={dark ? "text-white/50" : "text-zinc-500"}>{r.label}</span>
-          <span className={`ml-auto font-medium ${dark ? "text-white/85" : "text-zinc-800"}`}>{r.value}</span>
+          <span className={dark ? "text-[#8b8890]" : "text-zinc-500"}>{r.label}</span>
+          <span className={`ml-auto font-medium ${dark ? "text-[#e9e7ea]" : "text-zinc-800"}`}>{r.value}</span>
         </li>
       ))}
     </ul>
