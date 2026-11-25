@@ -80,7 +80,9 @@ export async function POST(request: Request) {
     const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
     let attempts = 1;
-    let image = await brandPinImage(await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)), title, art, { demo: ctx.mode === "demo", angle });
+    const raw = await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
+    // Real AI images are always full size (1000×1500); only labelled placeholders are kept small.
+    let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
     if (image.source === "ai" && image.design.retryPhoto) {
       // The photo itself was weak (blurry or badly exposed): make one more and keep the better pin.
       attempts = 2;
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
       if (signed.error) throw new Error(signed.error.message);
       imageUrl = signed.data.signedUrl;
     } else {
-      // Demo storage keeps the (small, labelled) placeholder inline in the browser.
+      // Demo storage: the browser keeps the image (in IndexedDB), so send it back inline.
       imageUrl = `data:${image.contentType};base64,${Buffer.from(image.bytes).toString("base64")}`;
       imagePath = imageUrl;
     }

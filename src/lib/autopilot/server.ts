@@ -1,4 +1,5 @@
 import "server-only";
+import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn } from "@/lib/supabase/compat";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getImageProvider } from "@/lib/ai/image";
 import { IMAGE_BUCKET, PIN_IMAGE_SIZE } from "@/lib/ai/image/types";
@@ -249,8 +250,10 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       const ledger = new OwnerLedger(admin, ws.owner_id);
       const text = getTextProvider();
       const images = getImageProvider();
-      const brandRes = await admin.from("brand_settings").select("brand_name, voice, audience, website_url, focus_keywords, banned_words, image_style, cta, language, region").eq("workspace_id", ws.workspace_id).maybeSingle();
-      const brand = (brandRes.data as BrandSettings | null) ?? { ...EMPTY_BRAND };
+      const brandSel = (cols: string) => admin.from("brand_settings").select(cols).eq("workspace_id", ws.workspace_id).maybeSingle();
+      let brandRes = await brandSel(`${BRAND_BASE_COLUMNS}, ${BRAND_V8_KEYS.join(", ")}`);
+      if (isMissingColumn(brandRes.error)) brandRes = await brandSel(BRAND_BASE_COLUMNS);
+      const brand: BrandSettings = { ...EMPTY_BRAND, ...((brandRes.data as Partial<BrandSettings> | null) ?? {}) };
 
       await assertWithinBudget(ledger, true);
       const result = await withRetry(() => text.generateDrafts({ workspace: ws.kind, idea: idea.idea, brand }));

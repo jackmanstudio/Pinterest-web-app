@@ -3,9 +3,13 @@ import { IMAGE_BUCKET } from "@/lib/ai/image/types";
 import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
+import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn, isMissingTable, NEEDS_MIGRATION, type DbError } from "@/lib/supabase/compat";
 
-const DRAFT_COLUMNS =
-  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, archived_at, duplicate_of, created_at, updated_at";
+type Res<T> = { data: T | null; error: DbError | null };
+
+const LEGACY_DRAFT_COLUMNS =
+  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, created_at, updated_at";
+const DRAFT_COLUMNS = `${LEGACY_DRAFT_COLUMNS}, archived_at, duplicate_of`;
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -18,20 +22,38 @@ export class SupabaseStore implements Store {
   readonly mode = "supabase" as const;
   constructor(private readonly db: SupabaseClient) {}
 
+  /** Set once the database turns out not to have migration 0008 yet. */
+  private legacy = false;
+
+  /** Runs a draft query with the new columns, falling back to the old ones on an older database. */
+  private async drafts<T>(q: (cols: string) => PromiseLike<Res<T>>): Promise<T> {
+    if (!this.legacy) {
+      const res = await q(DRAFT_COLUMNS);
+      if (!isMissingColumn(res.error)) return check(res);
+      this.legacy = true;
+    }
+    return check(await q(LEGACY_DRAFT_COLUMNS));
+  }
+
   async getWorkspace(kind: WorkspaceKind): Promise<Workspace> {
     return check(await this.db.from("workspaces").select("id, kind, name").eq("kind", kind).single());
   }
   async getBrand(workspaceId: string): Promise<BrandSettings> {
-    const res = await this.db
-      .from("brand_settings")
-      .select("brand_name, voice, audience, website_url, focus_keywords, banned_words, image_style, cta, language, region, pin_template")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
+    const sel = (cols: string) => this.db.from("brand_settings").select(cols).eq("workspace_id", workspaceId).maybeSingle();
+    let res = await sel(`${BRAND_BASE_COLUMNS}, ${BRAND_V8_KEYS.join(", ")}, pin_template`);
+    if (isMissingColumn(res.error)) res = await sel(`${BRAND_BASE_COLUMNS}, pin_template`);
+    if (isMissingColumn(res.error)) res = await sel(BRAND_BASE_COLUMNS);
     if (res.error) throw new Error(res.error.message);
-    return res.data ?? { ...EMPTY_BRAND };
+    return { ...EMPTY_BRAND, ...((res.data as Partial<BrandSettings> | null) ?? {}) };
   }
   async saveBrand(workspaceId: string, brand: BrandSettings) {
-    const res = await this.db.from("brand_settings").upsert({ workspace_id: workspaceId, ...brand });
+    let res = await this.db.from("brand_settings").upsert({ workspace_id: workspaceId, ...brand });
+    if (isMissingColumn(res.error)) {
+      // Older database: save everything it knows about.
+      const older: Record<string, unknown> = { workspace_id: workspaceId, ...brand };
+      for (const k of BRAND_V8_KEYS) delete older[k];
+      res = await this.db.from("brand_settings").upsert(older);
+    }
     if (res.error) throw new Error(res.error.message);
   }
   async listCategories(workspaceId: string): Promise<Category[]> {
@@ -47,21 +69,26 @@ export class SupabaseStore implements Store {
     if (res.error) throw new Error(res.error.message);
   }
   async listDrafts(workspaceId: string): Promise<PinDraft[]> {
-    return check(
-      await this.db.from("pin_drafts").select(DRAFT_COLUMNS).eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-    );
+    return this.drafts((cols) => this.db.from("pin_drafts").select(cols).eq("workspace_id", workspaceId).order("created_at", { ascending: false })) as unknown as Promise<PinDraft[]>;
   }
   async saveDrafts(workspaceId: string, drafts: NewDraft[]): Promise<PinDraft[]> {
     const rows = drafts.map((d) => ({ ...d, workspace_id: workspaceId }));
-    return check(await this.db.from("pin_drafts").insert(rows).select(DRAFT_COLUMNS));
+    const first = await this.db.from("pin_drafts").insert(rows).select(this.legacy ? LEGACY_DRAFT_COLUMNS : DRAFT_COLUMNS);
+    if (!isMissingColumn(first.error)) return check(first) as unknown as PinDraft[];
+    this.legacy = true;
+    // Older database: no duplicate link column yet.
+    const older = rows.map(({ duplicate_of: _dup, ...r }) => r); // eslint-disable-line @typescript-eslint/no-unused-vars
+    return check(await this.db.from("pin_drafts").insert(older).select(LEGACY_DRAFT_COLUMNS)) as unknown as PinDraft[];
   }
   async updateDraft(workspaceId: string, id: string, patch: DraftPatch): Promise<PinDraft> {
-    return check(
-      await this.db.from("pin_drafts").update(patch).eq("workspace_id", workspaceId).eq("id", id).select(DRAFT_COLUMNS).single(),
-    );
+    const res = await this.db.from("pin_drafts").update(patch).eq("workspace_id", workspaceId).eq("id", id).select(this.legacy ? LEGACY_DRAFT_COLUMNS : DRAFT_COLUMNS).single();
+    if (!isMissingColumn(res.error)) return check(res) as unknown as PinDraft;
+    this.legacy = true;
+    if ("archived_at" in patch) throw new Error(NEEDS_MIGRATION);
+    return check(await this.db.from("pin_drafts").update(patch).eq("workspace_id", workspaceId).eq("id", id).select(LEGACY_DRAFT_COLUMNS).single()) as unknown as PinDraft;
   }
   async getDraft(workspaceId: string, id: string): Promise<PinDraft> {
-    return check(await this.db.from("pin_drafts").select(DRAFT_COLUMNS).eq("workspace_id", workspaceId).eq("id", id).single());
+    return this.drafts((cols) => this.db.from("pin_drafts").select(cols).eq("workspace_id", workspaceId).eq("id", id).single()) as unknown as Promise<PinDraft>;
   }
   async setImage(workspaceId: string, id: string): Promise<PinDraft> {
     // The server route already wrote the image; just re-read the row.
@@ -123,15 +150,15 @@ export class SupabaseStore implements Store {
     return copy;
   }
   async listVersions(workspaceId: string, draftId: string): Promise<DraftVersion[]> {
-    return check(
-      await this.db
+    const res = await this.db
         .from("pin_draft_versions")
         .select("id, draft_id, title, description, tags, alt_text, concept, image_prompt, link, changed_by, created_at")
         .eq("workspace_id", workspaceId)
         .eq("draft_id", draftId)
         .order("created_at", { ascending: false })
-        .limit(30),
-    );
+        .limit(30);
+    if (isMissingTable(res.error)) throw new Error(NEEDS_MIGRATION);
+    return check(res) as DraftVersion[];
   }
   async listActivity(workspaceId: string, limit = 200): Promise<AuditEvent[]> {
     return check(

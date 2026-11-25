@@ -2,6 +2,7 @@ import { defaultCategories } from "@/lib/categories/taxonomy";
 import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
+import type { ImageCache } from "@/lib/client/imageCache";
 
 /** Starter taxonomy from the spec: Macro gets all 40 categories, Fashion the first ten. */
 export const DEFAULT_CATEGORIES: Record<WorkspaceKind, string[]> = {
@@ -31,7 +32,11 @@ const uuid = () => crypto.randomUUID();
  */
 export class LocalStore implements Store {
   readonly mode = "demo" as const;
-  constructor(private readonly kv: KeyValue) {}
+  /** `images`: where pin images are kept (IndexedDB in the browser). Without it they stay inline. */
+  constructor(
+    private readonly kv: KeyValue,
+    private readonly images: ImageCache | null = null,
+  ) {}
 
   private key(kind: WorkspaceKind) {
     return `pin-ai-studio:v1:workspace:${kind}`;
@@ -51,7 +56,13 @@ export class LocalStore implements Store {
   }
 
   private write(data: WorkspaceData) {
-    this.kv.setItem(this.key(data.workspace.kind), JSON.stringify(data));
+    try {
+      this.kv.setItem(this.key(data.workspace.kind), JSON.stringify(data));
+    } catch (e) {
+      if ((e as Error).name === "QuotaExceededError" || /quota/i.test((e as Error).message))
+        throw new Error("This browser's storage is full. Delete or archive old pins, or connect Supabase to keep everything online.");
+      throw e;
+    }
   }
 
   private byId(workspaceId: string): WorkspaceData {
@@ -92,7 +103,22 @@ export class LocalStore implements Store {
     d.drafts = d.drafts.map((p) => (p.category_id && gone.has(p.category_id) ? { ...p, category_id: null } : p));
     this.write(d);
   }
+  /** Moves images saved inline by older versions into IndexedDB, freeing localStorage. */
+  private async moveInlineImages(workspaceId: string) {
+    if (!this.images) return;
+    const d = this.byId(workspaceId);
+    const inline = d.drafts.filter((p) => p.image_path?.startsWith("data:"));
+    if (!inline.length) return;
+    for (const p of inline) {
+      const key = `idb:${p.id}:${Date.now()}`;
+      await this.images.put(key, p.image_path!);
+      p.image_path = key;
+    }
+    this.write(d);
+  }
+
   async listDrafts(workspaceId: string) {
+    await this.moveInlineImages(workspaceId).catch(() => {});
     return [...this.byId(workspaceId).drafts].sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
   async saveDrafts(workspaceId: string, drafts: NewDraft[]) {
@@ -158,6 +184,14 @@ export class LocalStore implements Store {
     return found;
   }
   async setImage(workspaceId: string, id: string, image: Pick<PinDraft, "image_status" | "image_path" | "image_source">) {
+    if (this.images && image.image_path?.startsWith("data:")) {
+      // Keep the picture in IndexedDB and only a short key in localStorage.
+      const key = `idb:${id}:${Date.now()}`;
+      await this.images.put(key, image.image_path);
+      const old = this.byId(workspaceId).drafts.find((p) => p.id === id)?.image_path;
+      if (old?.startsWith("idb:")) await this.images.remove(old).catch(() => {});
+      image = { ...image, image_path: key };
+    }
     const d = this.byId(workspaceId);
     const i = d.drafts.findIndex((p) => p.id === id);
     if (i < 0) throw new Error("Draft not found in this workspace");
@@ -166,7 +200,9 @@ export class LocalStore implements Store {
     return d.drafts[i];
   }
   async imageUrl(draft: PinDraft) {
-    return draft.image_status === "ready" ? draft.image_path : null;
+    if (draft.image_status !== "ready" || !draft.image_path) return null;
+    if (draft.image_path.startsWith("idb:")) return this.images ? this.images.get(draft.image_path) : null;
+    return draft.image_path;
   }
   async transition(workspaceId: string, id: string, action: WorkflowAction, opts: TransitionOptions = {}) {
     if (LIVE_ACTIONS.includes(action) || action === "cancel_schedule") {
@@ -219,6 +255,8 @@ export class LocalStore implements Store {
   }
   async deleteDraft(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);
+    const path = d.drafts.find((p) => p.id === id)?.image_path;
+    if (this.images && path?.startsWith("idb:")) await this.images.remove(path).catch(() => {});
     d.drafts = d.drafts.filter((p) => p.id !== id);
     d.versions = (d.versions ?? []).filter((v) => v.draft_id !== id);
     this.write(d);
