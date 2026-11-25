@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getTextProvider } from "@/lib/ai/text";
@@ -17,6 +18,8 @@ const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS) });
  * drops any insight that quotes a number not present in that data.
  */
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "insights");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   try {

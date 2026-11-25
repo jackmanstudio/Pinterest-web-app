@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { getTextProvider } from "@/lib/ai/text";
 import { ProviderError } from "@/lib/ai/text/types";
@@ -10,6 +11,8 @@ import { estimateTextCost } from "@/lib/usage/pricing";
 import type { GenerateResponse } from "@/lib/types";
 
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "generate");
+  if (limitedRes) return limitedRes;
   let body: unknown;
   try {
     body = await request.json();

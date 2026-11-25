@@ -12,6 +12,7 @@ export function AppHeader() {
   if (path.startsWith("/login")) return null;
   const seg = path.split("/");
   const kind = seg[1] === "w" && isWorkspaceKind(seg[2] ?? "") ? seg[2] : "fashion";
+  const inWorkspace = seg[1] === "w";
   const section = seg[3] ?? "";
 
   const signOut = async () => {
@@ -47,7 +48,7 @@ export function AppHeader() {
           ))}
         </nav>
         <nav className="flex gap-1" aria-label="Sections">
-          {tab(`/w/${kind}`, "Studio", section === "")}
+          {tab(`/w/${kind}`, "Studio", inWorkspace && section === "")}
           {tab(`/w/${kind}/drafts`, "Saved drafts", section === "drafts")}
           {tab(`/w/${kind}/publish`, "Review & publish", section === "publish")}
           {tab(`/w/${kind}/settings`, "Brand & categories", section === "settings")}
@@ -55,11 +56,16 @@ export function AppHeader() {
           {tab(`/w/${kind}/usage`, "Usage & cost", section === "usage")}
           {tab(`/w/${kind}/pinterest`, "Pinterest", section === "pinterest")}
         </nav>
-        {isSupabaseConfigured && (
-          <button onClick={signOut} className="ml-auto text-sm text-zinc-600 hover:text-zinc-900">
-            Sign out
-          </button>
-        )}
+        <div className="ml-auto flex items-center gap-3">
+          <Link href="/account" className={`text-sm ${path === "/account" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
+            Account &amp; data
+          </Link>
+          {isSupabaseConfigured && (
+            <button onClick={signOut} className="text-sm text-zinc-600 hover:text-zinc-900">
+              Sign out
+            </button>
+          )}
+        </div>
       </div>
       <div className="mx-auto max-w-6xl px-4 pb-3">
         <StatusBar />

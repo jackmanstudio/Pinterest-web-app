@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { parseTrends } from "@/lib/analytics/parse";
@@ -19,6 +20,8 @@ const Body = z.object({
 
 /** Pinterest Trends (official endpoint). Stored with source and date; never estimated. */
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "pinterest");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   try {

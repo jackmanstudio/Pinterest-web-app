@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getImageProvider } from "@/lib/ai/image";
@@ -16,6 +17,8 @@ const Body = z.object({
 });
 
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "images");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { workspace, draftId } = parsed.data;

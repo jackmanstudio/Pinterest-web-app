@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pinterestContext } from "@/lib/pinterest/server";
@@ -10,6 +11,8 @@ const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS) });
 
 /** Read-only sync of boards and pins. Never creates, edits or deletes anything on Pinterest. */
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "pinterest");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 

@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { PinterestApi } from "@/lib/pinterest/api";
@@ -25,6 +26,8 @@ const Body = z.object({
 });
 
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "publish");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const b = parsed.data;

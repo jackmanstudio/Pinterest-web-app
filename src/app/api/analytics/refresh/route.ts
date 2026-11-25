@@ -1,3 +1,4 @@
+import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { dateRange, parseAccountAnalytics, parsePinSummary, parseTopPins } from "@/lib/analytics/parse";
@@ -13,6 +14,8 @@ const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS), days: z.union([z.lit
 
 /** Pulls verified analytics from Pinterest and stores each response as a snapshot. Read-only. */
 export async function POST(request: Request) {
+  const limitedRes = rateLimited(request, "pinterest");
+  if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   let pc: Awaited<ReturnType<typeof pinterestContext>>;

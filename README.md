@@ -10,6 +10,8 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
 | Image AI | **Pipeline built, no real provider yet.** Generates labelled DEMO placeholder images through the same route, storage and ledger a real provider will use. Adding a provider = one adapter in `src/lib/ai/image/`. |
 | Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
+| Production hardening | **Built.** Rate limits, security headers, structured logs, `/api/health`, data export and account deletion, CI. Rate limits are in-memory (one server instance); swap in Redis/Upstash for multi-instance hosting. |
+| Competitor tracking | **Not available.** Pinterest v5 has no API for other accounts' analytics, so this is intentionally not built. |
 | Pinterest API v5 | **OAuth, sync and approval-based publishing built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Publishing is off until `PINTEREST_ENABLE_PUBLISHING=true`, and every publish needs approval plus confirmation. |
 
 ## Phase 1 scope (this build)
@@ -89,13 +91,44 @@ Verified against the official Pinterest v5 docs and OpenAPI spec (Nov 2026).
 
 The migration creates both workspaces for every new user, enables row-level security on all tables, and uses composite foreign keys so a draft can't reference a category from the other workspace.
 
+## Phase 6: production readiness (this build)
+
+- **Row-level security** on every table, tested on real Postgres (`supabase/tests/10_rls_test.sql`, 22 checks): workspace isolation, draft-status guards, Pinterest tokens invisible to users, one publish job per draft, single job claim, storage folders per workspace.
+- **Token protection:** Pinterest tokens are AES-256-GCM encrypted (`TOKEN_ENCRYPTION_KEY`), stored in a table with no user policies, and only read by server code. AI keys never reach the browser. Logs redact any field named like a token, secret, key, password, cookie or authorization.
+- **Rate limiting** (per signed-in user, else per IP, per minute): generate 20, images 10, insights 5, Pinterest sync/trends/refresh 10, workflow actions 30, account export/delete 5. Over the limit returns 429 with `Retry-After`.
+- **Cost caps:** `AI_MONTHLY_BUDGET_USD` stops paid AI calls; the ledger is visible under *Usage & cost*.
+- **Audit log:** every review, approval, schedule, publish attempt, export and account deletion is recorded in `audit_events`.
+- **Security headers:** CSP (`frame-ancestors 'none'`, `object-src 'none'`), `X-Frame-Options: DENY`, `nosniff`, HSTS, strict referrer, permissions policy; `no-store` on every API response.
+- **Monitoring:** `GET /api/health` returns which integrations are configured and whether the database answers (503 if not), with no secrets. Server errors go out as one-line JSON logs via `instrumentation.ts`, ready for any log drain (Vercel, Datadog, Axiom). Point an uptime monitor at `/api/health`.
+- **Export & delete:** *Account & data* (top right) downloads a JSON export of both workspaces (never tokens) and deletes the account after typing `DELETE MY ACCOUNT`. Deletion removes images, drafts, connections and the auth user; pins already on Pinterest are left alone. In Demo mode the same page exports or clears browser data.
+- **Automated tests:** unit tests (`npm test`), database tests (below) and GitHub Actions CI (`.github/workflows/ci.yml`) on every push and PR.
+
+### Backup and recovery
+
+- **Database:** Supabase takes daily backups on paid plans; turn on Point-in-Time Recovery (Project settings → Add-ons) to restore to any second. For an extra off-site copy, run `supabase db dump` on a schedule.
+- **Images:** Supabase Storage is not included in database backups. Copy the `pin-images` bucket periodically (S3-compatible API or `supabase storage` CLI) if images must survive a project loss.
+- **Schema:** everything is in `supabase/migrations/`, so a new project can be rebuilt by running them in order.
+- **Per user:** the export endpoint gives each user a full JSON copy of their content.
+- **Pinterest:** the source of truth for published pins stays on Pinterest; a sync re-imports boards and pins.
+
+### Production checklist
+
+1. Supabase project created, migrations applied, auth redirect URLs set, PITR on.
+2. All env vars from `.env.example` set on the host; `TOKEN_ENCRYPTION_KEY` and `CRON_SECRET` are random 32-byte values, stored only there.
+3. Pinterest app redirect URI set to `https://<your-domain>/api/pinterest/callback`, Standard access approved before publishing for real.
+4. `AI_MONTHLY_BUDGET_USD` set to a figure you are comfortable with.
+5. Scheduler calling `POST /api/cron/publish-due` with `Authorization: Bearer $CRON_SECRET` every 5 minutes (only needed for scheduled pins).
+6. Uptime monitor on `/api/health`, log drain connected.
+7. CI green.
+
 ## Checks
 
 ```bash
-npm test          # unit tests (distinctness, demo provider, workspace isolation, provider selection)
+npm test          # unit tests
 npm run typecheck
 npm run lint
 npm run build
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres scripts/test-db.sh   # migrations + RLS tests on a throwaway DB
 ```
 
 ## Layout
@@ -107,7 +140,6 @@ npm run build
 - `src/app/api/status` – integration status for the UI (never returns secrets)
 - `supabase/migrations/` – schema, RLS and signup bootstrap
 
-## Next phases
+## Still needs your accounts
 
-2. Real image generation, usage/cost tracking and budget caps
-6. Production hardening
+The code for all six phases is in place. What remains needs accounts only you can create: a Supabase project, a Claude API key, an image provider choice, a Pinterest developer app, and a host to deploy to. See *Production checklist* above.
