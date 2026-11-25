@@ -315,7 +315,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               onClick={() => setSource(m)}
               className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 font-medium ${source === m ? "bg-white shadow-sm" : "text-zinc-600"}`}
             >
-              {m === "idea" ? "From an idea" : "From a link (blog post or product)"}
+              {m === "idea" ? "From an idea" : <>From a link<span className="hidden sm:inline"> (blog post or product)</span></>}
             </button>
           ))}
         </div>

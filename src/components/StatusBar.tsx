@@ -30,7 +30,7 @@ export function StatusBar() {
   if (err) return <Pill tone="off">Status unavailable</Pill>;
   if (!s) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5" aria-label="Integration status">
+    <div className="-mx-4 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0" aria-label="Integration status">
       {s.storage === "supabase" ? <Pill tone="ok">Storage: Supabase</Pill> : <Pill tone="demo">Storage: Demo (this browser only)</Pill>}
       {s.text.source === "ai" ? <Pill tone="ok">Text AI: {s.text.provider}</Pill> : <Pill tone="demo">Text AI: Demo templates</Pill>}
       {s.image.source === "ai" ? (

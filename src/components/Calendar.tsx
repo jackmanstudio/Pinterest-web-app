@@ -74,7 +74,7 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
           <button onClick={() => setCursor(new Date())} className="ml-1 text-xs underline">Today</button>
         </div>
         <span className="ml-auto text-xs text-zinc-600">
-          {count("published")} published · {count("scheduled")} scheduled · {count("created")} drafts in view
+          {count("published")} published · {count("scheduled")} scheduled · {count("created")} not scheduled yet (draft, in review or approved)
         </span>
       </div>
 

@@ -26,7 +26,7 @@ export function AppHeader() {
   const tab = (href: string, label: string, active: boolean) => (
     <Link
       href={href}
-      className={`rounded-md px-3 py-1.5 text-sm font-medium ${active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"}`}
+      className={`shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ${active ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"}`}
     >
       {label}
     </Link>
@@ -49,7 +49,7 @@ export function AppHeader() {
             </Link>
           ))}
         </nav>
-        <nav className="flex flex-wrap gap-1" aria-label="Sections">
+        <nav className="-mx-4 flex w-[calc(100%+2rem)] gap-1 overflow-x-auto px-4 sm:mx-0 sm:w-auto sm:flex-wrap sm:overflow-visible sm:px-0" aria-label="Sections">
           {tab(`/w/${kind}`, "Studio", inWorkspace && section === "")}
           {tab(`/w/${kind}/drafts`, "Pin library", section === "drafts")}
           {tab(`/w/${kind}/calendar`, "Calendar", section === "calendar")}

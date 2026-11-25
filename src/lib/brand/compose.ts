@@ -66,7 +66,7 @@ export async function composePin({ base, title, template, logo, size, quality = 
   design: DesignReport;
 }> {
   const { width: W, height: H } = size;
-  const resized = await sharp(Buffer.from(base), { density: 144 }).resize(W, H, { fit: "cover", position: "attention" }).toBuffer();
+  const resized = await sharp(Buffer.from(base), { density: 144 }).resize(W, H, { fit: "cover", position: pagePhoto ? "north" : "attention" }).toBuffer();
   const logoHref = logo ? `data:${logo.contentType};base64,${Buffer.from(logo.bytes).toString("base64")}` : null;
   const measured = await measurePhoto(resized).catch(() => null);
   const picked = title.trim() ? layoutFor(template, angle, title) : null;
