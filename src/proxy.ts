@@ -10,6 +10,9 @@ const PUBLIC = [/^\/robots\.txt$/, /^\/login/, /^\/signup/, /^\/forgot-password/
 /** Refreshes the Supabase session and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
   if (!isSupabaseConfigured) return demoGate(request);
+  // No Supabase auth cookie means nobody is signed in: skip the network call to Supabase entirely.
+  const hasSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  if (!hasSession) return signedOut(request);
 
   let response = NextResponse.next({ request });
   const remember = readRemember((n) => request.cookies.get(n)?.value);
@@ -32,12 +35,7 @@ export async function proxy(request: NextRequest) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
     }
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    // Come back to the page they asked for after signing in.
-    if (path !== "/") url.searchParams.set("next", path + request.nextUrl.search);
-    return NextResponse.redirect(url);
+    return toLogin(request);
   }
   // Signed-in users don't need the sign-in pages.
   if (data.user && /^\/(login|signup|forgot-password)/.test(path)) {
@@ -47,6 +45,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
   return response;
+}
+
+/** A visitor without any session: public pages pass, the home page shows sign-in in place, the rest go to /login. */
+function signedOut(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  if (PUBLIC.some((r) => r.test(path))) return NextResponse.next();
+  if (path.startsWith("/api/")) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  return toLogin(request);
+}
+
+/**
+ * Sends a signed-out visitor to sign in. The home page shows the sign-in page in place (no redirect hop,
+ * which costs a full round trip on phones); other pages redirect to /login?next=… so they come back after.
+ */
+function toLogin(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  if (path === "/") return NextResponse.rewrite(url);
+  url.searchParams.set("next", path + request.nextUrl.search);
+  return NextResponse.redirect(url);
 }
 
 /**
@@ -59,11 +79,7 @@ function demoGate(request: NextRequest) {
   const signedIn = request.cookies.get(DEMO_COOKIE)?.value === "1";
   const isPublic = PUBLIC.some((r) => r.test(path)) || path.startsWith("/api/");
   if (!signedIn && !isPublic) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = "";
-    if (path !== "/") url.searchParams.set("next", path + request.nextUrl.search);
-    return NextResponse.redirect(url);
+    return toLogin(request);
   }
   if (signedIn && /^\/(login|signup|forgot-password)/.test(path)) {
     const url = request.nextUrl.clone();

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "./NavLink";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { demoSignOut } from "@/lib/auth/demo";
 import { WORKSPACE_KINDS, WORKSPACE_LABELS, isWorkspaceKind } from "@/lib/types";
@@ -45,11 +45,13 @@ const GROUPS: { title: string; items: Item[] }[] = [
   { title: "Setup", items: [{ section: "settings", label: "Brand & categories", icon: "brand" }, { section: "pinterest", label: "Pinterest", icon: "pin" }] },
 ];
 
-const AUTH = /^\/(login|signup|forgot-password|reset-password)/;
+const AUTH_SEGMENTS = new Set(["login", "signup", "forgot-password", "reset-password"]);
 
 /** App frame for signed-in pages: sidebar on desktop, top bar + drawer + bottom tabs on phones. */
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
+  // The route actually rendered, not the address bar: "/" shows the sign-in page in place for signed-out visitors.
+  const segment = useSelectedLayoutSegment();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [lastPath, setLastPath] = useState(path);
@@ -65,7 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, [open]);
 
-  if (AUTH.test(path)) return <main className="flex-1">{children}</main>;
+  if (segment && AUTH_SEGMENTS.has(segment)) return <main className="flex-1">{children}</main>;
 
   const seg = path.split("/");
   const inWorkspace = seg[1] === "w" && isWorkspaceKind(seg[2] ?? "");
