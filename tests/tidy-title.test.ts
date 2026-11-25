@@ -26,3 +26,47 @@ describe("title keyword check", async () => {
     expect(reviewDraft({ ...base, title: "عید کے لیے خوبصورت لباس" }, { idea: "Eid outfits" }).checks.map((c) => c.id)).not.toContain("title-keyword");
   });
 });
+
+describe("SEO titles are enforced", async () => {
+  const { ensureSeoTitle, mainKeyword, tidyDrafts } = await import("@/lib/drafts/tidyTitle");
+  it("derives the main keyword from the idea", () => {
+    expect(mainKeyword("Small living room decor ideas on a budget")).toBe("Small Living Room Decor Ideas on a Budget");
+    expect(mainKeyword("Easy meal prep for busy weeknights")).toBe("Easy Meal Prep for Busy Weeknights");
+    expect(mainKeyword("Winter shawl styling tips")).toBe("Winter Shawl Styling");
+  });
+  it("fixes the QA titles: keyword first, at least 40 characters", () => {
+    const cases: [string, string][] = [
+      ["Budget Decor: 5 ideas", "Small living room decor ideas on a budget"],
+      ["Cozy Nights: easy meals", "Easy meal prep for busy weeknights"],
+      ["Autumn Layers: 5 Trench Coat", "Layering a trench coat for autumn"],
+      ["Tiny Room: maximize every inch", "Small living room decor ideas on a budget"],
+      ["Meal Prep: fast dinners", "Easy meal prep for busy weeknights"],
+    ];
+    for (const [title, idea] of cases) {
+      const out = ensureSeoTitle(title, idea);
+      expect(out.length, out).toBeGreaterThanOrEqual(40);
+      expect(out.length, out).toBeLessThanOrEqual(100);
+    }
+    expect(ensureSeoTitle("Cozy Nights: easy meals", "Easy meal prep for busy weeknights")).toBe("Easy Meal Prep for Busy Weeknights: easy meals");
+    expect(ensureSeoTitle("Budget Decor: 5 ideas", "Small living room decor ideas on a budget")).toBe("Small Living Room Decor Ideas on a Budget: 5 ideas");
+  });
+  it("leaves good titles alone and skips other languages", () => {
+    const good = "Small Living Room Decor: 7 budget ideas that make it feel bigger";
+    expect(ensureSeoTitle(good, "Small living room decor ideas on a budget")).toBe(good);
+    const ur = [{ title: "عید کے لیے لباس" }];
+    expect(tidyDrafts(ur, "Eid outfits", "Urdu")).toEqual(ur);
+  });
+});
+
+describe("descriptions and off-season words", async () => {
+  const { tidyDescription, dropOffSeason } = await import("@/lib/drafts/tidyTitle");
+  it("fixes the comma before the call to action", () => {
+    expect(tidyDescription("Cozy layers for small rooms, Save this pin for later.")).toBe("Cozy layers for small rooms. Save this pin for later.");
+  });
+  it("drops a season the idea doesn't mention when it's out of season", () => {
+    const nov = new Date("2026-11-25T12:00:00Z");
+    expect(dropOffSeason("Summer small living room refresh", "Small living room decor", nov)).toBe("Small living room refresh");
+    expect(dropOffSeason("Summer Linen Outfits", "Summer linen outfits", nov)).toBe("Summer Linen Outfits");
+    expect(dropOffSeason("Cozy winter living room", "Small living room decor", nov)).toBe("Cozy winter living room");
+  });
+});

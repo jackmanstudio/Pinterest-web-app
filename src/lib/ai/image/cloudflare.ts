@@ -56,7 +56,7 @@ export class CloudflareImageProvider implements ImageProvider {
     if (!res.ok || body?.success === false) {
       const msg = body?.errors?.map((e) => e.message).filter(Boolean).join("; ") || `HTTP ${res.status}`;
       if (res.status === 401 || res.status === 403) throw new ProviderError(`Cloudflare rejected the credentials. Check CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN (needs Workers AI permission). ${msg}`, 502, false);
-      if (res.status === 429 || /neuron|limit|quota/i.test(msg)) throw new ProviderError(`Cloudflare's daily free image limit was reached; it resets daily. (${msg})`, 429, false);
+      if (res.status === 429 || /neuron|limit|quota/i.test(msg)) throw new ProviderError("Daily AI limit reached: today's free image allowance is used up. It resets at midnight UTC. The pin text is saved; press Retry image tomorrow or after upgrading the plan.", 429, false);
       const retryable = res.status >= 500;
       throw new ProviderError(`Image generation failed: ${msg}`, retryable ? 503 : 502, retryable);
     }

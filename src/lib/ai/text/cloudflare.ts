@@ -87,7 +87,7 @@ export class CloudflareTextProvider implements TextProvider {
     if (!res.ok || body?.success === false) {
       const msg = body?.errors?.map((e) => e.message).filter(Boolean).join("; ") || `HTTP ${res.status}`;
       if (res.status === 401 || res.status === 403) throw new ProviderError("Cloudflare rejected the credentials for text AI. Check CLOUDFLARE_API_TOKEN (needs Workers AI permission).", 502, false);
-      if (res.status === 429 || /neuron|limit|quota/i.test(msg)) throw new ProviderError(`Cloudflare's daily free AI allowance is used up; it resets daily. (${msg})`, 429, false);
+      if (res.status === 429 || /neuron|limit|quota/i.test(msg)) throw new ProviderError("Daily AI limit reached: today's free AI allowance is used up. It resets at midnight UTC. Your saved pins are safe and can still be edited.", 429, false);
       throw new ProviderError(`Text generation failed: ${msg}`, res.status >= 500 ? 503 : 502, res.status >= 500);
     }
     let out = body?.result?.response;

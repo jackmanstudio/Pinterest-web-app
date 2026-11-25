@@ -99,7 +99,7 @@ describe("Cloudflare image adapter", () => {
   });
   it("explains the daily free limit", async () => {
     const p = new CloudflareImageProvider({ accountId: "a", apiToken: "t", fetchImpl: (async () => json(429, { success: false, errors: [{ message: "neurons exhausted" }] })) as unknown as typeof fetch });
-    await expect(p.generate("x")).rejects.toThrow(/daily free image limit/);
+    await expect(p.generate("x")).rejects.toThrow(/Daily AI limit reached/);
   });
 });
 

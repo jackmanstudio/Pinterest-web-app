@@ -1,7 +1,10 @@
+import { seasonTiming } from "@/lib/seo/seasonality";
+
 /**
  * Small, safe clean-ups for English pin titles from any provider: repeated
  * words or phrases, a second season tacked on, "Ideas Is", and capitalised
- * joining words in Title Case. It never adds new words.
+ * joining words in Title Case. tidyTitle never adds words; ensureSeoTitle
+ * (used by tidyDrafts) adds the main keyword or length when a title lacks them.
  */
 const SEASONS = ["spring", "summer", "autumn", "fall", "winter"];
 const SMALL = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "with", "vs", "from", "into", "nor"]);
@@ -51,8 +54,85 @@ export function tidyTitle(raw: string, idea = ""): string {
   return fixCase(t.replace(/\s+([:?!,])/g, "$1").trim());
 }
 
-/** Tidies English titles in a set of drafts (other languages are left as written). */
-export function tidyDrafts<T extends { title: string }>(drafts: T[], idea: string, language?: string | null): T[] {
+const GENERIC = new Set(["ideas", "idea", "tips", "guide", "inspiration", "easy", "best", "simple", "ways", "budget"]);
+const TRAIL = new Set(["ideas", "idea", "tips", "guide", "inspiration"]);
+const keyWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9'\s-]/g, " ").split(/\s+/).filter((w) => w.length > 3 && !GENERIC.has(w));
+
+/** Does the title carry the idea's main keyword? (At least half of its key words, or the one there is.) */
+export function hasMainKeyword(title: string, idea: string): boolean {
+  const keys = [...new Set(keyWords(idea))];
+  if (!keys.length) return true;
+  const t = title.toLowerCase();
+  const hits = keys.filter((w) => t.includes(w.replace(/s$/, ""))).length;
+  return hits >= (keys.length >= 3 ? Math.ceil(keys.length / 2) : 1);
+}
+
+/** The idea as a headline keyword: Title Case, without trailing filler like "ideas" or "tips", at most ~50 characters. */
+export function mainKeyword(idea: string): string {
+  let words = idea.trim().replace(/[.!?]+$/, "").split(/\s+/);
+  while (words.length > 2 && TRAIL.has(words[words.length - 1].toLowerCase())) words = words.slice(0, -1);
+  let out = "";
+  for (const w of words) {
+    if ((out + " " + w).trim().length > 50) break;
+    out = `${out} ${w}`.trim();
+  }
+  out = out.replace(/\s+(for|on|with|in|and|to|of|a|the)$/i, "");
+  return fixCase(out.split(" ").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" "));
+}
+
+export const MIN_TITLE = 40;
+
+/**
+ * Makes sure an English title works for Pinterest search: it leads with the
+ * idea's main keyword when it lacks it, and short titles are lengthened.
+ * Titles are never cut, and never longer than the 100-character limit.
+ */
+export function ensureSeoTitle(title: string, idea: string, max = 100): string {
+  let t = title.trim();
+  const [head, ...rest] = t.split(":");
+  const hook = rest.join(":").trim();
+  if (!hasMainKeyword(t, idea)) {
+    const k = mainKeyword(idea);
+    const candidate = `${k}: ${hook || head.trim()}`;
+    if (k && candidate.length <= max) t = candidate;
+  }
+  if (t.length < MIN_TITLE && hook) {
+    // Short "Head: hook" → lead with the full keyword instead of the short head.
+    const k = mainKeyword(idea);
+    if (k.length > head.trim().length && `${k}: ${hook}`.length <= max) t = `${k}: ${hook}`;
+  }
+  if (t.length < MIN_TITLE) {
+    const extra = t.includes(":") ? " to Save and Try" : ": Ideas Worth Saving";
+    if ((t + extra).length <= max) t = t + extra;
+  }
+  return t;
+}
+
+/** ", Save this pin for later." → ". Save this pin for later." */
+export function tidyDescription(desc: string): string {
+  return desc.replace(/,\s+(Save|Pin|Tap|Click)\b/g, ". $1").replace(/,\s*$/, ".");
+}
+
+/**
+ * A season the idea never mentions, out of season today ("Summer … refresh"
+ * in November), is dropped from the title.
+ */
+export function dropOffSeason(title: string, idea: string, now = new Date()): string {
+  let t = title;
+  for (const s of SEASONS) {
+    const status = seasonTiming(s, now).status;
+    if (status === "ahead" || status === "peak" || status === "evergreen" || new RegExp(`\\b${s}\\b`, "i").test(idea)) continue;
+    t = t.replace(new RegExp(`\\b${s}('s)?\\s+`, "i"), "").replace(new RegExp(`\\s+(for|this|in)\\s+${s}\\b`, "i"), "");
+  }
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Tidies English titles and descriptions in a set of drafts (other languages are left as written). */
+export function tidyDrafts<T extends { title: string; description?: string }>(drafts: T[], idea: string, language?: string | null, now = new Date()): T[] {
   if (language && !/^english$/i.test(language.trim())) return drafts;
-  return drafts.map((d) => ({ ...d, title: tidyTitle(d.title, idea) }));
+  return drafts.map((d) => ({
+    ...d,
+    title: ensureSeoTitle(tidyTitle(dropOffSeason(d.title, idea, now), idea), idea),
+    ...(typeof d.description === "string" ? { description: tidyDescription(d.description) } : {}),
+  }));
 }
