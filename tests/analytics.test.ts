@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compactNumber, dateRange, freshness, parseAccountAnalytics, parsePinSummary, parseTopPins, parseTrends } from "@/lib/analytics/parse";
 import { allowedNumbers, quotedNumbers, verifyInsights } from "@/lib/analytics/verify";
 import { DemoTextProvider } from "@/lib/ai/text/demo";
+import type { TextProvider } from "@/lib/ai/text/types";
 
 describe("analytics parsing", () => {
   it("clamps ranges to Pinterest's 90-day window", () => {
@@ -56,6 +57,7 @@ describe("insight verification", () => {
     expect(r.dropped).toEqual([invented]);
   });
   it("the demo text provider cannot generate insights", () => {
-    expect(new DemoTextProvider().generateInsights).toBeUndefined();
+    const p: TextProvider = new DemoTextProvider();
+    expect(p.generateInsights).toBeUndefined();
   });
 });
