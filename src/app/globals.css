@@ -18,80 +18,24 @@ body {
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-MediumItalic.ttf") format("truetype"); font-weight: 500; font-style: italic; font-display: swap; }
 
-/* ================= Midnight Pro theme (signed-in app only) =================
-   Near-black surfaces, hairline borders, one red glow, Inter / Inter Tight.
-   Pages were built with light utilities; inside .app-main they are remapped here
-   so every page follows the same dark theme without rewriting each one. */
+/* ================= Pin Wall theme (signed-in app) =================
+   White, Pinterest-like: rounded pills, bold black, Pinterest red #e60023. */
 @theme inline {
   --font-display: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
 }
-.mp-body { background: #08080a; color: #e9e7ea; font-family: var(--font-inter), system-ui, sans-serif; color-scheme: dark; }
-.mp-glow { background: radial-gradient(900px 300px at 70% -120px, rgb(230 0 35 / 0.16), transparent 70%); }
-.app-main { color: #e9e7ea; }
-.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.02em; color: #fff; }
-.app-main h1 { font-weight: 650; }
-
-/* surfaces */
-.app-main .bg-white, .app-main .bg-white\/90, .app-main .bg-white\/80 { background-color: #0f0f12; }
-.app-main .bg-zinc-50, .app-main .bg-stone-50 { background-color: #141417; }
-.app-main .bg-zinc-100 { background-color: #1a1a1f; }
-.app-main .bg-zinc-200 { background-color: #26262c; }
-.app-main .bg-zinc-900 { background-color: #f2f0f3; color: #0b0b0d; }
-.app-main .bg-zinc-900.text-white, .app-main .bg-zinc-900 .text-white { color: #0b0b0d; }
-.app-main .hover\:bg-zinc-50:hover, .app-main .hover\:bg-zinc-100:hover { background-color: #1b1b20; }
-.app-main .hover\:bg-zinc-200:hover { background-color: #26262c; }
-.app-main .hover\:bg-zinc-800:hover { background-color: #ffffff; }
+.pw-body { background: #fff; color: #111; font-family: var(--font-inter), system-ui, sans-serif; }
+.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.02em; color: #111; }
+.app-main h1 { font-weight: 700; }
 .app-main .bg-red-700, .app-main .bg-red-600 { background-color: #e60023; }
-.app-main .hover\:bg-red-800:hover { background-color: #c8001e; }
-
-/* text */
-.app-main .text-zinc-900, .app-main .text-zinc-800 { color: #f3f1f4; }
-.app-main .text-zinc-700 { color: #cfcbd2; }
-.app-main .text-zinc-600 { color: #a6a2aa; }
-.app-main .text-zinc-500 { color: #8b8890; }
-.app-main .text-zinc-400 { color: #6c6970; }
-.app-main .hover\:text-zinc-900:hover { color: #fff; }
-.app-main .text-red-700, .app-main .text-rose-600 { color: #ff4d6a; }
-.app-main .text-red-800, .app-main .text-red-900 { color: #ff8095; }
-.app-main :is(.text-amber-700, .text-amber-800, .text-amber-900) { color: #fcd34d; }
-.app-main :is(.text-emerald-600, .text-emerald-700, .text-emerald-800) { color: #6ee7b7; }
-.app-main :is(.text-sky-800, .text-sky-900) { color: #7dd3fc; }
-.app-main .text-violet-800 { color: #c4b5fd; }
-
-/* tints */
-.app-main :is(.bg-amber-50, .bg-amber-100) { background-color: rgb(245 158 11 / 0.1); }
-.app-main :is(.bg-emerald-50, .bg-emerald-100) { background-color: rgb(16 185 129 / 0.1); }
-.app-main :is(.bg-red-50, .bg-red-100, .bg-rose-50) { background-color: rgb(230 0 35 / 0.1); }
-.app-main :is(.bg-sky-50, .bg-sky-100) { background-color: rgb(14 165 233 / 0.1); }
-.app-main :is(.bg-violet-50, .bg-violet-100) { background-color: rgb(139 92 246 / 0.12); }
-
-/* lines */
-.app-main :is(.border-zinc-100, .border-zinc-200) { border-color: #1f1e22; }
-.app-main .border-zinc-300 { border-color: #2a292e; }
-.app-main :is(.border-amber-200, .border-amber-300) { border-color: rgb(245 158 11 / 0.3); }
-.app-main :is(.border-red-200, .border-red-300) { border-color: rgb(230 0 35 / 0.35); }
-.app-main .border-emerald-200 { border-color: rgb(16 185 129 / 0.3); }
-.app-main :is(.ring-zinc-100, .ring-zinc-200, .ring-zinc-900\/5) { --tw-ring-color: #232227; }
-.app-main :is(.ring-amber-200, .ring-amber-300) { --tw-ring-color: rgb(245 158 11 / 0.3); }
-.app-main :is(.ring-emerald-200) { --tw-ring-color: rgb(16 185 129 / 0.3); }
-.app-main .divide-zinc-100 > * + * { border-color: #1d1c20; }
-.app-main .shadow-sm, .app-main .shadow, .app-main .shadow-md { --tw-shadow: 0 0 #0000; box-shadow: none; }
-
-/* cards: flat, hairline, slight lift on hover */
-.app-main :is(.rounded-xl, .rounded-2xl, .rounded-lg).bg-white { border-color: #1f1e22; }
-.app-main a:is(.rounded-xl, .rounded-2xl).bg-white:hover { border-color: #34333a; background-color: #121215; }
-
-/* form controls */
-.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { background-color: #0f0f12; color: #f3f1f4; border-color: #2a292e; }
-.app-main :is(input, textarea)::placeholder { color: #6c6970; }
-.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #e60023; box-shadow: 0 0 0 3px rgb(230 0 35 / 0.18); }
+.app-main .hover\:bg-red-800:hover { background-color: #cc001f; }
+.app-main .text-red-700 { color: #e60023; }
+.app-main :is(.rounded-xl, .rounded-2xl).bg-white.border-zinc-200 { border-color: #ececec; border-radius: 1.25rem; }
+.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #111; box-shadow: 0 0 0 3px rgb(0 0 0 / 0.08); }
 .app-main input[type="checkbox"], .app-main input[type="radio"] { accent-color: #e60023; }
-.app-main option { background: #0f0f12; color: #f3f1f4; }
-
-/* motion */
-@keyframes mp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.mp-in > * { animation: mp-in 0.35s ease-out both; }
-.mp-in > *:nth-child(2) { animation-delay: 0.04s; }
-.mp-in > *:nth-child(3) { animation-delay: 0.08s; }
-.mp-in > *:nth-child(n+4) { animation-delay: 0.12s; }
-@media (prefers-reduced-motion: reduce) { .mp-in > * { animation: none; } }
+.pw-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+@media (min-width: 640px) { .pw-wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 16px; } }
+@media (min-width: 1024px) { .pw-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1280px) { .pw-wall { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@keyframes pw-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.pw-wall > * { animation: pw-in 0.4s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .pw-wall > * { animation: none; } }

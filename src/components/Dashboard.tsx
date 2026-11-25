@@ -38,24 +38,8 @@ function series(pins: Pin[], field: (d: PinDraft) => string | null | undefined, 
 }
 const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 
-const I = {
-  grid: "M4 4h6v7H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 15h6v5H4z",
-  eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
-  cal: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4",
-  check: "M4 12.5 9 17.5 20 6.5",
-  spark: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6",
-  arrow: "M5 12h14M13 6l6 6-6 6",
-  plus: "M12 5v14M5 12h14",
-};
-function Svg({ d, className = "h-4 w-4" }: { d: string; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d={d} />
-    </svg>
-  );
-}
 
-const card = "rounded-xl border border-[#1f1e22] bg-[#0f0f12]";
+const card = "rounded-3xl bg-[#f6f6f6]";
 
 /** Home after sign-in. Every number comes from this app's own pins; nothing here is mock data. */
 export function Dashboard() {
@@ -121,7 +105,7 @@ export function Dashboard() {
         if (cancelled) return;
         setPins(all);
         setSpaces(ws);
-        const firstTen = all.slice(0, 8);
+        const firstTen = all.slice(0, 30);
         const pairs = await Promise.all(firstTen.map(async (p) => [p.draft.id, await store.imageUrl(p.draft).catch(() => null)] as const));
         if (!cancelled) setUrls(Object.fromEntries(pairs));
       } catch (e) {
@@ -136,24 +120,8 @@ export function Dashboard() {
   const view = useMemo(() => (pins ?? []).filter((p) => filter === "all" || p.kind === filter), [pins, filter]);
   const days = useMemo(() => (today ? lastDays(DAYS, today) : []), [today]);
   const made = useMemo(() => series(view, (d) => d.created_at, days), [view, days]);
-  const kpis = useMemo(() => {
-    const now = view.length;
-    const review = view.filter((p) => p.draft.status === "in_review");
-    const sched = view.filter((p) => p.draft.status === "scheduled");
-    const pub = view.filter((p) => p.draft.status === "published");
-    return [
-      { label: "Pins made", value: now, s: made, href: "drafts", icon: I.grid, tone: "text-rose-600", grad: "from-rose-500 to-red-700" },
-      { label: "In review", value: review.length, s: series(review, (d) => d.updated_at, days), href: "publish", icon: I.eye, tone: "text-amber-500", grad: "from-amber-400 to-orange-600" },
-      { label: "Scheduled", value: sched.length, s: series(sched, (d) => d.scheduled_for, days), href: "calendar", icon: I.cal, tone: "text-violet-600", grad: "from-violet-500 to-indigo-700" },
-      { label: "Published", value: pub.length, s: series(pub, (d) => d.published_at, days), href: "analytics", icon: I.check, tone: "text-emerald-600", grad: "from-emerald-400 to-teal-700" },
-    ];
-  }, [view, made, days]);
-  const upcoming = useMemo(
-    () => view.filter((p) => p.draft.status === "scheduled" && p.draft.scheduled_for).sort((a, b) => a.draft.scheduled_for!.localeCompare(b.draft.scheduled_for!)).slice(0, 5),
-    [view],
-  );
-  const review = useMemo(() => view.filter((p) => p.draft.status === "in_review").slice(0, 4), [view]);
-  const recent = view.slice(0, 8);
+  const [status_, setStatus_] = useState<"all" | "draft" | "in_review" | "scheduled" | "published">("all");
+  const wall = view.filter((p) => status_ === "all" || p.draft.status === status_ || (status_ === "draft" && p.draft.status === "approved")).slice(0, 30);
   const ws = filter === "all" ? target : filter;
 
   function create(e: React.FormEvent) {
@@ -167,260 +135,220 @@ export function Dashboard() {
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
   const dateLabel = today?.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" }) ?? "";
 
-  const PILL: Record<string, string> = {
-    draft: "border-[#333238] text-[#a6a2aa]",
-    in_review: "border-amber-400/30 text-amber-300",
-    approved: "border-sky-400/30 text-sky-300",
-    scheduled: "border-violet-400/30 text-violet-300",
-    published: "border-emerald-400/30 text-emerald-300",
+  const count = (st: string) => view.filter((p) => p.draft.status === st || (st === "draft" && p.draft.status === "approved")).length;
+  const chips = [
+    { k: "all" as const, label: "All pins", n: view.length },
+    { k: "in_review" as const, label: "In review", n: count("in_review") },
+    { k: "scheduled" as const, label: "Scheduled", n: count("scheduled") },
+    { k: "published" as const, label: "Live", n: count("published") },
+    { k: "draft" as const, label: "Drafts", n: count("draft") },
+  ];
+  const BADGE: Record<string, string> = {
+    draft: "bg-white/95 text-[#111]",
+    approved: "bg-white/95 text-[#111]",
+    in_review: "bg-amber-300 text-[#111]",
+    scheduled: "bg-[#111] text-white",
+    published: "bg-[#e60023] text-white",
   };
-  const ago = (iso: string) => {
-    if (!today) return "";
-    const m = Math.max(0, Math.round((today.getTime() - new Date(iso).getTime()) / 60000));
-    return m < 1 ? "just now" : m < 60 ? `${m}m ago` : m < 1440 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`;
-  };
+  const PLACE = ["from-orange-300 to-rose-500", "from-violet-300 to-fuchsia-600", "from-teal-200 to-emerald-600", "from-amber-200 to-orange-500", "from-sky-200 to-indigo-500", "from-pink-200 to-rose-500", "from-lime-200 to-green-600", "from-rose-200 to-red-600"];
+  const PH = [1.35, 1.6, 1.2, 1.5, 1.3, 1.55, 1.25, 1.45];
+  const needsSetup = spaces.find((w) => !w.brand);
 
   return (
-    <div className="mp-in flex flex-col gap-5">
-      {/* Greeting + command bar */}
-      <section className="flex flex-col gap-4 pt-1">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[13px] text-[#8b8890]">{dateLabel}</p>
-            <h1 className="mt-1 text-[1.9rem] font-semibold leading-tight sm:text-4xl">
-              {hello}
-              {name ? `, ${name}` : ""}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {mode === "demo" && <span className="rounded-full border border-amber-400/30 px-2.5 py-1 text-xs font-medium text-amber-300">Demo · this browser only</span>}
-            <div className="flex rounded-lg border border-[#232227] bg-[#0f0f12] p-0.5" role="radiogroup" aria-label="Show workspace">
-              {(["all", ...WORKSPACE_KINDS] as Filter[]).map((f) => (
-                <button
-                  key={f}
-                  role="radio"
-                  aria-checked={filter === f}
-                  onClick={() => setFilter(f)}
-                  className={`rounded-md px-3 py-1 text-[13px] font-medium transition-colors ${filter === f ? "bg-[#1f1f24] text-white" : "text-[#8b8890] hover:text-white"}`}
-                >
-                  {f === "all" ? "All" : WORKSPACE_LABELS[f]}
-                </button>
-              ))}
-            </div>
-          </div>
+    <div className="flex flex-col gap-5">
+      {/* Greeting */}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <p className="text-sm font-medium text-[#767676]">{dateLabel}</p>
+          <h1 className="text-[1.8rem] leading-tight sm:text-4xl">
+            {hello}
+            {name ? `, ${name}` : ""}
+          </h1>
         </div>
-
-        <form onSubmit={create} className="group flex flex-col gap-2 rounded-xl border border-[#2a292e] bg-[#0f0f12] p-1.5 shadow-[0_0_0_1px_rgba(0,0,0,0.3),0_20px_50px_-20px_rgba(230,0,35,0.35)] transition-colors focus-within:border-[#e60023]/60 sm:flex-row sm:items-center">
-          <div className="flex shrink-0 gap-0.5 rounded-lg bg-[#17171b] p-0.5" role="radiogroup" aria-label="Workspace for new pins">
-            {WORKSPACE_KINDS.map((k) => (
+        <div className="flex items-center gap-2">
+          {mode === "demo" && <span className="whitespace-nowrap rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900" title="Saved in this browser only">Demo mode</span>}
+          <div className="flex gap-1 rounded-full bg-[#efefef] p-1" role="radiogroup" aria-label="Show workspace">
+            {(["all", ...WORKSPACE_KINDS] as Filter[]).map((f) => (
               <button
-                key={k}
-                type="button"
+                key={f}
                 role="radio"
-                aria-checked={target === k}
-                onClick={() => setTarget(k)}
-                className={`flex-1 rounded-md px-3 py-1.5 text-[13px] font-semibold ${target === k ? "bg-[#26262c] text-white" : "text-[#8b8890] hover:text-white"}`}
+                aria-checked={filter === f}
+                onClick={() => setFilter(f)}
+                className={`rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors ${filter === f ? "bg-[#111] text-white" : "text-[#5f5f5f] hover:text-[#111]"}`}
               >
-                {WORKSPACE_LABELS[k]}
+                {f === "all" ? "All" : WORKSPACE_LABELS[f]}
               </button>
             ))}
           </div>
-          <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
-            <Svg d={I.spark} className="h-4 w-4 shrink-0 text-[#ff4d6a]" />
-            <input
-              ref={cmd}
-              value={idea}
-              onChange={(e) => setIdea(e.target.value)}
-              placeholder="Type a keyword or product idea…"
-              aria-label="Pin idea"
-              className="min-w-0 flex-1 !border-0 !bg-transparent py-2 text-[15px] !shadow-none outline-none"
-            />
-            <kbd className="hidden rounded border border-[#2a292e] px-1.5 py-0.5 font-sans text-[11px] text-[#6c6970] sm:inline">⌘K</kbd>
-          </div>
-          <button className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#f2f0f3] px-4 py-2 text-[13px] font-semibold text-[#0b0b0d] transition hover:bg-white">
-            Create pins <Svg d={I.arrow} className="h-3.5 w-3.5" />
-          </button>
-        </form>
-      </section>
-
-      {err && <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">Could not load your pins: {err}</p>}
-
-      {/* Stat boxes */}
-      <section aria-label="Key numbers" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {kpis.map((k) => {
-          const week = sum(k.s.slice(-7));
-          return (
-            <Link key={k.label} href={`/w/${ws}/${k.href}`} className={`${card} group flex flex-col p-4 transition-colors hover:border-[#34333a] hover:bg-[#121215]`}>
-              <div className="flex items-center justify-between text-[13px] text-[#8b8890]">
-                <span className="flex items-center gap-2">
-                  <Svg d={k.icon} className="h-3.5 w-3.5" />
-                  {k.label}
-                </span>
-                <Svg d={I.arrow} className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover:opacity-100" />
-              </div>
-              <div className="mt-3 flex items-end justify-between gap-2">
-                <p className="font-[family-name:var(--font-display)] text-[2rem] font-semibold leading-none tracking-tight tabular-nums text-white">{pins ? k.value.toLocaleString() : "–"}</p>
-                <Sparkline values={k.s} className="hidden text-[#e60023] sm:block" />
-              </div>
-              <p className="mt-2 text-xs text-[#6c6970]">
-                <span className={week > 0 ? "text-emerald-400" : "text-[#8b8890]"}>{week > 0 ? `+${week}` : "0"}</span> last 7 days
-              </p>
-            </Link>
-          );
-        })}
-      </section>
-
-      {/* Chart + side */}
-      <div className="grid gap-3 lg:grid-cols-3">
-        <section className={`${card} p-5 lg:col-span-2`}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-[15px] font-semibold">Pins made per day</h2>
-              <p className="text-xs text-[#6c6970]">Last {DAYS} days · {filter === "all" ? "all workspaces" : WORKSPACE_LABELS[filter]}</p>
-            </div>
-            <p className="text-right">
-              <span className="block font-[family-name:var(--font-display)] text-2xl font-semibold leading-none tabular-nums text-white">{sum(made)}</span>
-              <span className="text-xs text-[#6c6970]">total</span>
-            </p>
-          </div>
-          <BarChart values={made} days={days} />
-        </section>
-
-        <section className={`${card} flex flex-col p-5`}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-[15px] font-semibold">{upcoming.length > 0 ? "Coming up" : "Needs review"}</h2>
-            <Link href={`/w/${ws}/${upcoming.length > 0 ? "calendar" : "publish"}`} className="text-xs text-[#8b8890] hover:text-white">Open</Link>
-          </div>
-          <ul className="mt-3 flex flex-1 flex-col">
-            {(upcoming.length > 0 ? upcoming : review).map(({ draft, kind }) => {
-              const when = draft.scheduled_for ? new Date(draft.scheduled_for) : null;
-              return (
-                <li key={draft.id} className="border-b border-[#1d1c20] last:border-0">
-                  <Link href={`/w/${kind}/${when ? "calendar" : "publish"}`} className="flex items-center gap-3 py-2.5 hover:opacity-80">
-                    <span className="w-12 shrink-0 text-xs tabular-nums text-[#8b8890]">{when ? when.toLocaleDateString(undefined, { day: "numeric", month: "short" }) : "Review"}</span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-[#e9e7ea]">{draft.title || draft.idea}</span>
-                  </Link>
-                </li>
-              );
-            })}
-            {pins && upcoming.length === 0 && review.length === 0 && (
-              <li className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-                <span className="grid h-9 w-9 place-items-center rounded-full border border-emerald-400/30 text-emerald-400">
-                  <Svg d={I.check} />
-                </span>
-                <p className="mt-2 text-[13px] font-medium text-white">All clear</p>
-                <p className="text-xs text-[#6c6970]">Nothing waiting, nothing scheduled.</p>
-              </li>
-            )}
-          </ul>
-          <div className="mt-3 border-t border-[#1d1c20] pt-3">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs text-[#8b8890]">AI budget this month</span>
-              <span className="text-[13px] tabular-nums text-white">
-                ${spent.toFixed(2)} <span className="text-[#6c6970]">/ ${budget.toFixed(2)}</span>
-              </span>
-            </div>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#1f1e22]" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Budget used">
-              <div className={`h-full rounded-full ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-amber-400" : "bg-[#e60023]"}`} style={{ width: `${Math.max(pct, 1)}%` }} />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      {/* Recent pins list + workspaces */}
-      <div className="grid gap-3 lg:grid-cols-3">
-        <section className={`${card} lg:col-span-2`}>
-          <div className="flex items-center justify-between px-5 pb-2 pt-4">
-            <h2 className="text-[15px] font-semibold">Recent pins</h2>
-            <Link href={`/w/${ws}/drafts`} className="inline-flex items-center gap-1 text-xs text-[#8b8890] hover:text-white">
-              Pin library <Svg d={I.arrow} className="h-3 w-3" />
-            </Link>
-          </div>
-          {!pins && !err && <div className="space-y-2 px-5 pb-5">{Array.from({ length: 4 }, (_, i) => <div key={i} className="h-12 animate-pulse rounded-lg bg-[#141417]" />)}</div>}
-          {pins && recent.length === 0 && (
-            <div className="flex flex-col items-center px-6 pb-10 pt-6 text-center">
-              <span className="grid h-10 w-10 place-items-center rounded-lg border border-[#2a292e] text-[#ff4d6a]">
-                <Svg d={I.grid} className="h-5 w-5" />
-              </span>
-              <p className="mt-3 text-[13px] font-medium text-white">No pins yet</p>
-              <p className="mt-1 max-w-xs text-xs text-[#6c6970]">Press ⌘K and type an idea to make your first set.</p>
-            </div>
-          )}
-          {recent.length > 0 && (
-            <ul className="pb-2">
-              {recent.map(({ draft, kind }) => (
-                <li key={draft.id}>
-                  <Link href={`/w/${kind}/drafts`} className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-t border-[#1d1c20] px-5 py-2.5 transition-colors hover:bg-[#121215] sm:grid-cols-[2.25rem_minmax(0,1fr)_auto_4.5rem]">
-                    <span className="block h-12 w-9 overflow-hidden rounded-md bg-[#1a1a1f] ring-1 ring-white/5">
-                      {urls[draft.id] && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={urls[draft.id]!} alt="" className="h-full w-full object-cover" />
-                      )}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-[13px] font-medium text-[#f3f1f4]">{draft.title || draft.idea}</span>
-                      <span className="block truncate text-xs text-[#6c6970]">
-                        {WORKSPACE_LABELS[kind]}
-                        {draft.source === "demo" ? " · Demo text" : ""}
-                      </span>
-                    </span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${PILL[draft.status]}`}>{STATUS_LABELS[draft.status]}</span>
-                    <span className="hidden text-right text-xs tabular-nums text-[#6c6970] sm:block">{ago(draft.created_at)}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <div className="flex flex-col gap-3">
-          {spaces.map((w) => {
-            const mine = (pins ?? []).filter((p) => p.kind === w.kind);
-            const c = (st: string) => mine.filter((p) => p.draft.status === st).length;
-            const next = !w.brand
-              ? { href: `/w/${w.kind}/settings`, label: "Set up brand" }
-              : w.connected !== true
-                ? { href: `/w/${w.kind}/pinterest`, label: "Connect Pinterest" }
-                : { href: `/w/${w.kind}`, label: "Make pins" };
-            return (
-              <section key={w.kind} className={`${card} p-4`}>
-                <div className="flex items-center gap-3">
-                  <span className={`grid h-8 w-8 place-items-center rounded-md text-[13px] font-bold text-white ${w.kind === "fashion" ? "bg-[#e60023]" : "bg-[#5b4bdb]"}`}>{w.name.charAt(0)}</span>
-                  <div className="min-w-0">
-                    <h2 className="text-[14px] font-semibold leading-tight">{w.name}</h2>
-                    <p className="text-xs text-[#6c6970]">{mine.length} pins</p>
-                  </div>
-                  <Link href={`/w/${w.kind}`} className="ml-auto rounded-md border border-[#2a292e] px-2.5 py-1 text-xs font-medium text-[#cfcbd2] hover:border-[#3a393f] hover:text-white">Open</Link>
-                </div>
-                <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-                  {([["Review", c("in_review")], ["Scheduled", c("scheduled")], ["Live", c("published")]] as const).map(([l, v]) => (
-                    <div key={l} className="rounded-md border border-[#1d1c20] py-1.5">
-                      <dd className="text-[15px] font-semibold tabular-nums text-white">{v}</dd>
-                      <dt className="text-[11px] text-[#6c6970]">{l}</dt>
-                    </div>
-                  ))}
-                </dl>
-                <Link href={next.href} className="mt-3 flex items-center justify-between text-xs text-[#a6a2aa] hover:text-white">
-                  <span className="flex items-center gap-1.5">
-                    <span className={`h-1.5 w-1.5 rounded-full ${w.brand && w.connected ? "bg-emerald-400" : "bg-amber-400"}`} aria-hidden />
-                    Next: {next.label}
-                  </span>
-                  <Svg d={I.arrow} className="h-3 w-3" />
-                </Link>
-              </section>
-            );
-          })}
-          <section className={`${card} p-4`}>
-            <h2 className="text-[14px] font-semibold">Connections</h2>
-            <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[13px]">
-              <Row label="Storage" ok={status?.storage === "supabase"} on="Cloud" off="Browser" loading={!status} />
-              <Row label="Writing" ok={status?.text.source === "ai"} on="Live" off="Demo" loading={!status} title={status?.text.provider} />
-              <Row label="Images" ok={status?.image.source === "ai"} on="Live" off={status?.image.source === "error" ? "Setup" : "Demo"} loading={!status} title={status?.image.provider} />
-              <Row label="Pinterest" ok={status?.pinterest.configured === true} on="Ready" off="Not set" loading={!status} />
-            </ul>
-          </section>
         </div>
       </div>
+
+      {/* Create bar */}
+      <form onSubmit={create} className="flex flex-col gap-2 rounded-[1.75rem] bg-[#efefef] p-2 transition-shadow focus-within:shadow-[0_0_0_4px_rgba(0,0,0,0.06)] sm:flex-row sm:items-center sm:rounded-full">
+        <div className="flex shrink-0 gap-1 rounded-full bg-white p-1" role="radiogroup" aria-label="Workspace for new pins">
+          {WORKSPACE_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              role="radio"
+              aria-checked={target === k}
+              onClick={() => setTarget(k)}
+              className={`flex-1 rounded-full px-4 py-1.5 text-[13px] font-bold ${target === k ? "bg-[#111] text-white" : "text-[#5f5f5f]"}`}
+            >
+              {WORKSPACE_LABELS[k]}
+            </button>
+          ))}
+        </div>
+        <div className="flex min-w-0 flex-1 items-center gap-2.5 px-3">
+          <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[#767676]" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            ref={cmd}
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            placeholder={target === "fashion" ? "What do you want to pin today? e.g. summer linen outfits" : "What do you want to pin today? e.g. budget meal prep"}
+            aria-label="Pin idea"
+            className="min-w-0 flex-1 !border-0 !bg-transparent py-2 text-base font-medium text-[#111] !shadow-none outline-none placeholder:font-normal placeholder:text-[#767676]"
+          />
+        </div>
+        <button className="inline-flex items-center justify-center gap-1.5 rounded-full bg-[#e60023] px-6 py-3 text-[15px] font-bold text-white transition hover:bg-[#cc001f]">
+          Create
+        </button>
+      </form>
+
+      {/* Status chips */}
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0" role="radiogroup" aria-label="Filter pins">
+        {chips.map((c) => (
+          <button
+            key={c.k}
+            role="radio"
+            aria-checked={status_ === c.k}
+            onClick={() => setStatus_(c.k)}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-colors ${status_ === c.k ? "bg-[#111] text-white" : "bg-[#efefef] text-[#111] hover:bg-[#e2e2e2]"}`}
+          >
+            {c.label}
+            <span className={`ml-1.5 tabular-nums ${status_ === c.k ? "text-white/70" : "text-[#767676]"}`}>{pins ? c.n : "–"}</span>
+          </button>
+        ))}
+        {needsSetup && (
+          <Link href={`/w/${needsSetup.kind}/settings`} className="ml-auto shrink-0 rounded-full bg-amber-100 px-4 py-2 text-sm font-bold text-amber-900 hover:bg-amber-200">
+            Set up {needsSetup.name} brand →
+          </Link>
+        )}
+      </div>
+
+      {err && <p className="rounded-2xl bg-red-50 p-3 text-sm text-red-800">Could not load your pins: {err}</p>}
+
+      {/* Wall */}
+      {!pins && !err && (
+        <div className="pw-wall">
+          {PH.map((h, i) => <div key={i} className="animate-pulse rounded-2xl bg-[#efefef]" style={{ aspectRatio: `1 / ${h}` }} />)}
+        </div>
+      )}
+      {pins && wall.length === 0 && (
+        <div className="relative overflow-hidden rounded-3xl">
+          <div className="pw-wall pointer-events-none opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden>
+            {PH.concat(PH).slice(0, 10).map((h, i) => <div key={i} className={`rounded-2xl bg-gradient-to-br ${PLACE[i % PLACE.length]}`} style={{ aspectRatio: `1 / ${h}` }} />)}
+          </div>
+          <div className="absolute inset-0 grid place-items-center p-6">
+            <div className="max-w-sm rounded-3xl bg-white p-6 text-center shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
+              <p className="font-[family-name:var(--font-display)] text-xl font-bold">{status_ === "all" ? "Your pin wall is empty" : `No ${chips.find((c) => c.k === status_)?.label.toLowerCase()} pins`}</p>
+              <p className="mt-1 text-sm text-[#5f5f5f]">Type an idea in the bar above and your designed pins appear here.</p>
+              <button onClick={() => cmd.current?.focus()} className="mt-4 rounded-full bg-[#e60023] px-5 py-2.5 text-sm font-bold text-white">Make my first pins</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {wall.length > 0 && (
+        <ul className="pw-wall">
+          {wall.map(({ draft, kind }, i) => (
+            <li key={draft.id} className="group" style={{ animationDelay: `${Math.min(i, 12) * 0.03}s` }}>
+              <div className="relative overflow-hidden rounded-2xl bg-[#efefef]">
+                {urls[draft.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={urls[draft.id]!} alt={draft.alt_text || draft.title} className="block aspect-[2/3] w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className={`grid aspect-[2/3] place-items-center bg-gradient-to-br p-4 text-center text-sm font-bold text-white ${PLACE[i % PLACE.length]}`}>{draft.image_status === "pending" ? "Making image…" : draft.title || draft.idea}</div>
+                )}
+                <span className={`absolute left-2.5 top-2.5 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm ${BADGE[draft.status]}`}>{STATUS_LABELS[draft.status]}</span>
+                <div className="absolute inset-0 flex flex-col justify-between bg-black/40 p-2.5 opacity-0 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100">
+                  <div className="flex justify-end">
+                    <Link href={`/w/${kind}/drafts`} className="rounded-full bg-[#e60023] px-4 py-2 text-sm font-bold text-white hover:bg-[#cc001f]">Open</Link>
+                  </div>
+                  <div className="flex gap-2">
+                    <Link href={`/w/${kind}/publish`} className="flex-1 rounded-full bg-white/95 px-3 py-2 text-center text-xs font-bold text-[#111] hover:bg-white">Review</Link>
+                    <Link href={`/w/${kind}/calendar`} className="flex-1 rounded-full bg-white/95 px-3 py-2 text-center text-xs font-bold text-[#111] hover:bg-white">Schedule</Link>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-2 line-clamp-2 px-1 text-[13px] font-semibold leading-snug text-[#111]">{draft.title || draft.idea}</p>
+              <p className="px-1 text-xs text-[#767676]">
+                {WORKSPACE_LABELS[kind]}
+                {draft.source === "demo" ? " · Demo text" : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {view.length > wall.length && status_ === "all" && (
+        <div className="flex justify-center">
+          <Link href={`/w/${ws}/drafts`} className="rounded-full bg-[#efefef] px-5 py-2.5 text-sm font-bold text-[#111] hover:bg-[#e2e2e2]">See all {view.length} pins</Link>
+        </div>
+      )}
+
+      {/* Footer info */}
+      <div className="mt-2 grid gap-3 md:grid-cols-3">
+        <section className={`${card} p-5`}>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold">This week</h2>
+            <span className="text-xs font-semibold text-[#767676]">{filter === "all" ? "All" : WORKSPACE_LABELS[filter]}</span>
+          </div>
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <div>
+              <p className="font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums">{sum(made.slice(-7))}</p>
+              <p className="text-xs text-[#767676]">pins made in 7 days</p>
+            </div>
+            <MiniBars values={made} />
+          </div>
+        </section>
+        <section className={`${card} p-5`}>
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold">AI budget</h2>
+            <Link href={`/w/${ws}/usage`} className="text-xs font-semibold text-[#767676] hover:text-[#111]">Details</Link>
+          </div>
+          <p className="mt-3 font-[family-name:var(--font-display)] text-4xl font-bold tabular-nums">
+            ${spent.toFixed(2)}
+            <span className="ml-1 text-sm font-medium text-[#767676]">of ${budget.toFixed(2)}</span>
+          </p>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Budget used">
+            <div className={`h-full rounded-full ${pct >= 90 ? "bg-[#e60023]" : pct >= 70 ? "bg-amber-500" : "bg-[#111]"}`} style={{ width: `${Math.max(pct, 1)}%` }} />
+          </div>
+        </section>
+        <section className={`${card} p-5`}>
+          <h2 className="text-base font-bold">Connections</h2>
+          <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+            <Row label="Storage" ok={status?.storage === "supabase"} on="Cloud" off="Browser" loading={!status} />
+            <Row label="Writing" ok={status?.text.source === "ai"} on="Live" off="Demo" loading={!status} title={status?.text.provider} />
+            <Row label="Images" ok={status?.image.source === "ai"} on="Live" off={status?.image.source === "error" ? "Setup" : "Demo"} loading={!status} title={status?.image.provider} />
+            <Row label="Pinterest" ok={status?.pinterest.configured === true} on="Ready" off="Not set" loading={!status} />
+          </ul>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+/** Seven small bars for the last 7 days; values are in the hover title. */
+function MiniBars({ values }: { values: number[] }) {
+  const v = values.slice(-7);
+  const max = Math.max(1, ...v);
+  return (
+    <div className="flex h-12 items-end gap-1" role="img" aria-label={`Pins per day, last 7 days: ${v.join(", ")}`}>
+      {v.map((x, i) => (
+        <span key={i} title={`${x} pin${x === 1 ? "" : "s"}`} className={`w-3 rounded-t-[4px] ${i === v.length - 1 ? "bg-[#e60023]" : "bg-[#111]"}`} style={{ height: `${Math.max(6, (x / max) * 100)}%`, opacity: x === 0 ? 0.15 : 1 }} />
+      ))}
     </div>
   );
 }
@@ -428,91 +356,10 @@ export function Dashboard() {
 function Row({ label, ok, on, off, loading, title }: { label: string; ok: boolean | undefined; on: string; off: string; loading: boolean; title?: string }) {
   return (
     <li className="flex items-center gap-2" title={title}>
-      <span className={`h-1.5 w-1.5 rounded-full ${loading ? "bg-zinc-600" : ok ? "bg-emerald-400" : "bg-amber-400"}`} aria-hidden />
-      <span className="text-[#8b8890]">{label}</span>
-      <span className={`ml-auto whitespace-nowrap text-xs font-medium ${loading ? "text-[#6c6970]" : ok ? "text-emerald-300" : "text-amber-300"}`}>{loading ? "…" : ok ? on : off}</span>
+      <span className={`h-2 w-2 rounded-full ${loading ? "bg-zinc-300" : ok ? "bg-emerald-500" : "bg-amber-500"}`} aria-hidden />
+      <span className="text-[#5f5f5f]">{label}</span>
+      <span className={`ml-auto whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${loading ? "text-[#767676]" : ok ? "bg-emerald-100 text-emerald-800" : "bg-white text-[#111]"}`}>{loading ? "…" : ok ? on : off}</span>
     </li>
-  );
-}
-
-/** 2px trend line, last point marked. Colour comes from the parent's text colour. */
-function Sparkline({ values, className }: { values: number[]; className: string }) {
-  const w = 84, h = 30, pad = 3;
-  if (values.length < 2) return <span className="h-[30px] w-[84px]" />;
-  const max = Math.max(1, ...values);
-  const pts = values.map((v, i) => [pad + (i * (w - 2 * pad)) / (values.length - 1), h - pad - (v / max) * (h - 2 * pad)] as const);
-  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
-  const [lx, ly] = pts[pts.length - 1];
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={`shrink-0 ${className}`} aria-hidden>
-      <path d={`${line}L${lx},${h}L${pad},${h}Z`} fill="currentColor" opacity={0.1} />
-      <path d={line} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lx} cy={ly} r={3.5} fill="currentColor" stroke="#0f0f12" strokeWidth={2} />
-    </svg>
-  );
-}
-
-/** Single-series column chart with a hover tooltip and a hidden table for screen readers. */
-function BarChart({ values, days }: { values: number[]; days: Date[] }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const max = Math.max(...values, 0);
-  const top = max <= 4 ? 4 : Math.ceil(max / 4) * 4;
-  const ticks = [0, top / 2, top];
-  const H = 190;
-  const empty = max === 0;
-  return (
-    <div className="mt-5">
-      <div className="relative flex gap-3">
-        <div className="relative w-6 shrink-0 text-right text-[11px] tabular-nums text-[#5d5a62]" style={{ height: H }} aria-hidden>
-          {ticks.map((t) => (
-            <span key={t} className="absolute right-0 -translate-y-1/2" style={{ top: H - (t / top) * H }}>{t}</span>
-          ))}
-        </div>
-        <div className="relative flex-1" style={{ height: H }} onMouseLeave={() => setHover(null)}>
-          {ticks.map((t) => (
-            <div key={t} className="absolute inset-x-0 h-px bg-[#1d1c20]" style={{ top: H - (t / top) * H }} aria-hidden />
-          ))}
-          <div className="absolute inset-0 flex items-end gap-[2px]">
-            {values.map((v, i) => (
-              <div key={i} className="relative flex h-full flex-1 items-end justify-center" onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} tabIndex={-1}>
-                {hover === i && <div className="absolute inset-y-0 inset-x-0.5 rounded-md bg-white/[0.03]" aria-hidden />}
-                <div
-                  className={`relative w-full max-w-[20px] rounded-t-[4px] transition-colors ${hover === i ? "bg-[#ff4d6a]" : "bg-[#e60023]"}`}
-                  style={{ height: v === 0 ? 0 : Math.max(3, (v / top) * H) }}
-                />
-                {hover === i && (
-                  <div className="pointer-events-none absolute z-10 whitespace-nowrap rounded-lg border border-[#2a292e] bg-[#17171b] px-2.5 py-1.5 text-xs text-white shadow-lg" style={{ bottom: Math.min(H - 8, (v / top) * H + 8) }}>
-                    <span className="font-semibold tabular-nums">{v}</span> pin{v === 1 ? "" : "s"}
-                    <span className="block text-[10px] text-white/60">{days[i]?.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          {empty && (
-            <div className="absolute inset-0 grid place-items-center">
-              <p className="rounded-lg border border-[#232227] bg-[#0f0f12] px-3 py-1.5 text-[13px] text-[#8b8890]">No pins made in the last {values.length} days</p>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="ml-9 mt-2 flex text-[11px] text-[#5d5a62]" aria-hidden>
-        {days.map((d, i) => (
-          <span key={i} className="flex-1 text-center">{i % 2 === (days.length - 1) % 2 ? d.getDate() : ""}</span>
-        ))}
-      </div>
-      <table className="sr-only">
-        <caption>Pins made per day</caption>
-        <tbody>
-          {days.map((d, i) => (
-            <tr key={i}>
-              <th scope="row">{d.toDateString()}</th>
-              <td>{values[i]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
   );
 }
 
