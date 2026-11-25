@@ -1,4 +1,5 @@
 "use client";
+import { PinImageBox } from "./PinImageBox";
 import { useCallback, useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import { STATUS_LABELS, WORKSPACE_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
@@ -240,13 +241,10 @@ function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: Workspace
 
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <PinImageBox src={url} alt={draft.alt_text}>
+        <div className="flex h-full items-center justify-center text-xs text-zinc-500">No image</div>
+      </PinImageBox>
       <div className="flex gap-3">
-        {url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- signed/data URL
-          <img src={url} alt={draft.alt_text} className="aspect-[2/3] w-20 flex-none rounded object-cover" />
-        ) : (
-          <div className="flex aspect-[2/3] w-20 flex-none items-center justify-center rounded bg-zinc-100 text-center text-[10px] text-zinc-500">No image</div>
-        )}
         <div className="flex min-w-0 flex-col gap-1">
           <span className={`self-start rounded px-1.5 py-0.5 text-xs font-semibold ${STATUS_TONE[draft.status]}`}>{STATUS_LABELS[draft.status]}</span>
           <p className="font-medium leading-snug">{draft.title}</p>

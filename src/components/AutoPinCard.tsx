@@ -1,4 +1,5 @@
 "use client";
+import { PIN_BOX } from "./PinImageBox";
 import { useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { PinDraft } from "@/lib/types";
@@ -32,7 +33,7 @@ export function AutoPinCard({ store, draft, error, disabled, onRetry, design }: 
   const shown = draft.image_status === "ready" ? url : null;
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-      <div className="relative aspect-[2/3] bg-zinc-100">
+      <div className={`${PIN_BOX} mt-3`}>
         {shown ? (
           // eslint-disable-next-line @next/next/no-img-element -- signed/data URLs, not optimisable
           <img src={shown} alt={draft.alt_text} className="h-full w-full object-cover" />

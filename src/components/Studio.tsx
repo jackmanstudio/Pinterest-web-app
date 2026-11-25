@@ -1,4 +1,5 @@
 "use client";
+import { PIN_GRID } from "./PinImageBox";
 import { autoPlanBoards } from "@/lib/client/boards";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -547,7 +548,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             </p>
           )}
           {auto.drafts.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className={PIN_GRID}>
               {auto.drafts.map((d) => (
                 <AutoPinCard key={d.id} store={store!} draft={d} design={auto.designs[d.id]} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} />
               ))}
