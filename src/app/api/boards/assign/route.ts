@@ -44,6 +44,9 @@ const Body = z.object({
  * never creates boards or changes anything on Pinterest. Boards come from the
  * account's own synced list on the server; demo mode uses labelled samples.
  */
+// Up to 50 pins go to the AI in batches of 10.
+export const maxDuration = 120;
+
 export async function POST(request: Request) {
   const limited = rateLimited(request, "generate");
   if (limited) return limited;
@@ -86,12 +89,25 @@ export async function POST(request: Request) {
       if (p.source === "ai" && p.assignBoards) {
         await assertWithinBudget(ctx.ledger, true);
         try {
-          const out = await p.assignBoards({ workspace, categories: own.length ? own : Object.keys(CONTENT_CATEGORIES), boards, pins: rest });
-          const byKey = new Map(out.assignments.map((a) => [a.key, a]));
-          for (const pin of rest) {
-            const a = byKey.get(pin.key);
-            assignments.push(a ? acceptAiAssignment(a, pin, boards) : keywordAssign(pin, boards));
+          // Long ids (UUIDs) are easy for a model to garble, so the AI sees short keys (p1, p2…)
+          // and works on 10 pins at a time; answers are mapped back here.
+          let inTok = 0, outTok = 0, model: string | null = null, aiPicked = 0;
+          for (let i = 0; i < rest.length; i += 10) {
+            const chunk = rest.slice(i, i + 10);
+            const out = await p.assignBoards({ workspace, categories: own.length ? own : Object.keys(CONTENT_CATEGORIES), boards, pins: chunk.map((pin, j) => ({ ...pin, key: `p${j + 1}` })) });
+            inTok += out.usage.input_tokens;
+            outTok += out.usage.output_tokens;
+            model = out.model;
+            const byKey = new Map(out.assignments.map((a) => [a.key.trim().toLowerCase(), a]));
+            chunk.forEach((pin, j) => {
+              // By short key; if the model dropped the keys but kept the order, use the position.
+              const a = byKey.get(`p${j + 1}`) ?? (out.assignments.length === chunk.length ? out.assignments[j] : undefined);
+              if (a) aiPicked++;
+              assignments.push(a ? acceptAiAssignment({ ...a, key: pin.key }, pin, boards) : keywordAssign(pin, boards));
+            });
           }
+          if (aiPicked < rest.length) note = `The AI answered for ${aiPicked} of ${rest.length} pins; the rest were matched by keywords.`;
+          const out = { model, usage: { input_tokens: inTok, output_tokens: outTok } };
           engine = "ai";
           const cost = estimateTextCost(out.model, out.usage.input_tokens, out.usage.output_tokens);
           await ctx.ledger
@@ -99,8 +115,9 @@ export async function POST(request: Request) {
             .catch(() => {});
         } catch (err) {
           if (!(err instanceof ProviderError)) throw err;
-          note = `AI board picking failed (${err.message}), so keyword matching was used.`;
-          assignments.push(...rest.map((pin) => keywordAssign(pin, boards)));
+          note = `AI board picking failed (${err.message}), so keyword matching was used for the remaining pins.`;
+          const done = new Set(assignments.map((a) => a.key));
+          assignments.push(...rest.filter((pin) => !done.has(pin.key)).map((pin) => keywordAssign(pin, boards)));
         }
       } else {
         note = "Text AI isn't configured, so boards were matched by keywords. Add an AI key for smarter picks.";
