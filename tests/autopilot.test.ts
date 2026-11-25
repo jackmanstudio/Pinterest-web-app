@@ -48,8 +48,9 @@ describe("OpenAI image adapter", () => {
   });
   it("never asks for logos or watermarks", () => {
     const p = buildImagePrompt({ title: "7 Linen Outfits for Summer", scene: "Vertical 2:3 grid of linen outfits, bold number badges", kind: "fashion", overlay: "elegant" });
-    expect(p).toContain('titled "7 Linen Outfits for Summer"');
-    expect(p).toMatch(/Avoid: any text, letters, words, numbers/);
+    expect(p).toContain("pin about linen outfits for summer");
+    expect(p).not.toContain('"');
+    expect(p).toMatch(/absolutely no text/);
     expect(p).toMatch(/upper third/);
     expect(p).not.toMatch(/number badges/);
     expect(p).toMatch(/fashion editorial/i);

@@ -21,7 +21,8 @@ export function SourceBadge({ source, what = "text" }: { source: ContentSource; 
         {what === "image" ? "DEMO — placeholder image, not AI" : "DEMO — template text, not AI"}
       </span>
     );
-  if (source === "ai") return <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">AI generated</span>;
+  // Real AI output needs no badge; only placeholders and templates are labelled.
+  if (source === "ai") return null;
   return <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-700">Manual</span>;
 }
 

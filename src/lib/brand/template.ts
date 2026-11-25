@@ -4,12 +4,13 @@ import { z } from "zod";
  * Brand pin template: how the title, handle and logo are laid over each pin
  * image. Pure code, shared by the server compositor and the browser preview.
  */
-export const TEMPLATE_STYLES = ["bold", "minimal", "elegant", "editorial", "none"] as const;
+export const TEMPLATE_STYLES = ["subtle", "editorial", "minimal", "elegant", "bold", "none"] as const;
 export const TEMPLATE_FONTS = ["sans", "serif", "display"] as const;
 export type TemplateStyle = (typeof TEMPLATE_STYLES)[number];
 export type TemplateFont = (typeof TEMPLATE_FONTS)[number];
 
 export const STYLE_LABELS: Record<TemplateStyle, string> = {
+  subtle: "Subtle caption (recommended)",
   bold: "Bold band",
   minimal: "Minimal fade",
   elegant: "Elegant card",
@@ -26,8 +27,8 @@ const CHAR_WIDTH: Record<TemplateFont, number> = { sans: 0.6, serif: 0.5, displa
 
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export const PinTemplateSchema = z.object({
-  style: z.enum(TEMPLATE_STYLES).catch("bold"),
-  font: z.enum(TEMPLATE_FONTS).catch("sans"),
+  style: z.enum(TEMPLATE_STYLES).catch("subtle"),
+  font: z.enum(TEMPLATE_FONTS).catch("serif"),
   primary_color: hex.catch("#b91c1c"),
   text_color: hex.catch("#ffffff"),
   handle: z.string().max(40).catch(""),
@@ -36,7 +37,7 @@ export const PinTemplateSchema = z.object({
 });
 export type PinTemplate = z.infer<typeof PinTemplateSchema>;
 
-export const DEFAULT_TEMPLATE: PinTemplate = { style: "bold", font: "sans", primary_color: "#b91c1c", text_color: "#ffffff", handle: "", logo: null };
+export const DEFAULT_TEMPLATE: PinTemplate = { style: "subtle", font: "serif", primary_color: "#b91c1c", text_color: "#ffffff", handle: "", logo: null };
 
 /** Accepts anything (including old rows with no template) and returns a valid template. */
 export function readTemplate(raw: unknown): PinTemplate {
@@ -62,10 +63,10 @@ export function wrapLines(text: string, maxWidth: number, fontSize: number, font
 }
 
 /** Picks the largest font size (within bounds) that fits the title in `maxLines`. */
-export function fitTitle(title: string, maxWidth: number, font: TemplateFont, scale: number, maxLines = 4) {
+export function fitTitle(title: string, maxWidth: number, font: TemplateFont, scale: number, maxLines = 4, bounds?: { max: number; min: number }) {
   const text = font === "display" ? title.toUpperCase() : title;
-  const max = (font === "display" ? 120 : 84) * scale;
-  const min = 40 * scale;
+  const max = (bounds?.max ?? (font === "display" ? 120 : 84)) * scale;
+  const min = (bounds?.min ?? 40) * scale;
   for (let size = max; size >= min; size -= 4 * scale) {
     const lines = wrapLines(text, maxWidth, size, font);
     if (lines.length <= maxLines) return { size, lines };
@@ -100,6 +101,21 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
   );
   if (t.style === "none" || !title.trim()) {
     if (!logoHref) return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"/>`;
+  } else if (t.style === "subtle") {
+    // Small, clean caption on a soft fade at the very bottom: the photo stays the hero.
+    const x = 56 * s;
+    const { size, lines } = fitTitle(title, W * 0.78, t.font, s, 3, { max: t.font === "display" ? 64 : 50, min: 32 });
+    const lh = size * (t.font === "display" ? 1.0 : 1.2);
+    const handleH = t.handle ? 44 * s : 0;
+    const bottom = H - 56 * s - handleH;
+    const first = bottom - (lines.length - 1) * lh;
+    const fadeTop = first - size - 140 * s;
+    parts.push(
+      `<defs><linearGradient id="soft" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.55"/></linearGradient></defs>`,
+      `<rect x="0" y="${fadeTop}" width="${W}" height="${H - fadeTop}" fill="url(#soft)"/>`,
+    );
+    lines.forEach((l, i) => parts.push(`<text x="${x}" y="${first + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`));
+    if (t.handle) parts.push(`<text x="${x}" y="${H - 52 * s}" font-family="Poppins" font-weight="500" font-size="${20 * s}" letter-spacing="${4 * s}" fill="${t.text_color}" fill-opacity="0.8">${esc(t.handle.toUpperCase())}</text>`);
   } else if (t.style === "bold") {
     const pad = 48 * s;
     const { size, lines } = fitTitle(title, W - 80 * s - pad * 2, t.font, s);

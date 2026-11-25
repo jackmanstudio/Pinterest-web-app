@@ -7,7 +7,7 @@ describe("brand template", () => {
   it("fills in defaults and rejects bad values", () => {
     expect(readTemplate(undefined)).toEqual(DEFAULT_TEMPLATE);
     const t = readTemplate({ style: "weird", primary_color: "red", handle: "@me" });
-    expect(t.style).toBe("bold");
+    expect(t.style).toBe("subtle");
     expect(t.primary_color).toBe(DEFAULT_TEMPLATE.primary_color);
     expect(t.handle).toBe("@me");
   });
@@ -30,7 +30,7 @@ describe("brand template", () => {
 describe("pin compositor", () => {
   it("returns a JPEG at the pin size with the overlay drawn", async () => {
     const base = await sharp({ create: { width: 1024, height: 1536, channels: 3, background: "#3b82f6" } }).png().toBuffer();
-    for (const style of ["bold", "minimal", "elegant", "none"] as const) {
+    for (const style of ["subtle", "bold", "minimal", "elegant", "editorial", "none"] as const) {
       const out = await composePin({ base, title: "7 Autumn Trench Coat Outfits", template: { ...DEFAULT_TEMPLATE, style, handle: "@studio" }, size: { width: 1000, height: 1500 } });
       const meta = await sharp(Buffer.from(out.bytes)).metadata();
       expect(meta.format).toBe("jpeg");

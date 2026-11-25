@@ -45,6 +45,7 @@ const AESTHETIC: Record<WorkspaceKind, string> = {
 };
 
 const SPACE: Record<TemplateStyle, string> = {
+  subtle: "Keep the bottom edge of the frame simple, because a small caption will sit there.",
   bold: "Keep the lower third of the frame calm and softly blurred (simple background, no important details) because a title band will be placed there.",
   minimal: "Keep the lower third of the frame darker and uncluttered because a white title will be placed there.",
   elegant: "Keep the upper third of the frame calm and uncluttered (sky, wall or soft background) because a title card will be placed there.",
@@ -60,11 +61,19 @@ const clean = (s: string) =>
     .replace(/,?\s*(with\s+)?(bold\s+)?(number(ed)?\s+(badges|labels|panels)|text overlay space[^,.]*|minimal text[^,.]*)/gi, "")
     .trim();
 
-export function buildImagePrompt({ title, scene, kind, overlay = "bold", angle }: ImagePromptInput): string {
-  const t = title.trim().slice(0, 140);
+export function buildImagePrompt({ title, scene, kind, overlay = "subtle", angle }: ImagePromptInput): string {
+  // Never quote the title: image models copy quoted words into the picture as (misspelled) text.
+  const t = title
+    .replace(/["“”'‘’:!?]/g, " ")
+    .replace(/\b\d+\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase()
+    .slice(0, 140);
   const sceneText = clean(scene).slice(0, 700) || t;
   return [
-    `A vertical 2:3 portrait image for a Pinterest pin titled "${t}". The image must clearly show what the title is about.`,
+    "A clean photograph with absolutely no text, lettering or typography anywhere in the image.",
+    `Vertical 2:3 portrait photo for a Pinterest pin about ${t}. The photo must clearly show this subject.`,
     `Scene: ${sceneText}`,
     AESTHETIC[kind],
     artDirection(angle, t),
@@ -72,6 +81,6 @@ export function buildImagePrompt({ title, scene, kind, overlay = "bold", angle }
     "Composition: a single cohesive scene with one clear focal point, rule of thirds, generous negative space, depth with a softly blurred background.",
     "Light and finish: soft natural light, gentle shadows, true-to-life skin and fabric textures, rich but natural colours, crisp focus on the subject, shot on a full-frame camera with a 50mm lens, magazine-quality retouching.",
     SPACE[overlay],
-    "Avoid: any text, letters, words, numbers, captions, logos, watermarks or signatures; collages, grids, split screens, borders or frames; extra or distorted fingers, hands or faces; clutter, harsh flash, oversaturated colours, cartoon or CGI look, cliché stock-photo poses.",
+    "Again: no text, letters, words, numbers, captions, headlines, signs, logos, watermarks or signatures; collages, grids, split screens, borders or frames; extra or distorted fingers, hands or faces; clutter, harsh flash, oversaturated colours, cartoon or CGI look, cliché stock-photo poses.",
   ].join("\n");
 }
