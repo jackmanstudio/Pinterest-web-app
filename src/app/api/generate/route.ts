@@ -3,17 +3,13 @@ import { getTextProvider } from "@/lib/ai/text";
 import { ProviderError } from "@/lib/ai/text/types";
 import { findNearDuplicates } from "@/lib/drafts/distinctness";
 import { GenerateRequestSchema } from "@/lib/drafts/validation";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getServerSupabase } from "@/lib/supabase/server";
+import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
+import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
+import type { UsageEntry } from "@/lib/usage/ledger";
+import { estimateTextCost } from "@/lib/usage/pricing";
 import type { GenerateResponse } from "@/lib/types";
 
 export async function POST(request: Request) {
-  if (isSupabaseConfigured) {
-    const supabase = await getServerSupabase();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -25,20 +21,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
   }
 
+  let usageBase: Omit<UsageEntry, "input_tokens" | "output_tokens" | "est_cost_usd" | "status" | "error"> | null = null;
+  let ledger: Awaited<ReturnType<typeof getRequestContext>>["ledger"] | null = null;
   try {
+    const ctx = await getRequestContext();
+    ledger = ctx.ledger;
+    const workspaceId = await workspaceIdFor(ctx, parsed.data.workspace);
     const provider = getTextProvider();
-    let result: GenerateResponse = await provider.generateDrafts(parsed.data);
+    usageBase = { workspace_id: workspaceId, workspace_kind: parsed.data.workspace, kind: "text", provider: provider.name, model: null, source: provider.source, images: 0 };
+    await assertWithinBudget(ctx.ledger, provider.source === "ai");
+
+    const tokens = { input: 0, output: 0 };
+    const run = async () => {
+      const r = await provider.generateDrafts(parsed.data);
+      tokens.input += r.usage?.input_tokens ?? 0;
+      tokens.output += r.usage?.output_tokens ?? 0;
+      return r;
+    };
+    let result: GenerateResponse = await run();
     // One bounded retry if the model returned near-duplicates.
-    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0) {
-      result = await provider.generateDrafts(parsed.data);
-    }
+    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0) result = await run();
+
+    const cost = estimateTextCost(result.model, tokens.input, tokens.output);
+    await ctx.ledger.record({ ...usageBase, model: result.model, input_tokens: tokens.input, output_tokens: tokens.output, est_cost_usd: cost, status: "ok", error: null });
+
     const duplicates = findNearDuplicates(result.drafts);
-    return NextResponse.json({ ...result, warnings: duplicates.length ? ["Some drafts are similar; consider editing them."] : [] });
+    return NextResponse.json({
+      ...result,
+      usage: { input_tokens: tokens.input, output_tokens: tokens.output },
+      est_cost_usd: cost,
+      warnings: duplicates.length ? ["Some drafts are similar; consider editing them."] : [],
+    });
   } catch (err) {
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    if (err instanceof BudgetExceededError) return NextResponse.json({ error: err.message, retryable: false }, { status: 402 });
+    if (ledger && usageBase) {
+      await ledger
+        .record({ ...usageBase, input_tokens: 0, output_tokens: 0, est_cost_usd: 0, status: "error", error: (err as Error).message })
+        .catch(() => {});
+    }
     if (err instanceof ProviderError) {
       return NextResponse.json({ error: err.message, retryable: err.retryable }, { status: err.status });
     }
     console.error("generate failed", err);
-    return NextResponse.json({ error: "Generation failed. Please retry." }, { status: 500 });
+    return NextResponse.json({ error: "Generation failed. Please retry.", retryable: true }, { status: 500 });
   }
 }

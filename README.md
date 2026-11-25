@@ -8,7 +8,8 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | --- | --- |
 | Supabase auth + database | **Built, not yet tested against a live project.** Without env vars the app runs in Demo mode (browser-only storage, clearly labelled). |
 | Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
-| Image AI | Not connected (Phase 2). Image status shows "No image yet". |
+| Image AI | **Pipeline built, no real provider yet.** Generates labelled DEMO placeholder images through the same route, storage and ledger a real provider will use. Adding a provider = one adapter in `src/lib/ai/image/`. |
+| Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
 | Pinterest API v5 | Not connected (Phase 3). Nothing is published, scheduled or synced. |
 
 ## Phase 1 scope (this build)
@@ -29,10 +30,18 @@ cp .env.example .env.local   # optional; leave empty for Demo mode
 npm run dev                  # http://localhost:3000
 ```
 
+## Phase 2 (this build, without keys)
+
+- Usage ledger (`ai_usage`): tokens, images, estimated cost and errors per call; users can read but never edit or delete rows
+- Monthly budget cap enforced server-side before any paid call
+- Image pipeline: `POST /api/images` → provider adapter (with capped retries) → private `pin-images` bucket under `<workspace_id>/` → signed URLs
+- Per-draft image status (pending / ready / failed) with visible errors; Usage & cost page per workspace
+- Text generation now records usage and shows estimated cost
+
 ## Connect Supabase
 
 1. Create a Supabase project.
-2. Run `supabase/migrations/0001_phase1_core.sql` in the SQL editor (or `supabase db push`).
+2. Run both files in `supabase/migrations/` in order in the SQL editor (or `supabase db push`).
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 4. In Supabase Auth → URL configuration, add `http://localhost:3000/auth/callback` (and your production URL) as a redirect URL.
 

@@ -63,6 +63,9 @@ export interface PinDraft extends DraftContent {
   batch_id: string;
   idea: string;
   image_status: ImageStatus;
+  /** Storage path (Supabase) or inline data URL (Demo storage). */
+  image_path: string | null;
+  image_source: ContentSource | null;
   status: DraftStatus;
   source: ContentSource;
   created_at: string;
@@ -82,4 +85,5 @@ export interface GenerateResponse {
   model: string | null;
   drafts: DraftContent[];
   usage?: { input_tokens: number; output_tokens: number };
+  est_cost_usd?: number;
 }

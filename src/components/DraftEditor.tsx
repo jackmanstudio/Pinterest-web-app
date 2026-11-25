@@ -3,7 +3,7 @@ import { LIMITS, parseList } from "@/lib/drafts/validation";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
 
 const IMAGE_LABEL: Record<ImageStatus, string> = {
-  not_generated: "No image yet (image AI not connected)",
+  not_generated: "No image yet",
   pending: "Generating…",
   ready: "Ready",
   failed: "Failed",
@@ -14,9 +14,13 @@ function Counter({ value, max }: { value: string; max: number }) {
   return <span className={`text-xs ${over ? "font-semibold text-red-600" : "text-zinc-500"}`}>{value.length}/{max}</span>;
 }
 
-export function SourceBadge({ source }: { source: ContentSource }) {
+export function SourceBadge({ source, what = "text" }: { source: ContentSource; what?: "text" | "image" }) {
   if (source === "demo")
-    return <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">DEMO — template text, not AI</span>;
+    return (
+      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-900">
+        {what === "image" ? "DEMO — placeholder image, not AI" : "DEMO — template text, not AI"}
+      </span>
+    );
   if (source === "ai") return <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">AI generated</span>;
   return <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs font-semibold text-zinc-700">Manual</span>;
 }
@@ -38,9 +42,11 @@ interface Props {
   imageStatus?: ImageStatus;
   onChange: (d: DraftContent) => void;
   footer?: React.ReactNode;
+  /** Optional image area (preview + generate button) for saved drafts. */
+  media?: React.ReactNode;
 }
 
-export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer }: Props) {
+export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media }: Props) {
   const set = <K extends keyof DraftContent>(k: K, v: DraftContent[K]) => onChange({ ...draft, [k]: v });
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
@@ -90,6 +96,7 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       <p className="text-xs text-zinc-600">
         <span className="font-medium">Image status:</span> {IMAGE_LABEL[imageStatus]}
       </p>
+      {media}
 
       {errors.length > 0 && (
         <ul className="rounded-md bg-red-50 p-2 text-xs text-red-700" role="alert">

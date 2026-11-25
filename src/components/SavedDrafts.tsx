@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Category, DraftContent, PinDraft, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { DraftEditor, draftErrors } from "./DraftEditor";
+import { DraftImage } from "./DraftImage";
 import { useWorkspace } from "./useWorkspace";
 
 const pick = (d: PinDraft): DraftContent => ({
@@ -82,6 +83,15 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 source={d.source}
                 imageStatus={d.image_status}
                 onChange={(nd) => setEdits((all) => ({ ...all, [d.id]: nd }))}
+                media={
+                  <DraftImage
+                    kind={kind}
+                    store={store}
+                    draft={d}
+                    promptDirty={Boolean(edits[d.id] && edits[d.id].image_prompt !== d.image_prompt)}
+                    onUpdated={(u) => setDrafts((all) => all!.map((x) => (x.id === u.id ? u : x)))}
+                  />
+                }
                 footer={
                   <div className="flex items-center gap-3">
                     <button

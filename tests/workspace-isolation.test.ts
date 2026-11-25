@@ -47,3 +47,16 @@ describe("LocalStore workspace isolation", () => {
     expect(await store.listCategories((await store.getWorkspace("macro")).id)).toHaveLength(0);
   });
 });
+
+describe("LocalStore images", () => {
+  it("records an image only on the draft's own workspace", async () => {
+    const store = new LocalStore(new MemoryKV());
+    const f = await store.getWorkspace("fashion");
+    const m = await store.getWorkspace("macro");
+    const [saved] = await store.saveDrafts(f.id, [draft]);
+    expect(saved.image_status).toBe("not_generated");
+    await expect(store.setImage(m.id, saved.id, { image_status: "ready", image_path: "data:x", image_source: "demo" })).rejects.toThrow();
+    const updated = await store.setImage(f.id, saved.id, { image_status: "ready", image_path: "data:x", image_source: "demo" });
+    expect(await store.imageUrl(updated)).toBe("data:x");
+  });
+});

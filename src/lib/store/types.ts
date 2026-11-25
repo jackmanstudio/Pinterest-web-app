@@ -23,4 +23,10 @@ export interface Store {
   saveDrafts(workspaceId: string, drafts: NewDraft[]): Promise<PinDraft[]>;
   updateDraft(workspaceId: string, id: string, patch: Partial<DraftContent>): Promise<PinDraft>;
   deleteDraft(workspaceId: string, id: string): Promise<void>;
+  /** Re-read one draft (e.g. after the server attached an image). */
+  getDraft(workspaceId: string, id: string): Promise<PinDraft>;
+  /** Demo storage only: the server can't write browser storage, so the client records the image. */
+  setImage(workspaceId: string, id: string, image: Pick<PinDraft, "image_status" | "image_path" | "image_source">): Promise<PinDraft>;
+  /** A URL the browser can display for a draft's image. */
+  imageUrl(draft: PinDraft): Promise<string | null>;
 }

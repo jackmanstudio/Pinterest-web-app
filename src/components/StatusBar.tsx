@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 interface Status {
   storage: "supabase" | "demo";
   text: { source: "demo" | "ai"; provider: string };
-  image: { status: string };
+  image: { source: "demo" | "ai" | "error"; provider: string };
   pinterest: { status: string };
 }
 
@@ -33,7 +33,13 @@ export function StatusBar() {
     <div className="flex flex-wrap items-center gap-1.5" aria-label="Integration status">
       {s.storage === "supabase" ? <Pill tone="ok">Storage: Supabase</Pill> : <Pill tone="demo">Storage: Demo (this browser only)</Pill>}
       {s.text.source === "ai" ? <Pill tone="ok">Text AI: {s.text.provider}</Pill> : <Pill tone="demo">Text AI: Demo templates</Pill>}
-      <Pill tone="off">Image AI: not connected</Pill>
+      {s.image.source === "ai" ? (
+        <Pill tone="ok">Image AI: {s.image.provider}</Pill>
+      ) : s.image.source === "demo" ? (
+        <Pill tone="demo">Image AI: Demo placeholders</Pill>
+      ) : (
+        <Pill tone="off">Image AI: {s.image.provider}</Pill>
+      )}
       <Pill tone="off">Pinterest: not connected</Pill>
     </div>
   );

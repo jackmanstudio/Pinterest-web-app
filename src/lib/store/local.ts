@@ -96,7 +96,17 @@ export class LocalStore implements Store {
       if (n.category_id && !d.categories.some((c) => c.id === n.category_id)) {
         throw new Error("Category does not belong to this workspace");
       }
-      return { ...n, id: uuid(), workspace_id: d.workspace.id, image_status: "not_generated", status: "draft", created_at: now, updated_at: now };
+      return {
+        ...n,
+        id: uuid(),
+        workspace_id: d.workspace.id,
+        image_status: "not_generated",
+        image_path: null,
+        image_source: null,
+        status: "draft",
+        created_at: now,
+        updated_at: now,
+      };
     });
     d.drafts.push(...saved);
     this.write(d);
@@ -109,6 +119,22 @@ export class LocalStore implements Store {
     d.drafts[i] = { ...d.drafts[i], ...patch, updated_at: new Date().toISOString() };
     this.write(d);
     return d.drafts[i];
+  }
+  async getDraft(workspaceId: string, id: string) {
+    const found = this.byId(workspaceId).drafts.find((p) => p.id === id);
+    if (!found) throw new Error("Draft not found in this workspace");
+    return found;
+  }
+  async setImage(workspaceId: string, id: string, image: Pick<PinDraft, "image_status" | "image_path" | "image_source">) {
+    const d = this.byId(workspaceId);
+    const i = d.drafts.findIndex((p) => p.id === id);
+    if (i < 0) throw new Error("Draft not found in this workspace");
+    d.drafts[i] = { ...d.drafts[i], ...image, updated_at: new Date().toISOString() };
+    this.write(d);
+    return d.drafts[i];
+  }
+  async imageUrl(draft: PinDraft) {
+    return draft.image_status === "ready" ? draft.image_path : null;
   }
   async deleteDraft(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);
