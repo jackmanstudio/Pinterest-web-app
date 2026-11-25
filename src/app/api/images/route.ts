@@ -8,12 +8,16 @@ import { ProviderError } from "@/lib/ai/text/types";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { WORKSPACE_KINDS } from "@/lib/types";
+import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
+import { readTemplate } from "@/lib/brand/template";
 
 const Body = z.object({
   workspace: z.enum(WORKSPACE_KINDS),
   draftId: z.string().min(1).max(64),
-  // Only used in Demo storage mode, where the server can't read the draft.
+  // Only used in Demo storage mode, where the server can't read the draft or brand.
   prompt: z.string().max(2000).optional(),
+  title: z.string().max(200).optional(),
+  template: z.unknown().optional(),
 });
 
 export async function POST(request: Request) {
@@ -37,27 +41,37 @@ export async function POST(request: Request) {
   try {
     workspaceId = await workspaceIdFor(ctx, workspace);
     let prompt = parsed.data.prompt ?? "";
+    let title = parsed.data.title ?? "";
+    let art: BrandArt;
 
     if (ctx.mode === "supabase") {
       // Read the draft through RLS: proves it belongs to this user and workspace.
       const { data: draft, error } = await ctx.db
         .from("pin_drafts")
-        .select("id, image_prompt, image_status, image_path")
+        .select("id, title, image_prompt, image_status, image_path")
         .eq("workspace_id", workspaceId)
         .eq("id", draftId)
         .single();
       if (error || !draft) throw new HttpError(404, "Draft not found in this workspace");
       if (draft.image_status === "pending") throw new HttpError(409, "An image is already being generated for this draft");
       prompt = draft.image_prompt;
+      title = draft.title;
+      art = await brandArtFor(ctx.db, workspaceId!);
       await ctx.db.from("pin_drafts").update({ image_status: "pending" }).eq("id", draftId).eq("workspace_id", workspaceId);
       markFailed = async () => {
         await ctx.db.from("pin_drafts").update({ image_status: "failed" }).eq("id", draftId).eq("workspace_id", workspaceId);
       };
     }
+    else {
+      const template = readTemplate(parsed.data.template);
+      art = { template, logo: logoFromDataUrl(template.logo) };
+    }
     if (!prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
     await assertWithinBudget(ctx.ledger, provider.source === "ai");
-    const image = await withRetry(() => provider.generate(prompt, PIN_IMAGE_SIZE));
+    const raw = await withRetry(() => provider.generate(prompt, PIN_IMAGE_SIZE));
+    // Title overlay, brand colours and logo are drawn on the server, then saved as one JPEG.
+    const image = await brandPinImage(raw, title, art, { demo: ctx.mode === "demo" });
 
     let imagePath: string;
     let imageUrl: string;

@@ -10,10 +10,12 @@ export interface ImageResult {
 export async function generateDraftImage(kind: WorkspaceKind, store: Store, draft: PinDraft): Promise<ImageResult> {
   let res: Response;
   try {
+    // Demo storage lives in the browser, so the server needs the prompt, title and pin design sent along.
+    const demo = store.mode === "demo" ? { prompt: draft.image_prompt, title: draft.title, template: (await store.getBrand(draft.workspace_id)).pin_template } : {};
     res = await fetch("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: kind, draftId: draft.id, prompt: store.mode === "demo" ? draft.image_prompt : undefined }),
+      body: JSON.stringify({ workspace: kind, draftId: draft.id, ...demo }),
     });
   } catch {
     return { draft, error: "Could not reach the server. Check your connection and retry." };

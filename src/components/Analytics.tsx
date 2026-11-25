@@ -191,7 +191,15 @@ export function Analytics({ kind }: { kind: WorkspaceKind }) {
                   <tbody>
                     {published.data.map((p) => (
                       <tr key={p.pin_id} className="border-t border-zinc-100">
-                        <td className="py-1.5">{p.title}{p.error && <span className="block text-xs text-red-700">{p.error}</span>}</td>
+                        <td className="py-1.5">
+                          {p.title}
+                          {p.error && <span className="block text-xs text-red-700">{p.error}</span>}
+                          {!sample && !p.error && (p.summary.SAVE ?? 0) + (p.summary.PIN_CLICK ?? 0) > 0 && (
+                            <a className="block text-xs text-red-700 underline" href={`/w/${kind}?idea=${encodeURIComponent(`New version of our best-performing pin "${p.title}"`)}`}>
+                              Make new versions
+                            </a>
+                          )}
+                        </td>
                         <td>{fmt("IMPRESSION", p.summary.IMPRESSION)}</td><td>{fmt("SAVE", p.summary.SAVE)}</td><td>{fmt("PIN_CLICK", p.summary.PIN_CLICK)}</td>
                       </tr>
                     ))}

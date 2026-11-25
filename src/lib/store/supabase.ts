@@ -24,7 +24,7 @@ export class SupabaseStore implements Store {
   async getBrand(workspaceId: string): Promise<BrandSettings> {
     const res = await this.db
       .from("brand_settings")
-      .select("brand_name, voice, audience, website_url, focus_keywords, banned_words")
+      .select("brand_name, voice, audience, website_url, focus_keywords, banned_words, pin_template")
       .eq("workspace_id", workspaceId)
       .maybeSingle();
     if (res.error) throw new Error(res.error.message);
@@ -66,6 +66,19 @@ export class SupabaseStore implements Store {
   async setImage(workspaceId: string, id: string): Promise<PinDraft> {
     // The server route already wrote the image; just re-read the row.
     return this.getDraft(workspaceId, id);
+  }
+  async uploadLogo(workspaceId: string, file: File) {
+    const ext = file.type === "image/png" ? "png" : "jpg";
+    const path = `${workspaceId}/brand/logo-${Date.now()}.${ext}`;
+    const { error } = await this.db.storage.from(IMAGE_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (error) throw new Error(error.message);
+    return path;
+  }
+  async logoUrl(logo: string | null) {
+    if (!logo) return null;
+    if (logo.startsWith("data:")) return logo;
+    const { data, error } = await this.db.storage.from(IMAGE_BUCKET).createSignedUrl(logo, 60 * 60);
+    return error ? null : data.signedUrl;
   }
   async imageUrl(draft: PinDraft) {
     if (draft.image_status !== "ready" || !draft.image_path) return null;

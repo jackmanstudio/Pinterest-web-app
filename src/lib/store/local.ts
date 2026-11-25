@@ -106,7 +106,7 @@ export class LocalStore implements Store {
         image_path: null,
         image_source: null,
         status: "draft",
-        link: null,
+        link: n.link ?? null,
         board_id: null,
         board_name: null,
         review_note: null,
@@ -178,5 +178,17 @@ export class LocalStore implements Store {
     const d = this.byId(workspaceId);
     d.drafts = d.drafts.filter((p) => p.id !== id);
     this.write(d);
+  }
+
+  async uploadLogo(_workspaceId: string, file: File) {
+    return await new Promise<string>((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result));
+      r.onerror = () => reject(new Error("Could not read the logo file"));
+      r.readAsDataURL(file);
+    });
+  }
+  async logoUrl(logo: string | null) {
+    return logo;
   }
 }

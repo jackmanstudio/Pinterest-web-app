@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
   cacheComponents: true,
   partialPrefetching: true,
   poweredByHeader: false,
+  serverExternalPackages: ["@resvg/resvg-js", "sharp"],
+  // Pin overlays are drawn on the server with the bundled fonts.
+  outputFileTracingIncludes: { "/api/**": ["./public/fonts/**"] },
   turbopack: {
     rules: {
       "*.css": {

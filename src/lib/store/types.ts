@@ -15,6 +15,8 @@ export interface NewDraft extends DraftContent {
   batch_id: string;
   category_id: string | null;
   source: ContentSource;
+  /** Destination URL (blog post, product page). */
+  link?: string | null;
 }
 
 /**
@@ -42,4 +44,8 @@ export interface Store {
   /** Moves a draft through the approval workflow. Live actions need Supabase + Pinterest. */
   transition(workspaceId: string, id: string, action: WorkflowAction, opts?: TransitionOptions): Promise<PinDraft>;
   audit(workspaceId: string, draftId: string): Promise<AuditEvent[]>;
+  /** Stores a brand logo; returns the value to keep in the pin template (storage path or data URL). */
+  uploadLogo(workspaceId: string, file: File): Promise<string>;
+  /** A URL the browser can display for a stored logo value. */
+  logoUrl(logo: string | null): Promise<string | null>;
 }

@@ -8,7 +8,9 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | --- | --- |
 | Supabase auth + database | **Built, not yet tested against a live project.** Without env vars the app runs in Demo mode (browser-only storage, clearly labelled). |
 | Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
-| Image AI | **Two adapters built, not yet tested with live keys.** Free: Cloudflare Workers AI (FLUX.2 klein 4B, about 60 images a day). Paid: OpenAI GPT Image. Without credentials, images are labelled DEMO placeholders. |
+| Image AI | **Three adapters built, not yet tested with live keys.** Recommended paid: fal.ai FLUX.3 Klein (~$0.011/pin; premium Nano Banana 2 or FLUX.3 via `IMAGE_AI_MODEL`). Free: Cloudflare Workers AI FLUX.2 klein 4B (~60/day). Alternative: OpenAI GPT Image. Without credentials, images are labelled DEMO placeholders. |
+| Pin design | **Built and tested.** Title overlay, brand colours, font, handle and logo drawn on the server (resvg + sharp, bundled OFL fonts). |
+| Trend finder | **Built.** Live Pinterest Trends when the app has Trends access; otherwise clearly labelled seasonal calendar suggestions. |
 | Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
 | Autopilot | **Built, not yet tested live.** Off by default. Turns queued ideas into pins and publishes them to Pinterest automatically within a daily limit and the AI budget. Needs Supabase, AI keys, Pinterest with publishing, and an hourly scheduler. |
 | Production hardening | **Built.** Rate limits, security headers, structured logs, `/api/health`, data export and account deletion, CI. Rate limits are in-memory (one server instance); swap in Redis/Upstash for multi-instance hosting. |
@@ -96,6 +98,12 @@ The migration creates both workspaces for every new user, enables row-level secu
 
 In Studio, type a title and press **Make 5 complete pins**. The app writes 5 distinct pins (title, description, tags, alt text), saves them, and generates an image for each. They wait as drafts in *Review & publish* until you approve them. "Write text only" keeps the old edit-first flow.
 
+## Pin design, links and trends
+
+- **Pin design** (*Brand & categories*): style (bold band, minimal fade, elegant card, or none), font, brand and text colours, handle, logo. Every new image is cropped to 1000×1500 and gets the title drawn on it in that design, as a JPEG. Fonts (Poppins, DM Serif Display, Bebas Neue, SIL OFL) live in `public/fonts`.
+- **Destination link**: Studio has a link box (defaults to the brand website); Autopilot has its own. Pinterest sends clicks there.
+- **Trend finder**: chips under the Studio box. Live Pinterest Trends if fetched; otherwise seasonal calendar ideas, labelled as such.
+
 ## Autopilot (opt-in automatic publishing)
 
 The brief requires approval before publishing. Autopilot is the owner's standing approval: it is **off by default**, turning it on requires typing `AUTO PUBLISH` (enforced by a database constraint), and pausing clears that consent.
@@ -104,6 +112,9 @@ The brief requires approval before publishing. Autopilot is the owner's standing
 - **Each hourly tick** (`/api/cron/autopilot`, `Authorization: Bearer $CRON_SECRET`): if no auto-approved pin is ready, the next idea becomes 5 pins with AI text and AI images; then one pin is published to the chosen board.
 - **Limits:** 1–10 pins per day, spaced at least 90% of 24h ÷ limit apart; the monthly AI budget pauses it (the idea goes back in the queue); demo text or images are never published.
 - **Safety:** every publish is audited (`autopilot_publish`); a pin that can't be published is parked as a draft with the reason; the same one-job-per-draft rule prevents duplicates.
+- **Best time to post:** learns the 3-hour windows when your own pins got the most saves and clicks (top pins + pins published here, by post hour in your timezone). Pinterest only gives daily analytics, so this is per-pin, not hourly totals. Until 8 pins have stats it uses a labelled default (midday + evening).
+- **Remake winners:** when the queue is empty, at most weekly, makes a fresh version of the best pin not remade in the last 60 days.
+- **Trends:** optionally uses the fastest-growing Pinterest trend for your topic (or matching your focus keywords) not used in 30 days.
 - **Built to become a full agent:** ideas come from an `IdeaSource` (`src/lib/autopilot/engine.ts`). Today it's the user's queue; a trends- or analytics-driven source can plug into the same interface (`autopilot_ideas.source` already allows `trends` and `agent`).
 - **Scheduler:** Vercel Pro cron, or a free external scheduler such as cron-job.org calling `GET https://<domain>/api/cron/autopilot` hourly and `/api/cron/publish-due` every 5 minutes with the `Authorization` header. Vercel Hobby crons run only once a day.
 

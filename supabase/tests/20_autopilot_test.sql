@@ -64,5 +64,18 @@ select pg_temp.check((select count(*) from claim_autopilot_idea((select id from 
 insert into pin_drafts (workspace_id, batch_id, idea, title, source, autopilot, status) select id, gen_random_uuid(), 'x idea', 't', 'ai', true, 'approved' from a_ws;
 select pg_temp.check((select count(*) from pin_drafts where autopilot) = 1, 'server can create approved autopilot drafts');
 
+-- Phase 8 columns
+select pg_temp.act_as('00000000-0000-0000-0000-00000000000a');
+update brand_settings set pin_template = '{"style":"minimal"}' where workspace_id = (select id from a_ws);
+insert into brand_settings (workspace_id, pin_template) select id, '{"style":"minimal"}' from a_ws on conflict (workspace_id) do nothing;
+select pg_temp.check((select pin_template->>'style' from brand_settings where workspace_id = (select id from a_ws)) = 'minimal', 'owner can save a pin design');
+update autopilot_settings set timezone = 'Asia/Karachi', remix_winners = true, auto_trends = true, trend_interest = 'womens_fashion';
+select pg_temp.check((select timezone = 'Asia/Karachi' and auto_trends from autopilot_settings), 'owner can set smart Autopilot options');
+select pg_temp.check(pg_temp.fails($$update autopilot_settings set trend_interest = 'crypto'$$), 'trend topic must be a Pinterest interest');
+select pg_temp.check(pg_temp.fails($$insert into autopilot_ideas (workspace_id, idea, source, ref) select id, 'trend idea', 'trends', 'x' from a_ws$$), 'users cannot fake trend ideas');
+select pg_temp.as_admin();
+insert into autopilot_ideas (workspace_id, idea, source, ref, status) select id, 'New version of a winner', 'agent', 'pin123', 'processing' from a_ws;
+select pg_temp.check((select count(*) from autopilot_ideas where source = 'agent' and ref = 'pin123') = 1, 'server records where an automatic idea came from');
+
 reset role;
 \echo ALL DATABASE TESTS PASSED

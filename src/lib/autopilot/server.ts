@@ -9,6 +9,7 @@ import { checkPinterestConfig, getPinterestConfig } from "@/lib/pinterest/config
 import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { EMPTY_BRAND, type BrandSettings } from "@/lib/types";
+import { brandArtFor, brandPinImage } from "@/lib/brand/server";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import type { UsageEntry, UsageLedger } from "@/lib/usage/ledger";
 import { estimateTextCost, startOfMonthUtc } from "@/lib/usage/pricing";
@@ -16,6 +17,114 @@ import { publishBlockers, PUBLISH_SCOPES } from "@/lib/workflow/checks";
 import { runPublishJob } from "@/lib/workflow/runner";
 import { audit, supabaseRunnerDeps } from "@/lib/workflow/server";
 import type { AutopilotDeps, AutopilotWorkspace, Idea } from "./engine";
+import { bestPostingHours, type PinSample } from "./bestTime";
+import { pickTrend, pickWinner, trendIdea, winnerIdea, type WinnerCandidate } from "./sources";
+import { analyticsCalls, saveSnapshot } from "@/lib/analytics/server";
+import { parseTopPins, parseTrends } from "@/lib/analytics/parse";
+import type { PublishedPinStats, TopPin, TrendKeyword } from "@/lib/analytics/types";
+import { ensureAccessToken } from "@/lib/pinterest/sync";
+
+const DAY = 86_400_000;
+
+async function latest<T>(db: SupabaseClient, workspaceId: string, kind: string): Promise<{ data: T; fetched_at: string } | null> {
+  const { data } = await db
+    .from("analytics_snapshots")
+    .select("data, fetched_at")
+    .eq("workspace_id", workspaceId)
+    .eq("kind", kind)
+    .order("fetched_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { data: T; fetched_at: string } | null) ?? null;
+}
+
+/** Your pins with their post time and stats, from the latest stored analytics. Works with RLS or admin clients. */
+export async function loadPinSamples(db: SupabaseClient, workspaceId: string): Promise<{ samples: PinSample[]; winners: WinnerCandidate[] }> {
+  const [top, published] = await Promise.all([
+    latest<TopPin[]>(db, workspaceId, "top_pins"),
+    latest<PublishedPinStats[]>(db, workspaceId, "published_pins"),
+  ]);
+  const byId = new Map<string, { created_at: string | null; title: string | null; m: Record<string, number> }>();
+  const topIds = (top?.data ?? []).map((p) => p.pin_id);
+  if (topIds.length) {
+    const { data } = await db.from("pinterest_pins").select("pin_id, title, pin_created_at").eq("workspace_id", workspaceId).in("pin_id", topIds);
+    const meta = new Map((data ?? []).map((r) => [r.pin_id as string, r]));
+    for (const p of top!.data) byId.set(p.pin_id, { created_at: meta.get(p.pin_id)?.pin_created_at ?? null, title: meta.get(p.pin_id)?.title ?? null, m: p.metrics });
+  }
+  const pub = (published?.data ?? []).filter((p) => !p.error);
+  if (pub.length) {
+    const { data } = await db.from("pin_drafts").select("id, published_at").eq("workspace_id", workspaceId).in("id", pub.map((p) => p.draft_id));
+    const when = new Map((data ?? []).map((r) => [r.id as string, r.published_at as string | null]));
+    for (const p of pub) if (!byId.has(p.pin_id)) byId.set(p.pin_id, { created_at: when.get(p.draft_id) ?? null, title: p.title, m: p.summary });
+  }
+  const samples: PinSample[] = [];
+  const winners: WinnerCandidate[] = [];
+  for (const [pin_id, v] of byId) {
+    const saves = v.m.SAVE ?? 0, clicks = v.m.PIN_CLICK ?? 0, outbound = v.m.OUTBOUND_CLICK ?? 0, impressions = v.m.IMPRESSION ?? 0;
+    if (v.created_at) samples.push({ created_at: v.created_at, saves, clicks, outbound, impressions });
+    winners.push({ pin_id, title: v.title, saves, clicks, outbound });
+  }
+  return { samples, winners };
+}
+
+async function usedRefs(admin: SupabaseClient, workspaceId: string, source: string, days: number): Promise<{ refs: Set<string>; lastAt: number | null }> {
+  const { data } = await admin
+    .from("autopilot_ideas")
+    .select("ref, created_at")
+    .eq("workspace_id", workspaceId)
+    .eq("source", source)
+    .gte("created_at", new Date(Date.now() - days * DAY).toISOString())
+    .order("created_at", { ascending: false });
+  return { refs: new Set((data ?? []).map((r) => String(r.ref ?? "").toLowerCase()).filter(Boolean)), lastAt: data?.[0] ? Date.parse(data[0].created_at) : null };
+}
+
+async function insertAutoIdea(admin: SupabaseClient, workspaceId: string, idea: string, source: "agent" | "trends", ref: string): Promise<Idea | null> {
+  const { data, error } = await admin.from("autopilot_ideas").insert({ workspace_id: workspaceId, idea, source, ref, status: "processing" }).select("id, idea").single();
+  if (error) throw new Error(error.message);
+  return data as Idea;
+}
+
+/** Fresh-enough trends: the latest stored snapshot, or a new fetch from Pinterest if it's over 3 days old. */
+async function trendsFor(admin: SupabaseClient, ws: AutopilotWorkspace): Promise<TrendKeyword[]> {
+  const snap = await latest<TrendKeyword[]>(admin, ws.workspace_id, "trends");
+  if (snap && Date.now() - Date.parse(snap.fetched_at) < 3 * DAY) return snap.data;
+  try {
+    const cfg = getPinterestConfig();
+    const api = new PinterestApi(cfg);
+    const repo = new ConnectionRepo(admin, cfg.encryptionKey);
+    const conn = await repo.get(ws.workspace_id);
+    if (!conn) return snap?.data ?? [];
+    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(ws.workspace_id, t, conn.refresh_token));
+    const trends = parseTrends(await analyticsCalls(api).trends(token, "US", "growing", ws.trend_interest ?? undefined));
+    await saveSnapshot(admin, {
+      workspaceId: ws.workspace_id, kind: "trends", source: "Pinterest API v5 · GET /trends/keywords/{region}/top/{trend_type}", environment: cfg.env,
+      end: new Date().toISOString().slice(0, 10), params: { region: "US", type: "growing", interest: ws.trend_interest, by: "autopilot" }, data: trends,
+    });
+    return trends;
+  } catch {
+    return snap?.data ?? [];
+  }
+}
+
+/** Keeps top-pin stats fresh (weekly) so winners and best times keep learning. */
+async function refreshTopPins(admin: SupabaseClient, ws: AutopilotWorkspace) {
+  const snap = await latest<TopPin[]>(admin, ws.workspace_id, "top_pins");
+  if (snap && Date.now() - Date.parse(snap.fetched_at) < 7 * DAY) return;
+  try {
+    const cfg = getPinterestConfig();
+    const api = new PinterestApi(cfg);
+    const repo = new ConnectionRepo(admin, cfg.encryptionKey);
+    const conn = await repo.get(ws.workspace_id);
+    if (!conn) return;
+    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(ws.workspace_id, t, conn.refresh_token));
+    const end = new Date().toISOString().slice(0, 10);
+    const start = new Date(Date.now() - 89 * DAY).toISOString().slice(0, 10);
+    const raw = await analyticsCalls(api).topPins(token, start, end);
+    await saveSnapshot(admin, { workspaceId: ws.workspace_id, kind: "top_pins", source: "Pinterest API v5 · GET /user_account/analytics/top_pins (sorted by saves)", environment: cfg.env, start, end, data: parseTopPins(raw) });
+  } catch {
+    /* analytics are optional for Autopilot */
+  }
+}
 
 /** Usage ledger for one owner, written with the service role (no user session in cron). */
 export class OwnerLedger implements UsageLedger {
@@ -42,7 +151,7 @@ export class OwnerLedger implements UsageLedger {
 export function serverReadiness(env: Record<string, string | undefined> = process.env): string[] {
   const out: string[] = [];
   if (getTextProvider(env).source !== "ai") out.push("Add TEXT_AI_API_KEY so pins are written by AI.");
-  if (getImageProvider(env).source !== "ai") out.push("Add image AI: free CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, or a paid OpenAI key in IMAGE_AI_API_KEY.");
+  if (getImageProvider(env).source !== "ai") out.push("Add image AI: free CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, or a paid FAL_KEY (recommended) or OpenAI key.");
   const pc = checkPinterestConfig(env);
   if (!pc.ready) out.push(`Pinterest isn't configured on the server (missing ${pc.missing.join(", ")}).`);
   if (env.PINTEREST_ENABLE_PUBLISHING !== "true") out.push("Set PINTEREST_ENABLE_PUBLISHING=true.");
@@ -53,6 +162,12 @@ export function serverReadiness(env: Record<string, string | undefined> = proces
 export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
   return {
     now: () => new Date(),
+
+    async postingHours(ws) {
+      await refreshTopPins(admin, ws);
+      const { samples } = await loadPinSamples(admin, ws.workspace_id);
+      return bestPostingHours(samples, ws.timezone).hours;
+    },
 
     async readinessProblems(ws) {
       const out = serverReadiness().filter((p) => !p.startsWith("Set CRON_SECRET"));
@@ -97,11 +212,29 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
     },
 
     ideas: {
+      // Your queue first; then (if switched on) a new version of a winning pin at most weekly; then a fresh trend.
       async next(ws) {
         const { data, error } = await admin.rpc("claim_autopilot_idea", { p_workspace: ws.workspace_id });
         if (error) throw new Error(error.message);
         const row = (data as Idea[] | null)?.[0];
-        return row ? { id: row.id, idea: row.idea } : null;
+        if (row) return { id: row.id, idea: row.idea };
+
+        if (ws.remix_winners) {
+          const used = await usedRefs(admin, ws.workspace_id, "agent", 60);
+          if (!used.lastAt || Date.now() - used.lastAt > 7 * DAY) {
+            await refreshTopPins(admin, ws);
+            const { winners } = await loadPinSamples(admin, ws.workspace_id);
+            const w = pickWinner(winners, used.refs);
+            if (w?.title) return insertAutoIdea(admin, ws.workspace_id, winnerIdea(w.title), "agent", w.pin_id);
+          }
+        }
+        if (ws.auto_trends) {
+          const used = await usedRefs(admin, ws.workspace_id, "trends", 30);
+          const brand = await admin.from("brand_settings").select("focus_keywords").eq("workspace_id", ws.workspace_id).maybeSingle();
+          const t = pickTrend(await trendsFor(admin, ws), used.refs, (brand.data?.focus_keywords as string[] | undefined) ?? [], !ws.trend_interest);
+          if (t) return insertAutoIdea(admin, ws.workspace_id, trendIdea(t.keyword), "trends", t.keyword.toLowerCase());
+        }
+        return null;
       },
       async finish(idea, r) {
         await admin
@@ -134,14 +267,15 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
             autopilot: true, status: "approved", approved_at: now, approved_by: ws.owner_id, review_note: "Auto-approved by Autopilot",
           })),
         )
-        .select("id, image_prompt");
+        .select("id, title, image_prompt");
       if (ins.error) throw new Error(ins.error.message);
+      const art = await brandArtFor(admin, ws.workspace_id);
 
       let made = 0;
       for (const d of ins.data ?? []) {
         try {
           await assertWithinBudget(ledger, true);
-          const img = await withRetry(() => images.generate(d.image_prompt, PIN_IMAGE_SIZE));
+          const img = await brandPinImage(await withRetry(() => images.generate(d.image_prompt, PIN_IMAGE_SIZE)), d.title, art);
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
           if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);
@@ -203,13 +337,16 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
 export async function enabledWorkspaces(admin: SupabaseClient, workspaceId?: string): Promise<AutopilotWorkspace[]> {
   let q = admin
     .from("autopilot_settings")
-    .select("workspace_id, board_id, board_name, pins_per_day, link, workspaces!inner(owner_id, kind)")
+    .select("workspace_id, board_id, board_name, pins_per_day, link, timezone, best_time, remix_winners, auto_trends, trend_interest, workspaces!inner(owner_id, kind)")
     .eq("enabled", true);
   if (workspaceId) q = q.eq("workspace_id", workspaceId);
   const { data, error } = await q;
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => {
     const w = (Array.isArray(r.workspaces) ? r.workspaces[0] : r.workspaces) as { owner_id: string; kind: AutopilotWorkspace["kind"] };
-    return { workspace_id: r.workspace_id, owner_id: w.owner_id, kind: w.kind, board_id: r.board_id!, board_name: r.board_name, pins_per_day: r.pins_per_day, link: r.link };
+    return {
+      workspace_id: r.workspace_id, owner_id: w.owner_id, kind: w.kind, board_id: r.board_id!, board_name: r.board_name, pins_per_day: r.pins_per_day, link: r.link,
+      timezone: r.timezone, best_time: r.best_time, remix_winners: r.remix_winners, auto_trends: r.auto_trends, trend_interest: r.trend_interest,
+    };
   });
 }

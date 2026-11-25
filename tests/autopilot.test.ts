@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { getImageProvider } from "@/lib/ai/image";
 import { CloudflareImageProvider } from "@/lib/ai/image/cloudflare";
+import { FalImageProvider } from "@/lib/ai/image/fal";
 import { OpenAIImageProvider, pinImagePrompt } from "@/lib/ai/image/openai";
 import { ProviderError } from "@/lib/ai/text/types";
 import { runAutopilotStep, spacingMs, type AutopilotDeps, type AutopilotWorkspace, type Idea } from "@/lib/autopilot/engine";
@@ -10,6 +11,11 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2]).toString("base64");
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 describe("image provider selection", () => {
+  it("uses fal when its key is set, and the chosen model's price", () => {
+    const p = getImageProvider({ FAL_KEY: "k", CLOUDFLARE_ACCOUNT_ID: "a", CLOUDFLARE_API_TOKEN: "t" });
+    expect(p).toBeInstanceOf(FalImageProvider);
+    expect(getImageProvider({ IMAGE_AI_PROVIDER: "cloudflare", FAL_KEY: "k", CLOUDFLARE_ACCOUNT_ID: "a", CLOUDFLARE_API_TOKEN: "t" })).toBeInstanceOf(CloudflareImageProvider);
+  });
   it("prefers free Cloudflare, then OpenAI, then demo", () => {
     expect(getImageProvider({}).source).toBe("demo");
     expect(getImageProvider({ OPENAI_API_KEY: "k" })).toBeInstanceOf(OpenAIImageProvider);
@@ -44,6 +50,33 @@ describe("OpenAI image adapter", () => {
   });
 });
 
+describe("fal image adapter", () => {
+  it("asks FLUX.3 Klein for a 1024x1536 JPEG and reads the inline image", async () => {
+    const fetchImpl = vi.fn(async () => json(200, { images: [{ url: `data:image/jpeg;base64,${JPEG}`, content_type: "image/jpeg" }], has_nsfw_concepts: [false] }));
+    const p = new FalImageProvider({ apiKey: "fk", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const img = await p.generate("linen dress");
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://fal.run/blackforestlabs/flux-3/klein/text-to-image");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Key fk");
+    expect(JSON.parse(init.body as string)).toMatchObject({ image_size: { width: 1024, height: 1536 }, output_format: "jpeg" });
+    expect(img).toMatchObject({ contentType: "image/jpeg", est_cost_usd: 0.011 });
+    expect(Array.from(img.bytes.slice(0, 2))).toEqual([0xff, 0xd8]);
+  });
+  it("uses an aspect ratio for Nano Banana and downloads hosted images", async () => {
+    const fetchImpl = vi.fn(async (u: string) =>
+      u.startsWith("https://fal.run") ? json(200, { images: [{ url: "https://v3.fal.media/x.jpg" }] }) : new Response(Buffer.from(JPEG, "base64"), { headers: { "content-type": "image/jpeg" } }),
+    );
+    const p = new FalImageProvider({ apiKey: "fk", model: "fal-ai/nano-banana-2", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const img = await p.generate("x");
+    expect(JSON.parse((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).aspect_ratio).toBe("2:3");
+    expect(img.est_cost_usd).toBe(0.067);
+  });
+  it("explains an empty balance", async () => {
+    const p = new FalImageProvider({ apiKey: "k", fetchImpl: (async () => json(402, { detail: "Insufficient balance" })) as unknown as typeof fetch });
+    await expect(p.generate("x")).rejects.toThrow(/no credit/);
+  });
+});
+
 describe("Cloudflare image adapter", () => {
   it("sends multipart prompt + 2:3 size and detects the image type", async () => {
     const fetchImpl = vi.fn(async () => json(200, { success: true, result: { image: PNG } }));
@@ -65,7 +98,7 @@ describe("Cloudflare image adapter", () => {
 
 // ---------------------------------------------------------------------------
 
-const ws: AutopilotWorkspace = { workspace_id: "w1", owner_id: "u1", kind: "fashion", board_id: "b1", board_name: "Board", pins_per_day: 3, link: null };
+const ws: AutopilotWorkspace = { workspace_id: "w1", owner_id: "u1", kind: "fashion", board_id: "b1", board_name: "Board", pins_per_day: 3, link: null, timezone: "UTC", best_time: false, remix_winners: false, auto_trends: false, trend_interest: null };
 const NOW = new Date("2026-11-25T12:00:00Z");
 
 function fakeDeps(opts: Partial<Omit<AutopilotDeps, "ideas">> & { ideas?: Idea[]; ready?: string[] } = {}) {
@@ -78,6 +111,7 @@ function fakeDeps(opts: Partial<Omit<AutopilotDeps, "ideas">> & { ideas?: Idea[]
   const deps: AutopilotDeps = {
     now: () => NOW,
     readinessProblems: async () => [],
+    postingHours: async () => null,
     recentPublishes: async () => ({ count: 0, lastAt: null }),
     nextReadyDraft: async () => (ready.length ? { id: ready[0] } : null),
     ideas: {

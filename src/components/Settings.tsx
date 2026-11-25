@@ -4,6 +4,7 @@ import { parseList } from "@/lib/drafts/validation";
 import type { BrandSettings, Category, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
+import { PinDesign } from "./PinDesign";
 
 export function Settings({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
@@ -114,6 +115,14 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
           <button className="rounded-md bg-zinc-900 px-3 py-2 text-sm text-white">Add</button>
         </form>
       </section>
+
+      <PinDesign
+        store={store}
+        workspaceId={workspace.id}
+        brand={brand}
+        sampleTitle={kind === "fashion" ? "7 Autumn Trench Coat Outfits Worth Saving" : "Your Pin Title Goes Right Here"}
+        onSaved={setBrand}
+      />
     </div>
   );
 }

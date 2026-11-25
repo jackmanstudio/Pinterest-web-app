@@ -1,7 +1,8 @@
 import { connection, NextResponse } from "next/server";
 import { z } from "zod";
 import { CONSENT_PHRASE, MAX_PINS_PER_DAY, runAutopilotStep } from "@/lib/autopilot/engine";
-import { enabledWorkspaces, serverReadiness, supabaseAutopilotDeps } from "@/lib/autopilot/server";
+import { enabledWorkspaces, loadPinSamples, serverReadiness, supabaseAutopilotDeps } from "@/lib/autopilot/server";
+import { bestPostingHours } from "@/lib/autopilot/bestTime";
 import { getPinterestConfig } from "@/lib/pinterest/config";
 import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
@@ -30,8 +31,8 @@ export async function GET(request: Request) {
     }
     const workspaceId = (await workspaceIdFor(ctx, kind))!;
     const [settings, ideas, boards, recent] = await Promise.all([
-      ctx.db.from("autopilot_settings").select("enabled, board_id, board_name, pins_per_day, link, enabled_at, paused_reason, last_run_at").eq("workspace_id", workspaceId).maybeSingle(),
-      ctx.db.from("autopilot_ideas").select("id, idea, status, error, created_at, processed_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50),
+      ctx.db.from("autopilot_settings").select("enabled, board_id, board_name, pins_per_day, link, enabled_at, paused_reason, last_run_at, timezone, best_time, remix_winners, auto_trends, trend_interest").eq("workspace_id", workspaceId).maybeSingle(),
+      ctx.db.from("autopilot_ideas").select("id, idea, status, error, source, created_at, processed_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50),
       ctx.db.from("pinterest_boards").select("board_id, name").eq("workspace_id", workspaceId).order("name"),
       ctx.db.from("pin_drafts").select("id, title, status, external_pin_id, published_at, review_note, image_status").eq("workspace_id", workspaceId).eq("autopilot", true).order("created_at", { ascending: false }).limit(20),
     ]);
@@ -44,9 +45,15 @@ export async function GET(request: Request) {
       /* Pinterest not configured: reported in readiness */
     }
     if (!connected) readiness.push("Connect Pinterest to this workspace (Pinterest tab), then sync boards.");
+    const tz = (settings.data?.timezone as string | undefined) ?? "UTC";
+    const bestTime = bestPostingHours((await loadPinSamples(ctx.db, workspaceId)).samples, tz);
     return NextResponse.json({
       mode: "supabase",
-      settings: settings.data ?? { enabled: false, board_id: null, board_name: null, pins_per_day: 3, link: null, enabled_at: null, paused_reason: null, last_run_at: null },
+      settings: settings.data ?? {
+        enabled: false, board_id: null, board_name: null, pins_per_day: 3, link: null, enabled_at: null, paused_reason: null, last_run_at: null,
+        timezone: "UTC", best_time: true, remix_winners: true, auto_trends: false, trend_interest: kind === "fashion" ? "womens_fashion" : null,
+      },
+      bestTime,
       ideas: ideas.data,
       boards: boards.data,
       recent: recent.data,
@@ -67,6 +74,18 @@ const Body = z.discriminatedUnion("action", [
     boardName: z.string().max(200).nullable(),
     pinsPerDay: z.number().int().min(1).max(MAX_PINS_PER_DAY),
     link: z.url().max(2000).nullable().or(z.literal("").transform(() => null)),
+    timezone: z.string().min(1).max(64).refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown timezone").default("UTC"),
+    bestTime: z.boolean().default(true),
+    remixWinners: z.boolean().default(true),
+    autoTrends: z.boolean().default(false),
+    trendInterest: z.enum(["womens_fashion", "mens_fashion", "beauty", "home_decor", "food_and_drinks", "travel", "art", "design"]).nullable().default(null),
   }),
   z.object({ action: z.literal("add_ideas"), workspace: z.enum(WORKSPACE_KINDS), ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
   z.object({ action: z.literal("delete_idea"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
@@ -92,6 +111,7 @@ export async function POST(request: Request) {
       const res = await ctx.db.from("autopilot_settings").upsert({
         workspace_id: workspaceId, enabled: b.enabled, consent_text: b.enabled ? CONSENT_PHRASE : null,
         board_id: b.boardId, board_name: b.boardName, pins_per_day: b.pinsPerDay, link: b.link,
+        timezone: b.timezone, best_time: b.bestTime, remix_winners: b.remixWinners, auto_trends: b.autoTrends, trend_interest: b.trendInterest,
       });
       if (res.error) throw new Error(res.error.message);
       if (b.enabled !== Boolean(prev.data?.enabled)) {

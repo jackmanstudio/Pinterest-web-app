@@ -14,12 +14,39 @@ interface Settings {
   enabled_at: string | null;
   paused_reason: string | null;
   last_run_at: string | null;
+  timezone: string;
+  best_time: boolean;
+  remix_winners: boolean;
+  auto_trends: boolean;
+  trend_interest: string | null;
+}
+interface BestTimeInfo {
+  hours: number[];
+  basis: "data" | "default";
+  detail: string;
+}
+const INTERESTS: Record<string, string> = {
+  womens_fashion: "Women's fashion", mens_fashion: "Men's fashion", beauty: "Beauty", home_decor: "Home decor",
+  food_and_drinks: "Food & drinks", travel: "Travel", art: "Art", design: "Design",
+};
+const hourLabel = (h: number) => `${((h + 11) % 12) + 1}${h < 12 ? "am" : "pm"}`;
+/** Collapses [12,13,14,18,19] into "12pm–3pm, 6pm–8pm". */
+function hoursText(hours: number[]): string {
+  const sorted = [...new Set(hours)].sort((a, b) => a - b);
+  const runs: [number, number][] = [];
+  for (const h of sorted) {
+    const last = runs.at(-1);
+    if (last && h === last[1] + 1) last[1] = h;
+    else runs.push([h, h]);
+  }
+  return runs.map(([a, b]) => `${hourLabel(a)}–${hourLabel((b + 1) % 24)}`).join(", ");
 }
 interface IdeaRow {
   id: string;
   idea: string;
   status: "queued" | "processing" | "done" | "failed";
   error: string | null;
+  source: "user" | "trends" | "agent";
   created_at: string;
 }
 interface RecentPin {
@@ -32,7 +59,7 @@ interface RecentPin {
 }
 type Data =
   | { mode: "demo"; readiness: string[] }
-  | { mode: "supabase"; settings: Settings; ideas: IdeaRow[]; boards: { board_id: string; name: string }[]; recent: RecentPin[]; readiness: string[] };
+  | { mode: "supabase"; settings: Settings; bestTime: BestTimeInfo; ideas: IdeaRow[]; boards: { board_id: string; name: string }[]; recent: RecentPin[]; readiness: string[] };
 
 const IDEA_STYLE: Record<IdeaRow["status"], string> = {
   queued: "bg-zinc-100 text-zinc-700",
@@ -49,14 +76,23 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [ideasText, setIdeasText] = useState("");
-  const [form, setForm] = useState({ boardId: "", pinsPerDay: 3, link: "", consent: "" });
+  const [form, setForm] = useState({
+    boardId: "", pinsPerDay: 3, link: "", consent: "", bestTime: true, remixWinners: true, autoTrends: false,
+    trendInterest: (kind === "fashion" ? "womens_fashion" : "") as string,
+  });
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/autopilot?workspace=${kind}`);
     const body = await res.json().catch(() => ({}));
     if (!res.ok) return setError(body.error ?? "Could not load Autopilot");
     setData(body);
-    if (body.mode === "supabase") setForm((f) => ({ ...f, boardId: body.settings.board_id ?? "", pinsPerDay: body.settings.pins_per_day, link: body.settings.link ?? "" }));
+    if (body.mode === "supabase") {
+      const st = body.settings as Settings;
+      setForm((f) => ({
+        ...f, boardId: st.board_id ?? "", pinsPerDay: st.pins_per_day, link: st.link ?? "",
+        bestTime: st.best_time, remixWinners: st.remix_winners, autoTrends: st.auto_trends, trendInterest: st.trend_interest ?? "",
+      }));
+    }
   }, [kind]);
 
   useEffect(() => {
@@ -98,6 +134,11 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
         boardName: boards.find((b) => b.board_id === form.boardId)?.name ?? null,
         pinsPerDay: form.pinsPerDay,
         link: form.link,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        bestTime: form.bestTime,
+        remixWinners: form.remixWinners,
+        autoTrends: form.autoTrends,
+        trendInterest: form.trendInterest || null,
       },
       enabled ? "Autopilot is on." : "Autopilot is paused.",
     ).then((done) => done && setForm((f) => ({ ...f, consent: "" })));
@@ -161,6 +202,45 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
               <input className="mt-1 block w-full rounded-md border border-zinc-300 px-3 py-2" placeholder="https://your-site.com" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
               <span className="mt-1 block text-xs text-zinc-500">Empty = your brand website from Brand &amp; categories.</span>
             </label>
+            <fieldset className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 text-sm">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Smart features</legend>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-1" checked={form.bestTime} onChange={(e) => setForm({ ...form, bestTime: e.target.checked })} />
+                <span>
+                  Post at the best times
+                  {live && (
+                    <span className="block text-xs text-zinc-500">
+                      {hoursText(live.bestTime.hours)} ({live.settings.timezone}). {live.bestTime.detail}
+                    </span>
+                  )}
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-1" checked={form.remixWinners} onChange={(e) => setForm({ ...form, remixWinners: e.target.checked })} />
+                <span>
+                  Remake winning pins
+                  <span className="block text-xs text-zinc-500">When the queue is empty, at most once a week, make fresh versions of your pin with the most saves and clicks.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="checkbox" className="mt-1" checked={form.autoTrends} onChange={(e) => setForm({ ...form, autoTrends: e.target.checked })} />
+                <span>
+                  Use Pinterest Trends when the queue is empty
+                  <span className="block text-xs text-zinc-500">Picks the fastest-growing trend that fits your topic. Needs Trends access on your Pinterest app.</span>
+                </span>
+              </label>
+              {form.autoTrends && (
+                <label className="ml-6 text-xs text-zinc-600">
+                  Trend topic{" "}
+                  <select className="rounded border border-zinc-300 px-1 py-0.5" value={form.trendInterest} onChange={(e) => setForm({ ...form, trendInterest: e.target.value })}>
+                    <option value="">Any (filtered by your focus keywords)</option>
+                    {Object.entries(INTERESTS).map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </fieldset>
             {s?.enabled ? (
               <div className="flex flex-wrap gap-3">
                 <button onClick={() => save(true)} className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium">Save changes</button>
@@ -204,6 +284,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
               <li key={i.id} className="flex items-start gap-2 py-2">
                 <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${IDEA_STYLE[i.status]}`}>{i.status}</span>
                 <span className="flex-1">
+                  {i.source !== "user" && <span className="mr-1 rounded bg-violet-100 px-1 text-[10px] font-semibold uppercase text-violet-800">{i.source === "trends" ? "trend" : "winner remake"}</span>}
                   {i.idea}
                   {i.error && <span className="block text-xs text-red-700">{i.error}</span>}
                 </span>

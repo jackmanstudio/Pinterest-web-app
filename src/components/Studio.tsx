@@ -7,6 +7,19 @@ import { generateDraftImage, runPool } from "@/lib/client/pinImages";
 import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 import { AutoPinCard } from "./AutoPinCard";
+import { TrendIdeas } from "./TrendIdeas";
+
+/** "" → null (no link); a valid http(s) URL → itself; anything else → false. */
+function normalizeLink(raw: string): string | null | false {
+  const v = raw.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+    return u.hostname.includes(".") ? u.toString() : false;
+  } catch {
+    return false;
+  }
+}
 
 class GenerateError extends Error {
   constructor(message: string, readonly retryable: boolean) {
@@ -35,10 +48,12 @@ interface Batch {
 export function Studio({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [idea, setIdea] = useState("");
+  // ?idea=… pre-fills the box (used by "Make new versions" on Analytics).
+  const [idea, setIdea] = useState(() => (typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("idea") ?? "").slice(0, 500)));
   const [categoryId, setCategoryId] = useState<string>("");
   const [busy, setBusy] = useState<"idle" | "generating" | "saving" | "auto">("idle");
   const [auto, setAuto] = useState<AutoRun | null>(null);
+  const [link, setLink] = useState("");
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -46,6 +61,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   useEffect(() => {
     if (!store || !workspace) return;
     store.listCategories(workspace.id).then(setCategories).catch((e: Error) => setError({ message: e.message, retryable: false }));
+    store.getBrand(workspace.id).then((b) => setLink((l) => l || b.website_url)).catch(() => {});
   }, [store, workspace]);
 
   async function requestDrafts(): Promise<Batch["result"]> {
@@ -93,6 +109,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   async function makeAll() {
     if (!store || !workspace) return;
     const theIdea = idea.trim();
+    const cleanLink = normalizeLink(link);
+    if (cleanLink === false) return setError({ message: "The link must be a full web address starting with https://", retryable: false });
     setBusy("auto");
     setError(null);
     setNotice(null);
@@ -109,7 +127,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       const batchId = crypto.randomUUID();
       const saved = await store.saveDrafts(
         workspace.id,
-        result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: categoryId || null, source: result.source })),
+        result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: categoryId || null, source: result.source, link: cleanLink })),
       );
       update({ phase: "images", drafts: saved });
       setIdea("");
@@ -150,12 +168,14 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       setError({ message: "Fix the highlighted fields before saving.", retryable: false });
       return;
     }
+    const cleanLink = normalizeLink(link);
+    if (cleanLink === false) return setError({ message: "The link must be a full web address starting with https://", retryable: false });
     setBusy("saving");
     setError(null);
     try {
       await store.saveDrafts(
         workspace.id,
-        chosen.map((d) => ({ ...d, idea: batch.idea, batch_id: batch.id, category_id: batch.categoryId, source: batch.result.source })),
+        chosen.map((d) => ({ ...d, idea: batch.idea, batch_id: batch.id, category_id: batch.categoryId, source: batch.result.source, link: cleanLink || null })),
       );
       setNotice(
         `Saved ${chosen.length} draft${chosen.length === 1 ? "" : "s"} to ${WORKSPACE_LABELS[kind]}${store.mode === "demo" ? " (Demo storage: this browser only)" : ""}.`,
@@ -211,6 +231,16 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             {busy === "auto" ? "Making pins…" : "Make 5 complete pins"}
           </button>
         </form>
+        <label className="mt-3 flex flex-col gap-1 text-sm text-zinc-700 sm:flex-row sm:items-center sm:gap-3">
+          <span className="font-medium">Link on these pins</span>
+          <input
+            type="url"
+            className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+            placeholder="https://your-blog.com/post or a product page (optional)"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+          />
+        </label>
         <button
           type="button"
           onClick={generate}
@@ -219,6 +249,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         >
           {busy === "generating" ? "Writing 5 drafts…" : "Or: write text only, so I can edit before saving"}
         </button>
+        <TrendIdeas kind={kind} store={store!} workspaceId={workspace.id} onPick={setIdea} />
         {error && (
           <div className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
             <span>{error.message}</span>

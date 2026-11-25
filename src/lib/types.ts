@@ -28,6 +28,8 @@ export interface BrandSettings {
   website_url: string;
   focus_keywords: string[];
   banned_words: string[];
+  /** Pin design (title overlay, colours, font, logo). Read with readTemplate(). */
+  pin_template?: unknown;
 }
 
 export const EMPTY_BRAND: BrandSettings = {

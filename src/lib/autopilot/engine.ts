@@ -1,4 +1,5 @@
 import type { WorkspaceKind } from "@/lib/types";
+import { localHour } from "./bestTime";
 
 /**
  * Autopilot core. One call = one step for one workspace: publish at most one
@@ -21,6 +22,11 @@ export interface AutopilotWorkspace {
   board_name: string | null;
   pins_per_day: number;
   link: string | null;
+  timezone: string;
+  best_time: boolean;
+  remix_winners: boolean;
+  auto_trends: boolean;
+  trend_interest: string | null;
 }
 
 export interface Idea {
@@ -38,6 +44,8 @@ export interface AutopilotDeps {
   now(): Date;
   /** Problems that stop publishing right now (missing keys, Pinterest not connected…). Empty = ready. */
   readinessProblems(ws: AutopilotWorkspace): Promise<string[]>;
+  /** Local hours (0–23) when posting is allowed, or null for any time. */
+  postingHours(ws: AutopilotWorkspace): Promise<number[] | null>;
   /** Autopilot publish attempts started since `since`, and when the latest one started. */
   recentPublishes(ws: AutopilotWorkspace, since: Date): Promise<{ count: number; lastAt: Date | null }>;
   /** Oldest autopilot pin that's approved, has a real image and isn't published. */
@@ -58,9 +66,19 @@ export type AutopilotOutcome =
   | { action: "published"; detail: string; pinId?: string; draftId: string }
   | { action: "failed"; detail: string };
 
-/** Minimum gap between pins so the day's posts are spread out. */
-export function spacingMs(pinsPerDay: number): number {
-  return Math.floor((DAY_MS / Math.max(1, Math.min(MAX_PINS_PER_DAY, pinsPerDay))) * 0.9);
+/** Minimum gap between pins so the day's posts are spread across the allowed hours. */
+export function spacingMs(pinsPerDay: number, activeHours = 24): number {
+  const span = Math.max(1, Math.min(24, activeHours)) * 3_600_000;
+  return Math.floor((span / Math.max(1, Math.min(MAX_PINS_PER_DAY, pinsPerDay))) * 0.9);
+}
+
+/** The next moment (on the hour) that falls inside `hours`, in the given timezone. */
+export function nextAllowedAt(now: Date, hours: number[], timeZone: string): Date {
+  for (let i = 1; i <= 24; i++) {
+    const t = new Date(Math.floor(now.getTime() / 3_600_000) * 3_600_000 + i * 3_600_000);
+    if (hours.includes(localHour(t, timeZone))) return t;
+  }
+  return new Date(now.getTime() + DAY_MS);
 }
 
 export async function runAutopilotStep(ws: AutopilotWorkspace, deps: AutopilotDeps): Promise<AutopilotOutcome> {
@@ -77,8 +95,13 @@ export async function runAutopilotStep(ws: AutopilotWorkspace, deps: AutopilotDe
     await deps.setState(ws, { paused_reason: null });
     return { action: "daily_limit", detail: `Daily limit reached (${recent.count}/${ws.pins_per_day} in the last 24 hours).` };
   }
+  const hours = ws.best_time ? await deps.postingHours(ws) : null;
+  if (hours?.length && !hours.includes(localHour(now, ws.timezone))) {
+    await deps.setState(ws, { paused_reason: null });
+    return { action: "waiting", detail: "Waiting for your best posting hours.", nextAt: nextAllowedAt(now, hours, ws.timezone).toISOString() };
+  }
   if (recent.lastAt) {
-    const nextAt = recent.lastAt.getTime() + spacingMs(ws.pins_per_day);
+    const nextAt = recent.lastAt.getTime() + spacingMs(ws.pins_per_day, hours?.length || 24);
     if (now.getTime() < nextAt) {
       await deps.setState(ws, { paused_reason: null });
       return { action: "waiting", detail: "Spacing out today's pins.", nextAt: new Date(nextAt).toISOString() };
