@@ -1,11 +1,12 @@
 import type { DraftContent } from "@/lib/types";
 import { LIMITS } from "./validation";
+import { seasonTiming } from "@/lib/seo/seasonality";
 
 export type Severity = "ok" | "info" | "warning" | "error";
 
 export interface QualityCheck {
   id: string;
-  area: "SEO" | "Proofreading" | "Accessibility" | "Brand safety" | "Destination";
+  area: "SEO" | "Timing" | "Proofreading" | "Accessibility" | "Brand safety" | "Destination";
   severity: Severity;
   message: string;
 }
@@ -22,6 +23,10 @@ export interface QualityContext {
   link?: string | null;
   /** Whether this pin must have a destination link. */
   requireLink?: boolean;
+  /** Today's date: turns on the seasonal timing check. */
+  today?: Date;
+  /** Rising searches from the user's own Pinterest Trends snapshot (live data only). */
+  trendKeywords?: string[];
 }
 
 const CLICHES = [
@@ -120,8 +125,21 @@ export function reviewDraft(d: DraftContent, ctx: QualityContext = {}): QualityR
     add("Destination", "warning", "link-http", "Link is not HTTPS.");
   }
 
+  // Timing: seasonal topics posted too late or far too early reach fewer planners.
+  if (ctx.today) {
+    const t = seasonTiming(`${title} ${desc} ${d.tags.join(" ")}`, ctx.today);
+    if (t.status === "late") add("Timing", "warning", "season-late", t.message);
+    else if (t.status === "peak" || t.status === "off") add("Timing", "info", `season-${t.status}`, t.message);
+  }
+
   const score = Math.max(0, 100 - checks.reduce((s, c) => s + PENALTY[c.severity], 0));
   if (!checks.length) add("SEO", "ok", "all-good", "No issues found by the automatic checks.");
+  if (ctx.today) {
+    const t = seasonTiming(`${title} ${desc} ${d.tags.join(" ")}`, ctx.today);
+    if (t.status === "ahead") add("Timing", "ok", "season-ahead", t.message);
+  }
+  const trending = (ctx.trendKeywords ?? []).filter((k) => k && has(all, k));
+  if (trending.length) add("SEO", "ok", "trending", `Uses a rising Pinterest search from your Trends data: “${trending.slice(0, 3).join("”, “")}”.`);
   return { score, checks };
 }
 

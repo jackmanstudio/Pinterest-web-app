@@ -7,6 +7,7 @@ import { recommendBoard } from "@/lib/publishing/boards";
 import { boardChecks, METHOD_LABELS, type BoardPlan } from "@/lib/boards/automation";
 import { draftFacts, loadBoardSource } from "@/lib/client/boards";
 import { ACTION_LABELS, type WorkflowAction } from "@/lib/workflow/transitions";
+import { spreadTimes } from "@/lib/planning/spread";
 import { SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 
@@ -139,6 +140,18 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
           </button>
           <span className="text-xs text-zinc-600">{bulk ?? "Or review each pin below."}</span>
         </div>
+      )}
+
+      {tab === "approved" && visible.length > 1 && (
+        <SpreadSchedule
+          store={store}
+          drafts={visible}
+          scheduled={live.filter((d) => d.status === "scheduled" && d.scheduled_for).map((d) => new Date(d.scheduled_for!))}
+          pin={pin}
+          plans={plans}
+          demo={store.mode === "demo"}
+          onDone={reload}
+        />
       )}
 
       {visible.length === 0 ? (
@@ -385,5 +398,117 @@ function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: Workspace
       )}
       <span className="sr-only">{kind}</span>
     </article>
+  );
+}
+
+/**
+ * Schedules several approved pins at once, a few per day inside a posting
+ * window, evenly spaced and away from pins already scheduled. Each pin goes
+ * to the board planned for it; pins without a valid board are left alone.
+ */
+function SpreadSchedule({ store, drafts, scheduled, pin, plans, demo, onDone }: {
+  store: Store; drafts: PinDraft[]; scheduled: Date[]; pin: PinterestInfo; plans: Map<string, BoardPlan>; demo: boolean; onDone: () => Promise<void>;
+}) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const [open, setOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [perDay, setPerDay] = useState(3);
+  const [fromHour, setFrom] = useState(12);
+  const [toHour, setTo] = useState(23);
+  const [gap, setGap] = useState(60);
+  const [startDay, setStartDay] = useState(() => localInputValue(new Date(Date.now() + 30 * 60_000)).slice(0, 10));
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const boardIds = new Set(pin.boards.map((b) => b.board_id));
+  const ready = drafts.filter((d) => {
+    const plan = plans.get(d.id);
+    // Without a live account, show the spacing plan anyway; scheduling stays off below.
+    return plan?.board_id && boardIds.has(plan.board_id) && (demo || !pin.ready || publishBlockers(d, { connected: Boolean(pin.username), connectionActive: pin.active, grantedScopes: pin.scopes, boardId: plan.board_id }).length === 0);
+  });
+  const skipped = drafts.length - ready.length;
+  const earliest = Math.max(now + 15 * 60_000, new Date(`${startDay}T00:00`).getTime() || 0);
+  const times = spreadTimes(ready.length, { start: new Date(earliest), perDay, fromHour, toHour, timeZone, minGapMinutes: gap, existing: scheduled });
+  const fmt = (d: Date) => d.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const blocked = demo ? "Scheduling needs Supabase and a connected Pinterest account." : !pin.ready ? "Pinterest isn't configured on the server." : null;
+
+  async function run() {
+    setResult(null);
+    let done = 0;
+    const failed: string[] = [];
+    for (const [i, d] of ready.entries()) {
+      const plan = plans.get(d.id)!;
+      setBusy(`Scheduling ${i + 1} of ${ready.length}…`);
+      try {
+        await store.transition(d.workspace_id, d.id, "schedule", { boardId: plan.board_id!, boardName: plan.board_name ?? undefined, runAt: times[i].toISOString() });
+        done++;
+      } catch (e) {
+        failed.push(`“${d.title}”: ${(e as Error).message}`);
+      }
+    }
+    setBusy(null);
+    setConfirm(false);
+    setResult(failed.length ? { ok: false, text: `${done} scheduled, ${failed.length} failed. ${failed.slice(0, 3).join(" ")}` } : { ok: true, text: `${done} pins scheduled. See them in the Scheduled tab.` });
+    await onDone();
+  }
+
+  const num = "w-16 rounded-md border border-zinc-300 px-2 py-1 text-sm";
+  if (!open) {
+    return (
+      <button onClick={() => { setNow(Date.now()); setOpen(true); }} className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50">
+        Schedule several pins, spaced out…
+      </button>
+    );
+  }
+  return (
+    <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm" aria-label="Spread schedule">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-semibold">Schedule several pins, spaced out</h2>
+          <p className="text-xs text-zinc-600">A few pins a day inside your window, evenly spaced and away from pins already scheduled. Times are in {timeZone}.</p>
+        </div>
+        <button onClick={() => setOpen(false)} className="text-sm underline">Close</button>
+      </div>
+      <div className="flex flex-wrap items-end gap-3 text-xs font-medium text-zinc-700">
+        <label className="flex flex-col gap-1">Start day<input type="date" className="rounded-md border border-zinc-300 px-2 py-1 text-sm" value={startDay} onChange={(e) => setStartDay(e.target.value)} /></label>
+        <label className="flex flex-col gap-1">Pins per day<input type="number" min={1} max={25} className={num} value={perDay} onChange={(e) => setPerDay(Number(e.target.value) || 1)} /></label>
+        <label className="flex flex-col gap-1">From hour<input type="number" min={0} max={23} className={num} value={fromHour} onChange={(e) => setFrom(Number(e.target.value))} /></label>
+        <label className="flex flex-col gap-1">To hour<input type="number" min={1} max={24} className={num} value={toHour} onChange={(e) => setTo(Number(e.target.value))} /></label>
+        <label className="flex flex-col gap-1">Min. gap (minutes)<input type="number" min={0} max={720} step={15} className={num} value={gap} onChange={(e) => setGap(Number(e.target.value) || 0)} /></label>
+      </div>
+      {skipped > 0 && (
+        <p className="text-xs text-amber-800">{skipped} approved pin{skipped === 1 ? " is" : "s are"} left out: no planned board yet, or something below needs fixing. Open each pin to finish it.</p>
+      )}
+      {ready.length > 0 && (
+        <ol className="max-h-56 overflow-y-auto rounded-md bg-zinc-50 p-2 text-xs">
+          {ready.map((d, i) => (
+            <li key={d.id} className="flex justify-between gap-3 py-0.5">
+              <span className="truncate">{d.title} <span className="text-zinc-500">→ {plans.get(d.id)?.board_name}</span></span>
+              <span className="flex-none font-medium">{times[i] ? fmt(times[i]) : "no slot"}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {blocked ? (
+        <p className="text-xs text-zinc-600">{blocked} The plan above shows how the pins would be spaced.</p>
+      ) : ready.length === 0 ? null : !confirm ? (
+        <button onClick={() => { setNow(Date.now()); setConfirm(true); }} disabled={Boolean(busy) || times.length < ready.length} className="self-start rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+          Schedule {ready.length} pins…
+        </button>
+      ) : (
+        <div className="flex flex-col gap-2 rounded-md border border-red-300 bg-red-50 p-3">
+          <p className="text-sm text-red-900">
+            This will create {ready.length} LIVE pins on {pin.username ? `@${pin.username}` : "the connected account"} at the times above
+            ({pin.env === "sandbox" ? "Sandbox: only you can see them" : "Production: public"}). You can cancel any of them from the Scheduled tab before its time. Continue?
+          </p>
+          <div className="flex gap-2">
+            <button disabled={Boolean(busy)} onClick={run} className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">{busy ?? "Yes, schedule them"}</button>
+            <button onClick={() => setConfirm(false)} className="text-sm underline">Cancel</button>
+          </div>
+        </div>
+      )}
+      {result && <p className={`text-sm ${result.ok ? "text-emerald-700" : "text-red-700"}`}>{result.text}</p>}
+    </section>
   );
 }

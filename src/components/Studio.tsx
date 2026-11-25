@@ -10,6 +10,7 @@ import { WORKSPACE_LABELS } from "@/lib/types";
 import { generateDraftImage, runPool } from "@/lib/client/pinImages";
 import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
+import { useTrendKeywords } from "@/lib/client/useTrendKeywords";
 import { AutoPinCard } from "./AutoPinCard";
 import { TrendIdeas } from "./TrendIdeas";
 import { downloadImage } from "@/lib/client/download";
@@ -55,6 +56,7 @@ interface Batch {
 
 export function Studio({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
+  const trendKeywords = useTrendKeywords(kind);
   const [categories, setCategories] = useState<Category[]>([]);
   // ?idea=… pre-fills the box (used by "Make new versions" on Analytics).
   const [idea, setIdea] = useState(() => (typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("idea") ?? "").slice(0, 500)));
@@ -585,7 +587,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
                 index={i}
                 draft={d}
                 source={batch.result.source}
-                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, link: normalizeLink(link) || null }}
+                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), link: normalizeLink(link) || null }}
                 onChange={(nd) => setBatch({ ...batch, drafts: batch.drafts.map((x, j) => (j === i ? nd : x)) })}
                 footer={
                   <label className="flex items-center gap-2 text-sm">

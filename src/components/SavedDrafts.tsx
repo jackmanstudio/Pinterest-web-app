@@ -8,6 +8,7 @@ import { draftsToCsv } from "@/lib/tools/csv";
 import { DraftEditor, draftErrors } from "./DraftEditor";
 import { DraftImage } from "./DraftImage";
 import { useWorkspace } from "./useWorkspace";
+import { useTrendKeywords } from "@/lib/client/useTrendKeywords";
 import { downloadFile, downloadImage as saveImage } from "@/lib/client/download";
 
 const pick = (d: PinDraft): DraftContent => ({
@@ -18,6 +19,7 @@ const PAGE = 24;
 
 export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
+  const trendKeywords = useTrendKeywords(kind);
   const [drafts, setDrafts] = useState<PinDraft[] | null>(null);
   const [edits, setEdits] = useState<Record<string, DraftContent>>({});
   const [categories, setCategories] = useState<Category[]>([]);
@@ -236,7 +238,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 draft={current}
                 source={d.source}
                 imageStatus={d.image_status}
-                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, link: d.link }}
+                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), link: d.link }}
                 onChange={(nd) => setEdits((all) => ({ ...all, [d.id]: nd }))}
                 media={
                   <DraftImage
