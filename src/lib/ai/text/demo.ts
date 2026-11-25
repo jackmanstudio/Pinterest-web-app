@@ -22,7 +22,13 @@ export class DemoTextProvider implements TextProvider {
 }
 
 const clip = (s: string, n: number) => (s.length <= n ? s : s.slice(0, n - 1).trimEnd() + "…");
-const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+const SMALL = new Set(["a", "an", "and", "as", "at", "but", "by", "for", "in", "of", "on", "or", "the", "to", "with", "vs"]);
+/** Headline case: capitalise words, keep short joining words lower-case (except the first). */
+export const titleCase = (s: string) =>
+  s
+    .split(/\s+/)
+    .map((w, i) => (i > 0 && SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
 
 function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): DraftContent {
   const idea = req.idea.trim();
@@ -36,37 +42,37 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
   const byAngle: Record<PinAngleKey, Omit<DraftContent, "angle" | "tags">> = {
     how_to: {
       concept: `Step-by-step guide showing how to recreate "${idea}" at home${cat}.`,
-      title: `How to Get the ${Idea} Look in 4 Easy Steps`,
+      title: `${Idea}: A Simple 4-Step Guide`,
       description: `Save this step-by-step guide to ${idea}. We break it into four simple steps ${audience} can follow today, with the small details that make the difference. More guides from ${brand}.`,
-      alt_text: `Four-panel step-by-step collage demonstrating ${idea}, numbered 1 to 4.`,
+      alt_text: `Overhead flat lay of the items needed for ${idea}, neatly arranged on light linen in soft window light.`,
       image_prompt: `Overhead styled flat lay of everything needed for ${idea}, neatly arranged on a light linen surface, soft natural window light.`,
     },
     list: {
       concept: `A numbered roundup of 7 variations on "${idea}".`,
-      title: `7 ${Idea} Ideas Worth Saving Right Now`,
+      title: `7 Fresh Ideas for ${Idea}`,
       description: `Seven fresh takes on ${idea}, from easy everyday options to standout statement versions. Pick your favourite and pin the rest for later. Curated by ${brand}.`,
-      alt_text: `Grid of seven different variations of ${idea} with number labels.`,
+      alt_text: `A stylish person showing ${idea} on a sunlit city street, full-length.`,
       image_prompt: `A stylish person showcasing ${idea} on a sunlit city street, full-length shot, confident relaxed pose, cohesive neutral palette.`,
     },
     inspiration: {
       concept: `Mood-led hero image that sells the feeling of "${idea}".`,
-      title: `${Idea}: Pure Everyday Inspiration`,
+      title: `${Idea}: Calm, Everyday Inspiration`,
       description: `Let this be your sign to try ${idea}. A calm, aspirational take for ${audience}, made to inspire your next board. Explore more moods from ${brand}.`,
-      alt_text: `Atmospheric single hero photo capturing the mood of ${idea}.`,
+      alt_text: `Warm golden-hour photo with a soft background that captures the mood of ${idea}.`,
       image_prompt: `Cinematic hero shot evoking ${idea}, shallow depth of field, warm golden-hour tones, calm and aspirational mood.`,
     },
     problem_solution: {
       concept: `Names a common frustration, then shows "${idea}" as the fix.`,
-      title: `Stuck in a Rut? ${Idea} Is the Easy Fix`,
+      title: `${Idea} Without the Guesswork`,
       description: `If you keep running into the same problem, ${idea} might be exactly what you need. Here is why it works and how to start without overthinking it. Tips from ${brand}.`,
-      alt_text: `Before-and-after split image showing the change ${idea} makes.`,
+      alt_text: `Close-up detail of ${idea}, showing texture on a clean, bright background.`,
       image_prompt: `Close-up detail shot of ${idea}, showing texture and craftsmanship, bright and fresh, clean background.`,
     },
     seasonal: {
       concept: `Frames "${idea}" as a must-try for ${season}.`,
-      title: `${Idea} for ${titleCase(season)}: Save It Before It's Gone`,
+      title: new RegExp(season, "i").test(idea) ? `${Idea}: Save This for Later` : `${Idea} This ${titleCase(season)}`,
       description: `${titleCase(season)} is the perfect moment for ${idea}. Pin this now so it is ready when you need it, and check back for more seasonal picks from ${brand}.`,
-      alt_text: `Seasonal ${season} scene featuring ${idea} with themed props.`,
+      alt_text: `Cosy ${season} lifestyle scene featuring ${idea} with seasonal props and warm colours.`,
       image_prompt: `A cosy ${season} lifestyle scene centred on ${idea}, seasonal props and colours, warm editorial styling.`,
     },
   };

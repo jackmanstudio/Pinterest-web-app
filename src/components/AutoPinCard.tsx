@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { PinDraft } from "@/lib/types";
 import { SourceBadge } from "./DraftEditor";
+import { CopyButton, pinAsText } from "./CopyButton";
+import { downloadImage } from "@/lib/client/download";
 
 interface Props {
   store: Store;
@@ -50,6 +52,14 @@ export function AutoPinCard({ store, draft, error, disabled, onRetry }: Props) {
         <div className="flex flex-wrap gap-1">
           <SourceBadge source={draft.source} />
           {draft.image_source && draft.image_status === "ready" && <SourceBadge source={draft.image_source} what="image" />}
+        </div>
+        <div className="mt-1 flex flex-wrap gap-3 border-t border-zinc-100 pt-2">
+          <CopyButton text={pinAsText(draft)} label="Copy text" />
+          {shown && (
+            <button type="button" onClick={() => downloadImage(shown, draft.title).catch(() => {})} className="text-xs text-zinc-500 underline decoration-zinc-300 hover:text-zinc-900">
+              Download image
+            </button>
+          )}
         </div>
       </div>
     </article>

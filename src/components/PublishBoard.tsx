@@ -35,7 +35,8 @@ function localInputValue(d: Date) {
 export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
   const [drafts, setDrafts] = useState<PinDraft[] | null>(null);
-  const [tab, setTab] = useState<DraftStatus>("in_review");
+  const [chosenTab, setTab] = useState<DraftStatus | null>(null);
+  const [bulk, setBulk] = useState<string | null>(null);
   const [pin, setPin] = useState<PinterestInfo>({ ready: false, env: "sandbox", username: null, active: false, scopes: [], boards: [] });
   const [error, setError] = useState<string | null>(null);
 
@@ -73,8 +74,31 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
   if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
   if (!store || !workspace || !drafts) return <p className="text-zinc-500">Loading…</p>;
 
-  const counts = Object.fromEntries(ORDER.map((s) => [s, drafts.filter((d) => d.status === s).length])) as Record<DraftStatus, number>;
-  const visible = drafts.filter((d) => d.status === tab);
+  const live = drafts.filter((d) => !d.archived_at);
+  const counts = Object.fromEntries(ORDER.map((s) => [s, live.filter((d) => d.status === s).length])) as Record<DraftStatus, number>;
+  // Open on the step that needs attention first.
+  const tab: DraftStatus = chosenTab ?? (["in_review", "approved", "draft", "scheduled", "published"] as DraftStatus[]).find((s) => counts[s] > 0) ?? "draft";
+  const visible = live.filter((d) => d.status === tab);
+  const bulkAction: WorkflowAction | null = tab === "draft" ? "submit" : tab === "in_review" ? "approve" : null;
+
+  async function runBulk(action: WorkflowAction) {
+    setError(null);
+    let done = 0;
+    const failed: string[] = [];
+    for (const d of visible) {
+      setBulk(`${ACTION_LABELS[action]}: ${done + 1} of ${visible.length}…`);
+      try {
+        await store!.transition(workspace!.id, d.id, action);
+        done++;
+      } catch (e) {
+        failed.push(`“${d.title}”: ${(e as Error).message}`);
+      }
+    }
+    setBulk(null);
+    await reload();
+    if (failed.length) setError(`${done} done, ${failed.length} failed. ${failed.slice(0, 3).join(" ")}`);
+    else setTab(action === "submit" ? "in_review" : "approved");
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -104,6 +128,19 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
           </button>
         ))}
       </nav>
+
+      {bulkAction && visible.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => runBulk(bulkAction)}
+            disabled={Boolean(bulk)}
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {bulkAction === "approve" ? `Approve all ${visible.length}` : `Send all ${visible.length} for review`}
+          </button>
+          <span className="text-xs text-zinc-600">{bulk ?? "Or review each pin below."}</span>
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <p className="text-sm text-zinc-600">No pins are {STATUS_LABELS[tab].toLowerCase()}.</p>

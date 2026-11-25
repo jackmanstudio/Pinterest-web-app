@@ -10,6 +10,7 @@ import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 import { AutoPinCard } from "./AutoPinCard";
 import { TrendIdeas } from "./TrendIdeas";
+import { downloadImage } from "@/lib/client/download";
 
 /** "" → null (no link); a valid http(s) URL → itself; anything else → false. */
 function normalizeLink(raw: string): string | null | false {
@@ -378,6 +379,20 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               <Link href={`/w/${kind}/drafts`} className="rounded-md px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
                 Edit in Pin library
               </Link>
+              {auto.drafts.some((d) => d.image_status === "ready") && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    for (const d of auto.drafts.filter((x) => x.image_status === "ready")) {
+                      const url = await store!.imageUrl(d).catch(() => null);
+                      if (url) await downloadImage(url, d.title).catch(() => {});
+                    }
+                  }}
+                  className="rounded-md px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100"
+                >
+                  Download all images
+                </button>
+              )}
             </div>
           )}
         </section>

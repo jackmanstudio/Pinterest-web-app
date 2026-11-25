@@ -6,7 +6,7 @@ import { buildUtmUrl, slugify, UTM_DEFAULTS, type UtmFields } from "@/lib/tools/
 import { IMPORT_TEMPLATE, validateImport, type ImportReport } from "@/lib/tools/csv";
 import type { UrlCheckResult } from "@/lib/tools/urlCheck";
 import { CopyButton } from "./CopyButton";
-import { downloadFile } from "./SavedDrafts";
+import { downloadFile } from "@/lib/client/download";
 import { useWorkspace } from "./useWorkspace";
 
 const card = "flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm";

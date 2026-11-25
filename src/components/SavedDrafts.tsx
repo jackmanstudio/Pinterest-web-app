@@ -8,19 +8,11 @@ import { draftsToCsv } from "@/lib/tools/csv";
 import { DraftEditor, draftErrors } from "./DraftEditor";
 import { DraftImage } from "./DraftImage";
 import { useWorkspace } from "./useWorkspace";
+import { downloadFile, downloadImage as saveImage } from "@/lib/client/download";
 
 const pick = (d: PinDraft): DraftContent => ({
   angle: d.angle, concept: d.concept, title: d.title, description: d.description, tags: d.tags, alt_text: d.alt_text, image_prompt: d.image_prompt,
 });
-
-export function downloadFile(name: string, content: string | Blob, type = "text/csv;charset=utf-8") {
-  const blob = content instanceof Blob ? content : new Blob([`﻿${content}`], { type });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
 
 const PAGE = 24;
 
@@ -162,8 +154,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
     try {
       const url = await store!.imageUrl(d);
       if (!url) throw new Error("No image yet");
-      const blob = await (await fetch(url)).blob();
-      downloadFile(`${d.title.replace(/[^\w-]+/g, "-").slice(0, 50) || "pin"}.jpg`, blob);
+      await saveImage(url, d.title);
     } catch (err) {
       fail(d.id, err);
     }
