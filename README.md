@@ -118,6 +118,10 @@ In Studio, type a title and press **Make 5 complete pins**. The app writes 5 dis
 - **Tools:** destination link checker (public addresses only, follows up to 5 redirects, compares page title with the pin), UTM builder that keeps existing parameters, CSV import with a validation preview and partial import, activity log.
 - **All accounts:** health numbers and prioritised next steps for every workspace, and one button to pause Autopilot everywhere.
 
+## Accounts & security (specs 12-13)
+
+Sign-up, login, forgot/reset password, Welcome onboarding and Account settings run on Supabase Auth through server routes under `/api/auth`. Run migrations `0010_profiles.sql` and `0011_job_recovery.sql`. [SECURITY.md](SECURITY.md) lists what is built, the Supabase/Vercel settings to turn on, and what still needs infrastructure.
+
 ## Boards & categories (spec 11)
 
 Run `supabase/migrations/0009_board_automation.sql` once on the live database. Until then, the Boards page still works for reading, but saving board settings or plans asks for the update.

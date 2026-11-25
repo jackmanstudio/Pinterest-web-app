@@ -152,3 +152,26 @@ describe("sync helpers", () => {
     expect(describePinterestError(new PinterestApiError("x", 403, "PINNER_DATA_ACCESS_DENIED"))).toMatch(/business accounts/);
   });
 });
+
+describe("token key rotation", () => {
+  const OLD = Buffer.alloc(32, 7).toString("base64");
+  const NEW = Buffer.alloc(32, 9).toString("base64");
+  it("reads tokens from the previous key and flags them for re-encryption", async () => {
+    const { decryptToken: dec, encryptToken: enc, needsReencrypt } = await import("@/lib/crypto/tokens");
+    const old = enc("pina_x", OLD);
+    expect(() => dec(old, NEW, [])).toThrow(/no longer configured/);
+    expect(dec(old, NEW, [OLD])).toBe("pina_x");
+    expect(needsReencrypt(old, NEW)).toBe(true);
+    expect(needsReencrypt(enc("pina_x", NEW), NEW)).toBe(false);
+  });
+  it("still reads the old v1 format", async () => {
+    const { createCipheriv } = await import("node:crypto");
+    const { decryptToken: dec, needsReencrypt } = await import("@/lib/crypto/tokens");
+    const iv = Buffer.alloc(12, 1);
+    const c = createCipheriv("aes-256-gcm", Buffer.from(OLD, "base64"), iv);
+    const ct = Buffer.concat([c.update("legacy", "utf8"), c.final()]);
+    const v1 = ["v1", iv.toString("base64"), c.getAuthTag().toString("base64"), ct.toString("base64")].join(".");
+    expect(dec(v1, NEW, [OLD])).toBe("legacy");
+    expect(needsReencrypt(v1, NEW)).toBe(true);
+  });
+});

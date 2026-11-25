@@ -6,6 +6,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { runPublishJob } from "@/lib/workflow/runner";
 import { supabaseRunnerDeps } from "@/lib/workflow/server";
 import { cronAuthorized } from "@/lib/server/cron";
+import { log } from "@/lib/server/log";
 
 /**
  * Publishes approved, scheduled pins whose time has come. Call every few
@@ -18,6 +19,10 @@ async function handle(request: Request) {
   const cfg = getPinterestConfig();
   const admin = getAdminSupabase();
   const deps = supabaseRunnerDeps(admin, new PinterestApi(cfg), new ConnectionRepo(admin, cfg.encryptionKey));
+
+  // Jobs whose worker died mid-publish go back to the queue as "uncertain" (migration 0011).
+  const recovered = await admin.rpc("recover_stale_publish_jobs");
+  if (recovered.error && !/recover_stale_publish_jobs/.test(recovered.error.message)) log("warn", "job_recovery_failed", { error: recovered.error.message });
 
   const { data, error } = await admin
     .from("publish_jobs")

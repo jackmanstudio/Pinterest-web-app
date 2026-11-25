@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { decryptToken, encryptToken } from "@/lib/crypto/tokens";
+import { decryptToken, encryptToken, needsReencrypt } from "@/lib/crypto/tokens";
 import type { PinterestAccount, PinterestBoard, PinterestPin, TokenResponse } from "./api";
 import { pinImageUrl } from "./api";
 import type { PinterestEnv } from "./config";
@@ -62,11 +62,43 @@ export class ConnectionRepo {
     if (error) throw new Error(error.message);
     if (!data) return null;
     const { access_token_enc, refresh_token_enc, ...rest } = data as Record<string, unknown> & { access_token_enc: string; refresh_token_enc: string | null };
-    return {
+    const conn = {
       ...(rest as unknown as Omit<StoredConnection, "access_token" | "refresh_token">),
       access_token: decryptToken(access_token_enc, this.encryptionKey),
       refresh_token: refresh_token_enc ? decryptToken(refresh_token_enc, this.encryptionKey) : null,
     };
+    // Key rotation: quietly re-encrypt tokens still under an old key or format.
+    if (needsReencrypt(access_token_enc, this.encryptionKey) || (refresh_token_enc && needsReencrypt(refresh_token_enc, this.encryptionKey))) {
+      await this.reencrypt(workspaceId, conn.access_token, conn.refresh_token).catch(() => {});
+    }
+    return conn;
+  }
+
+  async reencrypt(workspaceId: string, access: string, refresh: string | null) {
+    const { error } = await this.admin
+      .from("pinterest_connections")
+      .update({ access_token_enc: encryptToken(access, this.encryptionKey), refresh_token_enc: refresh ? encryptToken(refresh, this.encryptionKey) : null })
+      .eq("workspace_id", workspaceId);
+    if (error) throw new Error(error.message);
+  }
+
+  /** Re-encrypts every stored connection with the current key. Returns counts. */
+  async rotateAll(): Promise<{ rotated: number; failed: number }> {
+    const { data, error } = await this.admin.from("pinterest_connections").select("workspace_id, access_token_enc, refresh_token_enc");
+    if (error) throw new Error(error.message);
+    let rotated = 0;
+    let failed = 0;
+    for (const row of data ?? []) {
+      const r = row as { workspace_id: string; access_token_enc: string; refresh_token_enc: string | null };
+      if (!needsReencrypt(r.access_token_enc, this.encryptionKey) && !(r.refresh_token_enc && needsReencrypt(r.refresh_token_enc, this.encryptionKey))) continue;
+      try {
+        await this.reencrypt(r.workspace_id, decryptToken(r.access_token_enc, this.encryptionKey), r.refresh_token_enc ? decryptToken(r.refresh_token_enc, this.encryptionKey) : null);
+        rotated++;
+      } catch {
+        failed++;
+      }
+    }
+    return { rotated, failed };
   }
 
   async save(workspaceId: string, env: PinterestEnv, tokens: TokenResponse, account: PinterestAccount, requestedScopes: string[]) {

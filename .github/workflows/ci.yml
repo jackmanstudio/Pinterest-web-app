@@ -18,6 +18,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Dependency audit (production deps, high+)
+        run: npm audit --omit=dev --audit-level=high
+      - name: No secrets committed
+        run: |
+          if git grep -nE '(sk-ant-[A-Za-z0-9_-]{20,}|pina_[A-Za-z0-9]{20,}|eyJhbGciOi[A-Za-z0-9_-]{30,}\.[A-Za-z0-9_-]{30,}|-----BEGIN (RSA |EC )?PRIVATE KEY-----)' -- ':!*.test.ts' ':!tests/**'; then
+            echo "Possible secret found in the repository"; exit 1
+          fi
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
