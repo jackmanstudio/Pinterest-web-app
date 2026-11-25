@@ -67,6 +67,15 @@ export interface PinDraft extends DraftContent {
   image_path: string | null;
   image_source: ContentSource | null;
   status: DraftStatus;
+  /** Destination URL for the pin (optional). */
+  link: string | null;
+  board_id: string | null;
+  board_name: string | null;
+  review_note: string | null;
+  approved_at: string | null;
+  scheduled_for: string | null;
+  published_at: string | null;
+  external_pin_id: string | null;
   source: ContentSource;
   created_at: string;
   updated_at: string;
@@ -86,4 +95,20 @@ export interface GenerateResponse {
   drafts: DraftContent[];
   usage?: { input_tokens: number; output_tokens: number };
   est_cost_usd?: number;
+}
+
+export const STATUS_LABELS: Record<DraftStatus, string> = {
+  draft: "Draft",
+  in_review: "In review",
+  approved: "Approved",
+  scheduled: "Scheduled",
+  published: "Published",
+};
+
+export interface AuditEvent {
+  id: string;
+  action: string;
+  target_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
 }

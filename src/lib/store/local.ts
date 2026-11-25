@@ -1,5 +1,6 @@
-import { EMPTY_BRAND, WORKSPACE_LABELS, type BrandSettings, type Category, type DraftContent, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
-import type { NewDraft, Store } from "./types";
+import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
+import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 
 /** Starter taxonomy. Macro is intentionally empty until the user defines it. */
 export const DEFAULT_CATEGORIES: Record<WorkspaceKind, string[]> = {
@@ -12,6 +13,7 @@ interface WorkspaceData {
   brand: BrandSettings;
   categories: Category[];
   drafts: PinDraft[];
+  audit?: (AuditEvent & { draft_id: string })[];
 }
 
 export interface KeyValue {
@@ -104,6 +106,14 @@ export class LocalStore implements Store {
         image_path: null,
         image_source: null,
         status: "draft",
+        link: null,
+        board_id: null,
+        board_name: null,
+        review_note: null,
+        approved_at: null,
+        scheduled_for: null,
+        published_at: null,
+        external_pin_id: null,
         created_at: now,
         updated_at: now,
       };
@@ -112,11 +122,15 @@ export class LocalStore implements Store {
     this.write(d);
     return saved;
   }
-  async updateDraft(workspaceId: string, id: string, patch: Partial<DraftContent>) {
+  async updateDraft(workspaceId: string, id: string, patch: DraftPatch) {
     const d = this.byId(workspaceId);
     const i = d.drafts.findIndex((p) => p.id === id);
     if (i < 0) throw new Error("Draft not found in this workspace");
-    d.drafts[i] = { ...d.drafts[i], ...patch, updated_at: new Date().toISOString() };
+    const cur = d.drafts[i];
+    if (cur.status === "scheduled" || cur.status === "published") throw new Error(`This pin is ${cur.status} and is locked; cancel the schedule first`);
+    // Same rule as the database: editing approved content withdraws the approval.
+    const withdraw = cur.status === "approved" ? { status: "draft" as const, approved_at: null } : {};
+    d.drafts[i] = { ...cur, ...patch, ...withdraw, updated_at: new Date().toISOString() };
     this.write(d);
     return d.drafts[i];
   }
@@ -135,6 +149,30 @@ export class LocalStore implements Store {
   }
   async imageUrl(draft: PinDraft) {
     return draft.image_status === "ready" ? draft.image_path : null;
+  }
+  async transition(workspaceId: string, id: string, action: WorkflowAction, opts: TransitionOptions = {}) {
+    if (LIVE_ACTIONS.includes(action) || action === "cancel_schedule") {
+      throw new Error("Scheduling and publishing need Supabase and a connected Pinterest account (Demo mode can't publish).");
+    }
+    const d = this.byId(workspaceId);
+    const i = d.drafts.findIndex((p) => p.id === id);
+    if (i < 0) throw new Error("Draft not found in this workspace");
+    const cur = d.drafts[i];
+    const status = nextStatus(cur.status, action);
+    const now = new Date().toISOString();
+    d.drafts[i] = {
+      ...cur,
+      status,
+      approved_at: status === "approved" ? now : status === "draft" ? null : cur.approved_at,
+      review_note: action === "request_changes" ? opts.note ?? null : action === "submit" ? null : cur.review_note,
+      updated_at: now,
+    };
+    d.audit = [...(d.audit ?? []), { id: uuid(), draft_id: id, action, target_id: id, details: { from: cur.status, to: status, ...(opts.note ? { note: opts.note } : {}), demo: true }, created_at: now }];
+    this.write(d);
+    return d.drafts[i];
+  }
+  async audit(workspaceId: string, draftId: string) {
+    return (this.byId(workspaceId).audit ?? []).filter((e) => e.draft_id === draftId).reverse();
   }
   async deleteDraft(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);

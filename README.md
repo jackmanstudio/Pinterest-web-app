@@ -10,7 +10,7 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
 | Image AI | **Pipeline built, no real provider yet.** Generates labelled DEMO placeholder images through the same route, storage and ledger a real provider will use. Adding a provider = one adapter in `src/lib/ai/image/`. |
 | Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
-| Pinterest API v5 | **OAuth + read-only sync built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Nothing is ever published, scheduled, edited or deleted on Pinterest yet. |
+| Pinterest API v5 | **OAuth, sync and approval-based publishing built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Publishing is off until `PINTEREST_ENABLE_PUBLISHING=true`, and every publish needs approval plus confirmation. |
 
 ## Phase 1 scope (this build)
 
@@ -46,6 +46,20 @@ npm run dev                  # http://localhost:3000
 - Shows connected account, Sandbox/Production, granted scopes and token expiry
 - Read-only sync of boards and pins with bookmark pagination (page cap, no pruning on partial syncs), one sync at a time, sync status and errors (401, 403 `PINNER_DATA_ACCESS_DENIED`, 429 with retry-after)
 - Disconnect removes stored tokens and synced copies only
+
+## Phase 4 (this build)
+
+- **Review & publish** page per workspace: Draft → In review → Approved → Scheduled → Published, with request-changes notes
+- Browsers can only move Draft ↔ In review. Approve / schedule / publish / cancel run in a server route and are checked by a database trigger; editing approved content automatically withdraws the approval; scheduled and published pins are locked
+- Publishing needs an approval **and** a second confirmation that names the account, board and Sandbox/Production
+- Pre-publish checks: real (non-demo) PNG/JPEG image, field limits, valid link, board chosen, connection active, write scopes granted
+- No duplicate pins: one live/successful job per draft (unique index), atomic job claim, a draft with a Pinterest pin ID is never published again, and after a timeout or 5xx the runner looks for the pin on the board before retrying
+- Capped retries with backoff (uses Pinterest's `retry-after` on 429); failures return the pin to Approved with the reason
+- Pinterest pin ID, time and board are stored and linked; every step goes into `audit_events` (shown as "Activity")
+- Pinterest has no API for scheduling organic pins, so the app runs the schedule: call `GET /api/cron/publish-due` every few minutes with `Authorization: Bearer $CRON_SECRET` (e.g. Vercel Cron or any scheduler)
+- In Demo mode, review and approval work in the browser; scheduling and publishing are disabled
+
+To enable publishing: set `PINTEREST_ENABLE_PUBLISHING=true` and `CRON_SECRET`, run migration `0004`, then reconnect each workspace so Pinterest grants the write scopes.
 
 ## Connect Pinterest
 
@@ -87,6 +101,5 @@ npm run build
 ## Next phases
 
 2. Real image generation, usage/cost tracking and budget caps
-4. Approval-based publishing with idempotency
 5. Analytics and agents (verified data only)
 6. Production hardening

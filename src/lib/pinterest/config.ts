@@ -8,8 +8,10 @@
  */
 export type PinterestEnv = "sandbox" | "production";
 
-/** Read-only scopes for Phase 3. Write scopes are requested in Phase 4. */
+/** Read-only scopes by default. */
 export const DEFAULT_SCOPES = ["user_accounts:read", "boards:read", "pins:read"];
+/** Added only when PINTEREST_ENABLE_PUBLISHING=true (required by POST /v5/pins). */
+export const PUBLISHING_SCOPES = ["boards:write", "pins:write"];
 
 export interface PinterestConfig {
   clientId: string;
@@ -53,7 +55,11 @@ export function getPinterestConfig(env: Env = process.env): PinterestConfig {
   const check = checkPinterestConfig(env);
   if (!check.ready) throw new Error(`Pinterest is not configured. Missing: ${check.missing.join(", ")}`);
   const host = check.env === "sandbox" ? "https://api-sandbox.pinterest.com" : "https://api.pinterest.com";
-  const scopes = env.PINTEREST_SCOPES ? env.PINTEREST_SCOPES.split(/[\s,]+/).filter(Boolean) : DEFAULT_SCOPES;
+  const scopes = env.PINTEREST_SCOPES
+    ? env.PINTEREST_SCOPES.split(/[\s,]+/).filter(Boolean)
+    : env.PINTEREST_ENABLE_PUBLISHING === "true"
+      ? [...DEFAULT_SCOPES, ...PUBLISHING_SCOPES]
+      : DEFAULT_SCOPES;
   return {
     clientId: env.PINTEREST_CLIENT_ID!,
     clientSecret: env.PINTEREST_CLIENT_SECRET!,

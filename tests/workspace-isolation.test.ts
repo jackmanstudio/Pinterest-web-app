@@ -60,3 +60,18 @@ describe("LocalStore images", () => {
     expect(await store.imageUrl(updated)).toBe("data:x");
   });
 });
+
+describe("LocalStore workflow (demo)", () => {
+  it("runs review and approval, withdraws approval on edit, and blocks live actions", async () => {
+    const store = new LocalStore(new MemoryKV());
+    const f = await store.getWorkspace("fashion");
+    const [d] = await store.saveDrafts(f.id, [draft]);
+    expect((await store.transition(f.id, d.id, "submit")).status).toBe("in_review");
+    await expect(store.transition(f.id, d.id, "publish_now")).rejects.toThrow(/Supabase/);
+    expect((await store.transition(f.id, d.id, "approve")).status).toBe("approved");
+    const edited = await store.updateDraft(f.id, d.id, { title: "changed" });
+    expect(edited.status).toBe("draft");
+    expect(edited.approved_at).toBeNull();
+    expect((await store.audit(f.id, d.id)).map((e) => e.action)).toEqual(["approve", "submit"]);
+  });
+});

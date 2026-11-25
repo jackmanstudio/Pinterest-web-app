@@ -1,10 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
-import { EMPTY_BRAND, type BrandSettings, type Category, type DraftContent, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
-import type { NewDraft, Store } from "./types";
+import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import type { WorkflowAction } from "@/lib/workflow/transitions";
+import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 
 const DRAFT_COLUMNS =
-  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, source, created_at, updated_at";
+  "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, created_at, updated_at";
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -54,7 +55,7 @@ export class SupabaseStore implements Store {
     const rows = drafts.map((d) => ({ ...d, workspace_id: workspaceId }));
     return check(await this.db.from("pin_drafts").insert(rows).select(DRAFT_COLUMNS));
   }
-  async updateDraft(workspaceId: string, id: string, patch: Partial<DraftContent>): Promise<PinDraft> {
+  async updateDraft(workspaceId: string, id: string, patch: DraftPatch): Promise<PinDraft> {
     return check(
       await this.db.from("pin_drafts").update(patch).eq("workspace_id", workspaceId).eq("id", id).select(DRAFT_COLUMNS).single(),
     );
@@ -71,6 +72,28 @@ export class SupabaseStore implements Store {
     const { data, error } = await this.db.storage.from(IMAGE_BUCKET).createSignedUrl(draft.image_path, 60 * 60);
     if (error) throw new Error(error.message);
     return data.signedUrl;
+  }
+  async transition(workspaceId: string, id: string, action: WorkflowAction, opts: TransitionOptions = {}): Promise<PinDraft> {
+    const kind = (await this.db.from("workspaces").select("kind").eq("id", workspaceId).single()).data?.kind;
+    const res = await fetch("/api/drafts/transition", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspace: kind, draftId: id, action, ...opts, confirm: true }),
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error ?? "Could not update the pin");
+    return this.getDraft(workspaceId, id);
+  }
+  async audit(workspaceId: string, draftId: string): Promise<AuditEvent[]> {
+    return check(
+      await this.db
+        .from("audit_events")
+        .select("id, action, target_id, details, created_at")
+        .eq("workspace_id", workspaceId)
+        .eq("target_id", draftId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    );
   }
   async deleteDraft(workspaceId: string, id: string) {
     const draft = await this.getDraft(workspaceId, id);

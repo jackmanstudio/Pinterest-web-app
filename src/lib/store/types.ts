@@ -1,4 +1,14 @@
-import type { BrandSettings, Category, DraftContent, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
+import type { WorkflowAction } from "@/lib/workflow/transitions";
+import type { AuditEvent, BrandSettings, Category, DraftContent, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
+
+export type DraftPatch = Partial<DraftContent> & { link?: string | null };
+
+export interface TransitionOptions {
+  boardId?: string;
+  boardName?: string;
+  runAt?: string;
+  note?: string;
+}
 
 export interface NewDraft extends DraftContent {
   idea: string;
@@ -21,7 +31,7 @@ export interface Store {
   deleteCategory(workspaceId: string, id: string): Promise<void>;
   listDrafts(workspaceId: string): Promise<PinDraft[]>;
   saveDrafts(workspaceId: string, drafts: NewDraft[]): Promise<PinDraft[]>;
-  updateDraft(workspaceId: string, id: string, patch: Partial<DraftContent>): Promise<PinDraft>;
+  updateDraft(workspaceId: string, id: string, patch: DraftPatch): Promise<PinDraft>;
   deleteDraft(workspaceId: string, id: string): Promise<void>;
   /** Re-read one draft (e.g. after the server attached an image). */
   getDraft(workspaceId: string, id: string): Promise<PinDraft>;
@@ -29,4 +39,7 @@ export interface Store {
   setImage(workspaceId: string, id: string, image: Pick<PinDraft, "image_status" | "image_path" | "image_source">): Promise<PinDraft>;
   /** A URL the browser can display for a draft's image. */
   imageUrl(draft: PinDraft): Promise<string | null>;
+  /** Moves a draft through the approval workflow. Live actions need Supabase + Pinterest. */
+  transition(workspaceId: string, id: string, action: WorkflowAction, opts?: TransitionOptions): Promise<PinDraft>;
+  audit(workspaceId: string, draftId: string): Promise<AuditEvent[]>;
 }

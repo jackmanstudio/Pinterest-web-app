@@ -20,7 +20,8 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith("/login") || path.startsWith("/auth");
+  // /api/cron authenticates with CRON_SECRET instead of a user session.
+  const isPublic = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/cron/");
   if (!data.user && !isPublic) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });

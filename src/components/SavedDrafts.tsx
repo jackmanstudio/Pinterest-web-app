@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Category, DraftContent, PinDraft, WorkspaceKind } from "@/lib/types";
-import { WORKSPACE_LABELS } from "@/lib/types";
+import { STATUS_LABELS, WORKSPACE_LABELS } from "@/lib/types";
 import { DraftEditor, draftErrors } from "./DraftEditor";
 import { DraftImage } from "./DraftImage";
 import { useWorkspace } from "./useWorkspace";
@@ -75,7 +75,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
           return (
             <div key={d.id} className="flex flex-col gap-1">
               <p className="text-xs text-zinc-500">
-                Idea: “{d.idea}”{catName(d.category_id) ? ` · ${catName(d.category_id)}` : ""} · Status: {d.status} · {new Date(d.created_at).toLocaleString()}
+                Idea: “{d.idea}”{catName(d.category_id) ? ` · ${catName(d.category_id)}` : ""} · Status: {STATUS_LABELS[d.status]} · {new Date(d.created_at).toLocaleString()}
               </p>
               <DraftEditor
                 index={i}

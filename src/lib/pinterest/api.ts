@@ -29,6 +29,15 @@ export interface TokenResponse {
   scope?: string;
 }
 
+export interface CreatePinBody {
+  board_id: string;
+  title?: string;
+  description?: string;
+  link?: string;
+  alt_text?: string;
+  media_source: { source_type: "image_base64"; content_type: "image/png" | "image/jpeg"; data: string } | { source_type: "image_url"; url: string };
+}
+
 export interface PinterestAccount {
   id?: string;
   username: string;
@@ -104,6 +113,17 @@ export class PinterestApi {
     const res = await this.fetchFn(u.toString(), { headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" } });
     if (!res.ok) throw await toError(res, `GET ${path}`);
     return (await res.json()) as T;
+  }
+
+  /** POST /v5/pins — creates a LIVE pin. Only called by the publish runner after approval. */
+  async createPin(accessToken: string, body: CreatePinBody): Promise<PinterestPin> {
+    const res = await this.fetchFn(this.cfg.apiBase + "/pins", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await toError(res, "Create pin");
+    return (await res.json()) as PinterestPin;
   }
 
   account(accessToken: string) {
