@@ -16,9 +16,19 @@ export interface SafeResponse {
  */
 export async function safeFetch(
   raw: string,
-  opts: { accept?: string; maxBytes?: number; timeoutMs?: number; fetchImpl?: typeof fetch } = {},
+  opts: { accept?: string; maxBytes?: number; timeoutMs?: number; fetchImpl?: typeof fetch; referer?: string; browserLike?: boolean } = {},
 ): Promise<SafeResponse> {
   const { accept = "*/*", maxBytes = 3_000_000, timeoutMs = 10_000, fetchImpl = fetch } = opts;
+  // Some image CDNs refuse bot user agents or images requested without the page as referer.
+  const ua = opts.browserLike
+    ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
+    : "Mozilla/5.0 (compatible; PinStudioBot/1.0; +pin preview)";
+  let referer: string | undefined;
+  try {
+    referer = opts.referer && /^https?:$/.test(new URL(opts.referer).protocol) ? new URL(opts.referer).toString() : undefined;
+  } catch {
+    referer = undefined;
+  }
   let url: URL;
   try {
     url = new URL(raw.trim());
@@ -36,7 +46,7 @@ export async function safeFetch(
     const r = await fetchImpl(url, {
       redirect: "manual",
       signal: deadline,
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; PinStudioBot/1.0; +pin preview)", Accept: accept },
+      headers: { "User-Agent": ua, Accept: accept, ...(referer ? { Referer: referer } : {}) },
     });
     const loc = r.headers.get("location");
     if (r.status >= 300 && r.status < 400 && loc) {

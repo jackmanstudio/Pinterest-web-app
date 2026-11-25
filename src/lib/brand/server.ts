@@ -40,6 +40,6 @@ export async function brandPinImage(
   opts: { demo?: boolean; angle?: string } = {},
 ): Promise<GeneratedImage & { design: DesignReport }> {
   const size = opts.demo ? { width: 600, height: 900 } : PIN_IMAGE_SIZE;
-  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 90, angle: opts.angle });
+  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 90, angle: opts.angle, pagePhoto: img.source === "manual" });
   return { ...img, ...out };
 }

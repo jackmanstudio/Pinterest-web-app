@@ -17,7 +17,12 @@ export interface ComposeInput {
   quality?: number;
   /** The pin's creative angle (picks the Designer-mix layout). */
   angle?: string;
+  /** A real photo from the user's page (often a model): keep text off the top so faces stay visible. */
+  pagePhoto?: boolean;
 }
+
+/** Layouts that put the headline over the top or middle of the photo, and their bottom-text stand-ins. */
+const PHOTO_SAFE: Partial<Record<string, "caption" | "framed">> = { paper: "caption", centered: "framed" };
 
 /** Measures the photo: sharpness, brightness, saturation, clipping, dominant colour and brightness per third. */
 export async function measurePhoto(img: Buffer): Promise<{ stats: PhotoStats; color: [number, number, number]; tone: { top: number; middle: number; bottom: number } }> {
@@ -54,7 +59,7 @@ export async function measurePhoto(img: Buffer): Promise<{ stats: PhotoStats; co
 }
 
 /** Crops the base image to the pin size, draws the design on top and self-checks it. Returns a JPEG. */
-export async function composePin({ base, title, template, logo, size, quality = 88, angle }: ComposeInput): Promise<{
+export async function composePin({ base, title, template, logo, size, quality = 88, angle, pagePhoto }: ComposeInput): Promise<{
   bytes: Uint8Array;
   contentType: "image/jpeg";
   extension: "jpg";
@@ -64,7 +69,8 @@ export async function composePin({ base, title, template, logo, size, quality = 
   const resized = await sharp(Buffer.from(base), { density: 144 }).resize(W, H, { fit: "cover", position: "attention" }).toBuffer();
   const logoHref = logo ? `data:${logo.contentType};base64,${Buffer.from(logo.bytes).toString("base64")}` : null;
   const measured = await measurePhoto(resized).catch(() => null);
-  const layout = title.trim() ? layoutFor(template, angle, title) : null;
+  const picked = title.trim() ? layoutFor(template, angle, title) : null;
+  const layout = picked && pagePhoto && template.style === "auto" ? (PHOTO_SAFE[picked] ?? picked) : picked;
   const input = { width: W, height: H, title, template, logoHref, angle, photoColor: measured?.color ?? null, tone: measured?.tone ?? null };
   const drawn = layout ? designerSvg(input, layout) : null;
   const svg = drawn ? drawn.svg : overlaySvg(input);

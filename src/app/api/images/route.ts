@@ -24,15 +24,9 @@ const Body = z.object({
   imageStyle: z.string().max(120).optional(),
   /** Use this photo (e.g. from the source page) instead of generating one. Fetched with the SSRF guard. */
   sourceImage: z.string().url().max(2048).optional(),
+  /** The page the photo came from (sent as referer; some CDNs require it). */
+  sourcePage: z.string().url().max(2048).optional(),
 });
-
-async function pagePhoto(url: string) {
-  try {
-    return await fetchPagePhoto(url);
-  } catch (e) {
-    throw new HttpError(422, e instanceof PhotoError ? e.message : "Couldn't download that photo.");
-  }
-}
 
 export async function POST(request: Request) {
   const limitedRes = rateLimited(request, "images");
@@ -85,14 +79,27 @@ export async function POST(request: Request) {
       const template = readTemplate(parsed.data.template);
       art = { template, logo: logoFromDataUrl(template.logo) };
     }
-    const source = parsed.data.sourceImage;
+    let source = parsed.data.sourceImage;
     if (!source && !prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
-    if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
     const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
+    // A page photo first (retried inside); if the site still refuses it, make an AI image instead of leaving the pin empty.
+    let notice: string | null = null;
+    let pagePhotoRaw: Awaited<ReturnType<typeof fetchPagePhoto>> | null = null;
+    if (source) {
+      try {
+        pagePhotoRaw = await fetchPagePhoto(source, { referer: parsed.data.sourcePage });
+      } catch (e) {
+        const why = e instanceof PhotoError ? e.message : "Couldn't download that photo.";
+        if (!prompt.trim()) throw new HttpError(422, why);
+        notice = `${why} An AI image was made instead.`;
+        source = undefined;
+      }
+    }
+    if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
     let attempts = source ? 0 : 1;
-    const raw = source ? await pagePhoto(source) : await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
+    const raw = pagePhotoRaw ?? (await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)));
     // Real images are always full size (1000×1500); only labelled placeholders are kept small.
     let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
     if (!source && image.source === "ai" && image.design.retryPhoto) {
@@ -127,7 +134,7 @@ export async function POST(request: Request) {
       workspace_id: workspaceId, workspace_kind: workspace, kind: "image", provider: image.provider, model: image.model, source: image.source,
       input_tokens: 0, output_tokens: 0, images: attempts, est_cost_usd: image.est_cost_usd * attempts, status: "ok", error: null,
     });
-    return NextResponse.json({ source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl, design: image.design });
+    return NextResponse.json({ source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl, design: image.design, notice });
   } catch (err) {
     if (!(err instanceof HttpError && (err.status === 404 || err.status === 409))) await markFailed().catch(() => {});
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });

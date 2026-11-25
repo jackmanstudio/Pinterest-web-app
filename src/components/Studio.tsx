@@ -235,8 +235,9 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       const pagePhotos = source === "link" && page && usePhotos ? photos : [];
       await runPool(
         saved,
-        2,
-        (d, i) => generateDraftImage(kind, store, d, pagePhotos.length ? { sourceImage: pagePhotos[i % pagePhotos.length] } : {}),
+        // Store sites often refuse several photo downloads at once: fetch page photos one at a time.
+        pagePhotos.length ? 1 : 2,
+        (d, i) => generateDraftImage(kind, store, d, pagePhotos.length ? { sourceImage: pagePhotos[i % pagePhotos.length], sourcePage: page?.url } : {}),
         (r) =>
           update({
             drafts: run.drafts.map((x) => (x.id === r.draft.id ? r.draft : x)),
