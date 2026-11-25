@@ -1,5 +1,4 @@
 "use client";
-import { PinImageBox } from "./PinImageBox";
 import { useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { PinDraft, WorkspaceKind } from "@/lib/types";
@@ -49,7 +48,8 @@ export function DraftImage({ kind, store, draft, promptDirty, onUpdated }: Props
     <div className="flex flex-col gap-2 rounded-md border border-dashed border-zinc-300 p-2">
       {url ? (
         <div className="flex flex-col gap-1">
-          <PinImageBox src={url} alt={draft.alt_text} />
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed/data URLs, not optimisable */}
+          <img src={url} alt={draft.alt_text} className="aspect-[2/3] w-full rounded object-cover" />
           {draft.image_source && <SourceBadge source={draft.image_source} what="image" />}
         </div>
       ) : (

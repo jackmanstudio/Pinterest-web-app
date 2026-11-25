@@ -1,5 +1,4 @@
 "use client";
-import { PinImageBox, PIN_GRID } from "./PinImageBox";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionInfo } from "@/lib/pinterest/connections";
@@ -195,10 +194,11 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
             {data.pins.length === 0 ? (
               <p className="mt-2 text-sm text-zinc-600">No pins synced yet.</p>
             ) : (
-              <ul className={`mt-3 ${PIN_GRID}`}>
+              <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {data.pins.map((p) => (
                   <li key={p.pin_id} className="flex flex-col gap-1 text-xs">
-                    {p.image_url && <PinImageBox src={p.image_url} alt={p.alt_text ?? p.title ?? ""} />}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Pinterest CDN image */}
+                    {p.image_url && <img src={p.image_url} alt={p.alt_text ?? p.title ?? ""} className="aspect-[2/3] w-full rounded object-cover" />}
                     <p className="font-medium">{p.title || "(untitled)"}</p>
                   </li>
                 ))}
