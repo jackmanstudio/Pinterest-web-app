@@ -155,7 +155,7 @@ export function Overview() {
               <ul className="mt-2 flex flex-col gap-1.5">
                 {h?.recommendations.map((r) => (
                   <li key={r.text}>
-                    <Link href={`/w/${kind}${r.href ? `/${r.href}` : ""}`} className="flex items-start gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2 text-[13px] text-white/85 ring-1 ring-white/10 transition hover:bg-white/[0.09]">
+                    <Link href={`/w/${kind}${r.href ? `/${r.href}` : ""}?todo=${r.todo}`} className="flex items-start gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2 text-[13px] text-white/85 ring-1 ring-white/10 transition hover:bg-white/[0.09]">
                       <span className={`mt-0.5 shrink-0 rounded-full border px-2 py-px text-[10px] font-bold uppercase tracking-wide ${PRIORITY[r.priority].pill}`}>{r.priority}</span>
                       <span className="flex-1">{r.text}</span>
                       <span aria-hidden className="text-white/40">→</span>

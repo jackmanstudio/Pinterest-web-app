@@ -45,9 +45,9 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
     <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
       {label}
       {multiline ? (
-        <textarea className={input} rows={2} value={brand[k]} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
+        <textarea id={k} className={input} rows={2} value={brand[k]} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
       ) : (
-        <input className={input} value={brand[k]} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
+        <input id={k} className={input} value={brand[k]} onChange={(e) => setBrand({ ...brand, [k]: e.target.value })} />
       )}
     </label>
   );

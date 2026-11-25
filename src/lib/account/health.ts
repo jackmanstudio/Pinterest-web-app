@@ -7,7 +7,11 @@ export interface Recommendation {
   text: string;
   /** Section of the workspace that fixes it. */
   href: string;
+  /** Which to-do this is, so the page it opens can explain what to do there. */
+  todo: TodoKey;
 }
+
+export type TodoKey = "brand" | "first-pins" | "review" | "schedule-approved" | "schedule" | "no-image" | "low-quality" | "duplicates" | "no-link" | "stale";
 
 export interface WorkspaceHealth {
   total: number;
@@ -56,15 +60,15 @@ export function workspaceHealth(drafts: PinDraft[], brand: BrandSettings | null,
     recommendations: [],
   };
   const r = h.recommendations;
-  if (!brand?.brand_name || !brand.audience) r.push({ priority: "high", text: "Fill in brand name and audience so every pin is written for the right people.", href: "settings" });
-  if (h.total === 0) r.push({ priority: "high", text: "No pins yet. Type a title in the Studio to make your first pins.", href: "" });
-  if (byStatus.in_review) r.push({ priority: "high", text: `${byStatus.in_review} pin(s) are waiting for your review.`, href: "publish" });
-  if (byStatus.approved && !byStatus.scheduled) r.push({ priority: "medium", text: `${byStatus.approved} approved pin(s) are not scheduled yet.`, href: "publish" });
-  if (h.scheduledNext7Days === 0 && h.total > 0) r.push({ priority: "medium", text: "Nothing is scheduled for the next 7 days. Regular posting keeps the account active.", href: "calendar" });
-  if (noImage) r.push({ priority: "medium", text: `${noImage} unpublished pin(s) have no image yet.`, href: "drafts" });
-  if (lowQuality) r.push({ priority: "medium", text: `${lowQuality} pin(s) score below 65 on the quality check. Open them to see what to fix.`, href: "drafts" });
-  if (duplicates) r.push({ priority: "low", text: `${duplicates} pin(s) look very similar to another pin. Change the angle or archive one.`, href: "drafts" });
-  if (noLink) r.push({ priority: "low", text: `${noLink} unpublished pin(s) have no destination link.`, href: "drafts" });
-  if (lastPublished && now - lastPublished > 14 * DAY) r.push({ priority: "medium", text: "Nothing published in the last 14 days.", href: "publish" });
+  if (!brand?.brand_name || !brand.audience) r.push({ priority: "high", text: "Fill in brand name and audience so every pin is written for the right people.", href: "settings", todo: "brand" });
+  if (h.total === 0) r.push({ priority: "high", text: "No pins yet. Type a title in the Studio to make your first pins.", href: "", todo: "first-pins" });
+  if (byStatus.in_review) r.push({ priority: "high", text: `${byStatus.in_review} pin(s) are waiting for your review.`, href: "publish", todo: "review" });
+  if (byStatus.approved && !byStatus.scheduled) r.push({ priority: "medium", text: `${byStatus.approved} approved pin(s) are not scheduled yet.`, href: "publish", todo: "schedule-approved" });
+  if (h.scheduledNext7Days === 0 && h.total > 0) r.push({ priority: "medium", text: "Nothing is scheduled for the next 7 days. Regular posting keeps the account active.", href: "calendar", todo: "schedule" });
+  if (noImage) r.push({ priority: "medium", text: `${noImage} unpublished pin(s) have no image yet.`, href: "drafts", todo: "no-image" });
+  if (lowQuality) r.push({ priority: "medium", text: `${lowQuality} pin(s) score below 65 on the quality check. Open them to see what to fix.`, href: "drafts", todo: "low-quality" });
+  if (duplicates) r.push({ priority: "low", text: `${duplicates} pin(s) look very similar to another pin. Change the angle or archive one.`, href: "drafts", todo: "duplicates" });
+  if (noLink) r.push({ priority: "low", text: `${noLink} unpublished pin(s) have no destination link.`, href: "drafts", todo: "no-link" });
+  if (lastPublished && now - lastPublished > 14 * DAY) r.push({ priority: "medium", text: "Nothing published in the last 14 days.", href: "publish", todo: "stale" });
   return h;
 }
