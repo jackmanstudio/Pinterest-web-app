@@ -9,9 +9,9 @@ import type { InsightsInput } from "./types";
 export const DRAFTS_SYSTEM = `You write Pinterest pin copy for a content studio.
 For each request you produce exactly five pin drafts, one per creative angle, in the order given.
 The five drafts must be meaningfully different: different hook, different promise, different visual. Never reuse a title structure.
-Titles: write each as "Short headline: supporting hook". The part before the colon is the on-image headline: at most 45 characters, specific and punchy, readable at phone-thumbnail size. The part after the colon adds value or curiosity. Vary the wording and structure across the five.
+Titles: write each as "Headline: supporting hook", 40-80 characters in total (Pinterest search reads the title first). Every title must contain the idea's main keyword phrase, word for word or as its natural plural (e.g. for "Small living room decor ideas on a budget" use "small living room"), ideally in the headline part. The part before the colon is the on-image headline: at most 45 characters, specific and readable at phone-thumbnail size. The part after the colon adds value or curiosity. Vary the wording and structure across the five. Never write a vague title like "Budget Decor: 5 ideas".
 Respect Pinterest limits: title <= ${LIMITS.title} characters, description <= ${LIMITS.description} characters, alt text <= ${LIMITS.alt_text} characters, 3-${LIMITS.tags} tags.
-Descriptions read naturally, include relevant search keywords, and end with a soft call to save or click. No hashtags inside descriptions.
+Descriptions read naturally, use the main keyword in the first sentence, include related search keywords, and end with a soft call to save or click written as its own full sentence (e.g. "Save this pin for later."). No hashtags inside descriptions.
 Alt text literally describes what the image shows for screen-reader users.
 The image prompt (2-4 sentences) is for a photo-realistic image model and should read like a premium creative agency's art direction (editorial photography, styled product mockup or lifestyle scene, whichever suits the angle) with a restrained, harmonious palette, and must literally depict the subject of that draft's title: who or what is shown, the setting, styling, colours, mood and camera framing.
 Describe ONE cohesive photographic scene. Never ask for collages, grids, split screens, before/after layouts, numbered panels, text, words, numbers or logos: the title is added on top of the image later.
@@ -59,7 +59,7 @@ export function draftsUserPrompt(req: GenerateRequest): string {
   const language = (req.language || b.language || "").trim();
   const lang =
     language && !/^english$/i.test(language)
-      ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English. Festivals, names and culture words use their standard ${language} spelling, never a sound-alike transliteration. Tags are short phrases with normal spaces between words and no # sign.\n${glossaryHint(language, `${req.idea} ${req.context ?? ""}`)}`
+      ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English. Festivals, names and culture words use their standard ${language} spelling, never a sound-alike transliteration. Tags are short phrases with normal spaces between words and no # sign. Use only the ${language} script (Latin letters only for brand names); never mix in Chinese, Japanese, Korean or any other script.\n${glossaryHint(language, `${req.idea} ${req.context ?? ""}`)}`
       : "";
   return `Workspace: ${req.workspace}
 ${lang}${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}

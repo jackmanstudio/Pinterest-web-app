@@ -5,6 +5,7 @@ import { ProviderError } from "@/lib/ai/text/types";
 import { findNearDuplicates } from "@/lib/drafts/distinctness";
 import { tidyDrafts } from "@/lib/drafts/tidyTitle";
 import { fixDraftSpelling } from "@/lib/ai/text/glossary";
+import { cleanDrafts, draftsHaveStray } from "@/lib/ai/text/script";
 import { GenerateRequestSchema } from "@/lib/drafts/validation";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
@@ -53,6 +54,13 @@ export async function POST(request: Request) {
     // One bounded retry if the model returned near-duplicates, only when the first call was quick
     // (a second slow call would keep the user waiting minutes).
     if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0 && Date.now() - started < 25_000) result = await run();
+    // Stray letters from another script (e.g. Chinese inside Urdu): retry once if there is time, then strip them.
+    const lang = parsed.data.language || parsed.data.brand.language;
+    if (result.source === "ai" && draftsHaveStray(result.drafts, lang) && Date.now() - started < 60_000) {
+      const again = await run().catch(() => null);
+      if (again && !draftsHaveStray(again.drafts, lang)) result = again;
+    }
+    result = { ...result, drafts: cleanDrafts(result.drafts, lang) };
 
     const cost = estimateTextCost(result.model, tokens.input, tokens.output);
     await ctx.ledger.record({ ...usageBase, model: result.model, input_tokens: tokens.input, output_tokens: tokens.output, est_cost_usd: cost, status: "ok", error: null });

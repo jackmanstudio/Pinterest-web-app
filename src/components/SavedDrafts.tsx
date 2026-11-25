@@ -240,7 +240,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 draft={current}
                 source={d.source}
                 imageStatus={d.image_status}
-                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), link: d.link }}
+                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), idea: d.idea, link: d.link }}
                 onChange={(nd) => setEdits((all) => ({ ...all, [d.id]: nd }))}
                 media={
                   <DraftImage

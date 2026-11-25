@@ -606,7 +606,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
                 index={i}
                 draft={d}
                 source={batch.result.source}
-                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), link: normalizeLink(link) || null }}
+                quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), idea: batch.idea, link: normalizeLink(link) || null }}
                 onChange={(nd) => setBatch({ ...batch, drafts: batch.drafts.map((x, j) => (j === i ? nd : x)) })}
                 footer={
                   <label className="flex items-center gap-2 text-sm">

@@ -23,6 +23,8 @@ export interface QualityContext {
   link?: string | null;
   /** Whether this pin must have a destination link. */
   requireLink?: boolean;
+  /** The idea the pin was made from: the title should carry its main keyword. */
+  idea?: string;
   /** Today's date: turns on the seasonal timing check. */
   today?: Date;
   /** Rising searches from the user's own Pinterest Trends snapshot (live data only). */
@@ -62,6 +64,13 @@ export function reviewDraft(d: DraftContent, ctx: QualityContext = {}): QualityR
   else if (title.length > LIMITS.title) add("SEO", "error", "title-long", `Title is ${title.length} characters; Pinterest allows ${LIMITS.title}.`);
   else if (title.length < 25) add("SEO", "warning", "title-short", "Title is very short; add the main keyword and a clear promise (aim for 40-80 characters).");
   else if (title.length > 80) add("SEO", "info", "title-trim", "Title may be cut off on mobile; the first 40 characters matter most.");
+  else if (title.length < 40 && /^[\p{Script=Latin}\d\s\p{P}\p{S}]+$/u.test(title)) add("SEO", "info", "title-shortish", "Title is under 40 characters; there is room for the main keyword and a clearer promise.");
+  const ideaKeys = contentWords(ctx.idea ?? "").filter((w) => w.length > 3 && !["ideas", "tips", "guide", "budget", "easy", "best"].includes(w));
+  if (title && ideaKeys.length && /^[\p{Script=Latin}\d\s\p{P}\p{S}]+$/u.test(title)) {
+    const tl = title.toLowerCase();
+    const hits = ideaKeys.filter((w) => tl.includes(w.replace(/s$/, ""))).length;
+    if (hits < (ideaKeys.length >= 3 ? Math.ceil(ideaKeys.length / 2) : 1)) add("SEO", "warning", "title-keyword", `Title doesn't use the main keyword from your idea (“${ideaKeys.slice(0, 3).join(" ")}”); people search with those words.`);
+  }
   if (title && VAGUE_TITLES.test(title)) add("SEO", "warning", "title-vague", "Title is too vague to match a search; say what the pin is about.");
 
   // SEO: description

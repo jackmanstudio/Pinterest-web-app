@@ -15,3 +15,14 @@ describe("tidyTitle", () => {
     expect(tidyTitle("Fall Outfits: the Fall Edit", "fall outfits")).toBe("Fall Outfits: The Fall Edit".replace("The", "the"));
   });
 });
+
+describe("title keyword check", async () => {
+  const { reviewDraft } = await import("@/lib/drafts/quality");
+  const base = { angle: "", concept: "", image_prompt: "", description: "x".repeat(160) + ".", tags: ["a", "b", "c"], alt_text: "A cosy small living room with a green sofa and plants." };
+  it("warns when the title misses the idea's main keyword", () => {
+    const idea = "Small living room decor ideas on a budget";
+    expect(reviewDraft({ ...base, title: "Budget Decor: 5 ideas" }, { idea }).checks.map((c) => c.id)).toEqual(expect.arrayContaining(["title-keyword", "title-short"]));
+    expect(reviewDraft({ ...base, title: "Small Living Room Decor: 5 budget ideas that work" }, { idea }).checks.map((c) => c.id)).not.toContain("title-keyword");
+    expect(reviewDraft({ ...base, title: "عید کے لیے خوبصورت لباس" }, { idea: "Eid outfits" }).checks.map((c) => c.id)).not.toContain("title-keyword");
+  });
+});
