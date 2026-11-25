@@ -71,8 +71,8 @@ export function StatusSummary({ dark = false }: { dark?: boolean }) {
       {rows.map((r) => (
         <li key={r.label} className="flex items-center gap-1.5" title={r.title}>
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot[r.tone]}`} aria-hidden />
-          <span className="text-[#8a877f]">{r.label}</span>
-          <span className={`ml-auto font-medium text-[#e8e6e0]`}>{r.value}</span>
+          <span className="text-white/50">{r.label}</span>
+          <span className={`ml-auto font-medium text-white/90`}>{r.value}</span>
         </li>
       ))}
     </ul>

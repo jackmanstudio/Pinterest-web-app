@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${inter.variable} ${interTight.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col bg-zinc-50 text-zinc-900">
+      <body className="flex min-h-full flex-col bg-[#0b0912] text-zinc-900">
         <Suspense fallback={<main className="flex-1">{children}</main>}>
           <AppShell>{children}</AppShell>
         </Suspense>

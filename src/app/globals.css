@@ -18,28 +18,87 @@ body {
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-MediumItalic.ttf") format("truetype"); font-weight: 500; font-style: italic; font-display: swap; }
 
-/* ================= Bold Bento theme (signed-in app) =================
-   Warm paper page, black sidebar, colourful tiles, Pinterest red #e60023,
-   heavy Inter Tight numbers. */
+/* ================= Aurora Glass theme (signed-in app) =================
+   Deep night background lit by red, orange and purple glows; glass panels.
+   Pages built with light utilities are remapped inside .app-main below. */
 @theme inline {
   --font-display: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
 }
-.bb-body { background: #f3f1ec; color: #141414; font-family: var(--font-inter), system-ui, sans-serif; }
-.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.025em; color: #141414; }
-.app-main h1 { font-weight: 800; }
-.app-main .bg-red-700, .app-main .bg-red-600 { background-color: #e60023; }
-.app-main .hover\:bg-red-800:hover { background-color: #cc001f; }
-.app-main .text-red-700 { color: #e60023; }
-.app-main :is(.rounded-xl, .rounded-2xl).bg-white.border-zinc-200 { border-color: #e4e0d8; border-radius: 1.25rem; box-shadow: none; }
-.app-main .bg-zinc-50, .app-main .bg-stone-50 { background-color: #f7f5f1; }
-.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #141414; box-shadow: 0 0 0 3px rgb(20 20 20 / 0.08); }
+.au-body {
+  color: #efeaf6; font-family: var(--font-inter), system-ui, sans-serif; color-scheme: dark;
+  background:
+    radial-gradient(700px 480px at 12% -8%, rgb(230 0 35 / 0.42), transparent 70%),
+    radial-gradient(760px 520px at 92% 4%, rgb(255 138 61 / 0.30), transparent 70%),
+    radial-gradient(800px 560px at 60% 105%, rgb(140 90 255 / 0.28), transparent 70%),
+    #0b0912;
+  background-attachment: fixed;
+}
+.au-glass { background: rgb(255 255 255 / 0.07); border: 1px solid rgb(255 255 255 / 0.13); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.au-grad { background-image: linear-gradient(90deg, #ff4d6a, #ff9a5a 50%, #b892ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.app-main { color: #efeaf6; }
+.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.02em; color: #fff; }
+.app-main h1 { font-weight: 700; }
+
+/* surfaces */
+.app-main .bg-white, .app-main .bg-white\/90, .app-main .bg-white\/80 { background-color: rgb(255 255 255 / 0.06); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.app-main .bg-zinc-50, .app-main .bg-stone-50 { background-color: rgb(255 255 255 / 0.04); }
+.app-main .bg-zinc-100 { background-color: rgb(255 255 255 / 0.08); }
+.app-main .bg-zinc-200 { background-color: rgb(255 255 255 / 0.14); }
+.app-main .bg-zinc-900 { background-color: #f2f0f3; color: #0b0b0d; }
+.app-main .bg-zinc-900.text-white, .app-main .bg-zinc-900 .text-white { color: #0b0b0d; }
+.app-main .hover\:bg-zinc-50:hover, .app-main .hover\:bg-zinc-100:hover { background-color: rgb(255 255 255 / 0.1); }
+.app-main .hover\:bg-zinc-200:hover { background-color: rgb(255 255 255 / 0.16); }
+.app-main .hover\:bg-zinc-800:hover { background-color: #ffffff; }
+.app-main .bg-red-700, .app-main .bg-red-600 { background-color: #e60023; background-image: linear-gradient(90deg, #e60023, #ff7a45); }
+.app-main .hover\:bg-red-800:hover { background-color: #c8001e; }
+
+/* text */
+.app-main .text-zinc-900, .app-main .text-zinc-800 { color: #f3f1f4; }
+.app-main .text-zinc-700 { color: #cfcbd2; }
+.app-main .text-zinc-600 { color: #a6a2aa; }
+.app-main .text-zinc-500 { color: #8b8890; }
+.app-main .text-zinc-400 { color: #6c6970; }
+.app-main .hover\:text-zinc-900:hover { color: #fff; }
+.app-main .text-red-700, .app-main .text-rose-600 { color: #ff4d6a; }
+.app-main .text-red-800, .app-main .text-red-900 { color: #ff8095; }
+.app-main :is(.text-amber-700, .text-amber-800, .text-amber-900) { color: #fcd34d; }
+.app-main :is(.text-emerald-600, .text-emerald-700, .text-emerald-800) { color: #6ee7b7; }
+.app-main :is(.text-sky-800, .text-sky-900) { color: #7dd3fc; }
+.app-main .text-violet-800 { color: #c4b5fd; }
+
+/* tints */
+.app-main :is(.bg-amber-50, .bg-amber-100) { background-color: rgb(245 158 11 / 0.1); }
+.app-main :is(.bg-emerald-50, .bg-emerald-100) { background-color: rgb(16 185 129 / 0.1); }
+.app-main :is(.bg-red-50, .bg-red-100, .bg-rose-50) { background-color: rgb(230 0 35 / 0.1); }
+.app-main :is(.bg-sky-50, .bg-sky-100) { background-color: rgb(14 165 233 / 0.1); }
+.app-main :is(.bg-violet-50, .bg-violet-100) { background-color: rgb(139 92 246 / 0.12); }
+
+/* lines */
+.app-main :is(.border-zinc-100, .border-zinc-200) { border-color: rgb(255 255 255 / 0.12); }
+.app-main .border-zinc-300 { border-color: rgb(255 255 255 / 0.18); }
+.app-main :is(.border-amber-200, .border-amber-300) { border-color: rgb(245 158 11 / 0.3); }
+.app-main :is(.border-red-200, .border-red-300) { border-color: rgb(230 0 35 / 0.35); }
+.app-main .border-emerald-200 { border-color: rgb(16 185 129 / 0.3); }
+.app-main :is(.ring-zinc-100, .ring-zinc-200, .ring-zinc-900\/5) { --tw-ring-color: rgb(255 255 255 / 0.12); }
+.app-main :is(.ring-amber-200, .ring-amber-300) { --tw-ring-color: rgb(245 158 11 / 0.3); }
+.app-main :is(.ring-emerald-200) { --tw-ring-color: rgb(16 185 129 / 0.3); }
+.app-main .divide-zinc-100 > * + * { border-color: rgb(255 255 255 / 0.08); }
+.app-main .shadow-sm, .app-main .shadow, .app-main .shadow-md { --tw-shadow: 0 0 #0000; box-shadow: none; }
+
+/* cards: flat, hairline, slight lift on hover */
+.app-main :is(.rounded-xl, .rounded-2xl, .rounded-lg).bg-white { border-color: rgb(255 255 255 / 0.13); }
+.app-main a:is(.rounded-xl, .rounded-2xl).bg-white:hover { border-color: rgb(255 255 255 / 0.25); background-color: rgb(255 255 255 / 0.09); }
+
+/* form controls */
+.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { background-color: rgb(0 0 0 / 0.25); color: #f3f1f4; border-color: rgb(255 255 255 / 0.16); }
+.app-main :is(input, textarea)::placeholder { color: #6c6970; }
+.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #e60023; box-shadow: 0 0 0 3px rgb(255 122 69 / 0.22); }
 .app-main input[type="checkbox"], .app-main input[type="radio"] { accent-color: #e60023; }
-.bb-num { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
-.bb-tile { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s; }
-a.bb-tile:hover, .bb-tile.bb-hover:hover { transform: translateY(-3px); box-shadow: 0 16px 30px -18px rgb(20 20 20 / 0.45); }
-@keyframes bb-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
-.bb-grid > * { animation: bb-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.bb-grid > *:nth-child(2) { animation-delay: 0.04s; } .bb-grid > *:nth-child(3) { animation-delay: 0.08s; }
-.bb-grid > *:nth-child(4) { animation-delay: 0.12s; } .bb-grid > *:nth-child(5) { animation-delay: 0.16s; }
-.bb-grid > *:nth-child(n+6) { animation-delay: 0.2s; }
-@media (prefers-reduced-motion: reduce) { .bb-grid > *, .bb-tile { animation: none; transition: none; } }
+.app-main option { background: #16121f; color: #f3f1f4; }
+
+
+@keyframes au-in { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
+.au-in > * { animation: au-in 0.5s ease-out both; }
+.au-in > *:nth-child(2) { animation-delay: 0.05s; } .au-in > *:nth-child(3) { animation-delay: 0.1s; }
+.au-in > *:nth-child(4) { animation-delay: 0.15s; } .au-in > *:nth-child(n+5) { animation-delay: 0.2s; }
+@media (prefers-reduced-motion: reduce) { .au-in > * { animation: none; } }
