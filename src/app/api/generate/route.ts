@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getTextProvider } from "@/lib/ai/text";
 import { ProviderError } from "@/lib/ai/text/types";
 import { findNearDuplicates } from "@/lib/drafts/distinctness";
+import { tidyDrafts } from "@/lib/drafts/tidyTitle";
 import { GenerateRequestSchema } from "@/lib/drafts/validation";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     const tokens = { input: 0, output: 0 };
     const run = async () => {
       const r = await provider.generateDrafts(parsed.data);
+      r.drafts = tidyDrafts(r.drafts, parsed.data.idea, parsed.data.language || parsed.data.brand.language);
       tokens.input += r.usage?.input_tokens ?? 0;
       tokens.output += r.usage?.output_tokens ?? 0;
       return r;

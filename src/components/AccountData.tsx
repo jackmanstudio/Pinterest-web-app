@@ -86,7 +86,7 @@ export function AccountData() {
         <p className="mt-1 text-sm text-zinc-600">
           {live
             ? "Your data is stored in Supabase with row-level security. Fashion and Macro stay separate in the export too."
-            : "Demo mode: everything lives only in this browser's local storage. Nothing is sent to a server."}
+            : "Demo mode: your pins and settings are saved only in this browser's local storage. To write pins and make images, your idea and brand settings are sent to the server and its AI provider; they are not stored there."}
         </p>
       </div>
 

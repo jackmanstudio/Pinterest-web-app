@@ -155,7 +155,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
           </span>
         </div>
         <p className="mt-1 max-w-3xl text-sm text-zinc-600">
-          Add titles or ideas to the queue. Every hour, Autopilot turns the next idea into 5 pins (AI text; photos from your page or AI images), then posts them to your
+          Add titles or ideas to the queue. Every hour, Autopilot turns the next idea into a full set of 5 pins, one per angle (AI text; photos from your page or AI images), then posts them to your
           board one at a time, up to your daily limit, within the monthly AI budget. <strong>Pins are published without asking you first.</strong>{" "}
           Pause it any time.
         </p>
@@ -266,7 +266,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
 
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="font-semibold">Idea queue {live && <span className="font-normal text-zinc-500">· {queued} waiting</span>}</h2>
-          <p className="mt-1 text-xs text-zinc-500">One title or idea per line. Each one becomes 5 pins.</p>
+          <p className="mt-1 text-xs text-zinc-500">One title or idea per line. Each one becomes a set of 5 pins, one per angle (in the Studio you choose 1 to 5).</p>
           <textarea rows={4} disabled={!live || busy} className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60"
             placeholder={kind === "fashion" ? "Autumn trench coat outfits\nMinimalist capsule wardrobe for work" : "One idea per line"}
             value={ideasText} onChange={(e) => setIdeasText(e.target.value)} />

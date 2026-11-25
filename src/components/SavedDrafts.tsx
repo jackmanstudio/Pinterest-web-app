@@ -69,6 +69,8 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
         return rest;
       });
       setMsg({ id: d.id, text: "Saved. The previous text is kept in History.", ok: true });
+      // Refresh an open History panel so the version just kept shows up.
+      if (history?.id === d.id) setHistory({ id: d.id, versions: await store.listVersions(workspace.id, d.id) });
     } catch (err) {
       fail(d.id, err);
     }

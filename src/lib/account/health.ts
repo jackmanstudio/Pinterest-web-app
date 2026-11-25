@@ -57,7 +57,7 @@ export function workspaceHealth(drafts: PinDraft[], brand: BrandSettings | null,
   };
   const r = h.recommendations;
   if (!brand?.brand_name || !brand.audience) r.push({ priority: "high", text: "Fill in brand name and audience so every pin is written for the right people.", href: "settings" });
-  if (h.total === 0) r.push({ priority: "high", text: "No pins yet. Type a title in the Studio to make your first five.", href: "" });
+  if (h.total === 0) r.push({ priority: "high", text: "No pins yet. Type a title in the Studio to make your first pins.", href: "" });
   if (byStatus.in_review) r.push({ priority: "high", text: `${byStatus.in_review} pin(s) are waiting for your review.`, href: "publish" });
   if (byStatus.approved && !byStatus.scheduled) r.push({ priority: "medium", text: `${byStatus.approved} approved pin(s) are not scheduled yet.`, href: "publish" });
   if (h.scheduledNext7Days === 0 && h.total > 0) r.push({ priority: "medium", text: "Nothing is scheduled for the next 7 days. Regular posting keeps the account active.", href: "calendar" });

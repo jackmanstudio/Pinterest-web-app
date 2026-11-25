@@ -92,8 +92,8 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h1 className="text-lg font-semibold">{label} · Pinterest account</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Each workspace connects its own Pinterest account. This app only <strong>reads</strong> boards and pins for now; it never publishes,
-          edits or deletes anything on Pinterest.
+          Each workspace connects its own Pinterest account. The app reads your boards and pins, and creates a pin only when you approve and confirm it in
+          Review &amp; publish, or when you turn on Autopilot yourself. It never edits or deletes your existing pins.
         </p>
 
         {error && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}

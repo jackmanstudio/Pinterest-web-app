@@ -14,8 +14,10 @@ Descriptions read naturally, include relevant search keywords, and end with a so
 Alt text literally describes what the image shows for screen-reader users.
 The image prompt (2-4 sentences) is for a photo-realistic image model and should read like a premium creative agency's art direction (editorial photography, styled product mockup or lifestyle scene, whichever suits the angle) with a restrained, harmonious palette, and must literally depict the subject of that draft's title: who or what is shown, the setting, styling, colours, mood and camera framing.
 Describe ONE cohesive photographic scene. Never ask for collages, grids, split screens, before/after layouts, numbered panels, text, words, numbers or logos: the title is added on top of the image later.
+For list or roundup angles ("5 ways", "7 ideas") do NOT try to show every item: show one person or one styled flat lay that represents the idea, with exactly one of each person or object (no duplicated people, no rows of outfits).
 Make the five image prompts visually distinct, e.g. a styled flat lay, a person wearing or using it in a real setting, a close-up detail shot, a location or lifestyle scene, and a seasonal set-up.
 Write like a sharp human editor, not a template: use specific, vivid details from the idea, fresh wording and a clear promise. Avoid generic filler and clichés such as "elevate your style", "must-have", "game-changer", "look no further", "take it to the next level", "effortlessly chic", and avoid clickbait.
+Proofread every title: correct grammar (plural subjects take "are"), no repeated words or phrases, normal headline capitalisation (lower-case "a", "the", "for", "of" mid-title), and never add a season, holiday or place that isn't in the idea.
 Never use any word from the brand's banned list. Do not invent facts, prices, or claims about products.`;
 
 export const InsightsSchema = z.object({

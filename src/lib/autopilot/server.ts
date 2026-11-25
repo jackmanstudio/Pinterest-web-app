@@ -1,4 +1,5 @@
 import "server-only";
+import { tidyDrafts } from "@/lib/drafts/tidyTitle";
 import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn } from "@/lib/supabase/compat";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getImageProvider } from "@/lib/ai/image";
@@ -324,6 +325,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
 
       await assertWithinBudget(ledger, true);
       const result = await withRetry(() => text.generateDrafts({ workspace: ws.kind, idea: idea.idea, brand, context: idea.context ?? undefined }));
+      result.drafts = tidyDrafts(result.drafts, idea.idea, brand.language);
       const cost = estimateTextCost(result.model, result.usage?.input_tokens ?? 0, result.usage?.output_tokens ?? 0);
       await ledger.record({ workspace_id: ws.workspace_id, kind: "text", provider: result.provider, model: result.model, source: result.source, input_tokens: result.usage?.input_tokens ?? 0, output_tokens: result.usage?.output_tokens ?? 0, images: 0, est_cost_usd: cost, status: "ok", error: null });
 
