@@ -61,7 +61,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [saveCustom, setSaveCustom] = useState(true);
   const [language, setLanguage] = useState("");
   const [brand, setBrand] = useState<BrandSettings | null>(null);
-  const [count, setCount] = useState(5);
+  const [count, setCount] = useState(3);
   const [customCount, setCustomCount] = useState(false);
   const [busy, setBusy] = useState<"idle" | "generating" | "saving" | "auto">("idle");
   const [auto, setAuto] = useState<AutoRun | null>(null);
@@ -285,9 +285,9 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
                   setCustomCount(false);
                   setCount(n);
                 }}
-                className={`rounded-full px-3.5 py-1 text-xs font-medium transition ${!customCount && count === n ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+                className={`rounded-full px-3.5 py-1 text-xs font-medium ${!customCount && count === n ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
               >
-                {n} pins
+                {n} Pins
               </button>
             ))}
             <button
@@ -295,7 +295,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               role="radio"
               aria-checked={customCount}
               onClick={() => setCustomCount(true)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium transition ${customCount ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+              className={`rounded-full px-3.5 py-1 text-xs font-medium ${customCount ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
             >
               Custom
             </button>
@@ -303,7 +303,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           {customCount && (
             <select aria-label="Custom number of pins" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={count} onChange={(e) => setCount(Number(e.target.value))}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>{n} pin{n === 1 ? "" : "s"}</option>
+                <option key={n} value={n}>{n} {n === 1 ? "Pin" : "Pins"}</option>
               ))}
             </select>
           )}
