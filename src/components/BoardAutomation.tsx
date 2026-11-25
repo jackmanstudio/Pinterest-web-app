@@ -19,10 +19,10 @@ import {
   type NewBoardSuggestion,
   type PlanMethod,
 } from "@/lib/boards/automation";
-import { draftFacts, loadBoardSource, requestAssignments, toPlan, type BoardSource } from "@/lib/client/boards";
+import { draftFacts, fillCategories, loadBoardSource, requestAssignments, toPlan, type BoardSource } from "@/lib/client/boards";
 import { toCsv } from "@/lib/tools/csv";
 import { downloadFile } from "@/lib/client/download";
-import { WORKSPACE_LABELS, type PinDraft, type WorkspaceKind } from "@/lib/types";
+import { WORKSPACE_LABELS, type Category, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
 
 /** One editable row: a pin or a bulk keyword with its board. */
@@ -50,6 +50,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
   const [settings, setSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
   const [savedSettings, setSavedSettings] = useState<string>("");
   const [drafts, setDrafts] = useState<PinDraft[] | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [pinRows, setPinRows] = useState<Row[]>([]);
   const [kwText, setKwText] = useState("");
   const [kwRows, setKwRows] = useState<Row[]>([]);
@@ -62,8 +63,12 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     let cancelled = false;
     (async () => {
       try {
-        const [s, bs, ds, plans] = await Promise.all([loadBoardSource(kind), store.getBoardSettings(workspace.id), store.listDrafts(workspace.id), store.listBoardPlans(workspace.id)]);
+        const [s, bs, ds, plans, cats] = await Promise.all([
+          loadBoardSource(kind), store.getBoardSettings(workspace.id), store.listDrafts(workspace.id), store.listBoardPlans(workspace.id), store.listCategories(workspace.id).catch(() => [] as Category[]),
+        ]);
         if (cancelled) return;
+        setCategories(cats);
+        const catName = new Map(cats.map((c) => [c.id, c.name]));
         setSrc(s);
         setSettings(bs);
         setSavedSettings(JSON.stringify(bs));
@@ -73,7 +78,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
           eligible(ds).map((d) => {
             const p = byDraft.get(d.id);
             return {
-              key: d.id, label: d.title, keyword: d.idea, category: p?.category ?? "", board_id: p?.board_id ?? null, board_name: p?.board_name ?? null,
+              key: d.id, label: d.title, keyword: d.idea, category: (d.category_id && catName.get(d.category_id)) || p?.category || "", board_id: p?.board_id ?? null, board_name: p?.board_name ?? null,
               method: p?.method ?? "custom", confidence: p?.confidence ?? null, reason: p?.reason ?? "", new_board: null, saved: Boolean(p),
             };
           }),
@@ -113,7 +118,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     setBusy(`Reading ${targets.length} pin${targets.length === 1 ? "" : "s"} and picking boards…`);
     setMsg(null);
     try {
-      const r = await requestAssignments(kind, targets.map(draftFacts), settings);
+      const r = await requestAssignments(kind, targets.map(draftFacts), settings, categories.map((c) => c.name));
       setNote(r.note);
       const byKey = new Map(r.assignments.map((a) => [a.key, a]));
       let rows = pinRows.map((row) => (byKey.has(row.key) ? { ...fromAssignment(byKey.get(row.key)!, row.label, row.keyword), saved: false } : row));
@@ -121,6 +126,8 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
       if (settings.mode !== "custom") {
         const plans = r.assignments.map(toPlan).filter((p): p is BoardPlan => p !== null);
         await store!.saveBoardPlans(workspace!.id, plans);
+        const filled = await fillCategories(store!, workspace!.id, targets, r.assignments, categories);
+        if (filled) setDrafts(await store!.listDrafts(workspace!.id));
         const savedKeys = new Set(plans.map((p) => p.draft_id));
         rows = rows.map((row) => (savedKeys.has(row.key) ? { ...row, saved: true } : row));
         setMsg({ ok: true, text: `Planned a board for ${plans.length} of ${targets.length} pins. Change any board below.` });
@@ -141,6 +148,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
       .map((r) => ({ draft_id: r.key, board_id: r.board_id!, board_name: r.board_name!, category: r.category || null, reason: r.reason || null, method: r.method, confidence: r.confidence }));
     try {
       await store!.saveBoardPlans(workspace!.id, plans);
+      await fillCategories(store!, workspace!.id, drafts!.filter((d) => plans.some((p) => p.draft_id === d.id)), pinRows.map((r) => ({ key: r.key, category: r.category }) as Assignment), categories);
       setPinRows((rows) => rows.map((r) => (r.board_id ? { ...r, saved: true } : r)));
       setMsg({ ok: true, text: `Saved boards for ${plans.length} pin${plans.length === 1 ? "" : "s"}.` });
     } catch (e) {
@@ -154,7 +162,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     setBusy(`Categorising ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}…`);
     setMsg(null);
     try {
-      const r = await requestAssignments(kind, keywords.map((k, i) => ({ key: `kw-${i}`, keyword: k })), { ...settings, keyword_plan: [] });
+      const r = await requestAssignments(kind, keywords.map((k, i) => ({ key: `kw-${i}`, keyword: k })), { ...settings, keyword_plan: [] }, categories.map((c) => c.name));
       setNote(r.note);
       setKwRows(r.assignments.map((a, i) => fromAssignment(a, keywords[i], keywords[i])));
       setMsg({ ok: true, text: `${keywords.length} keywords sorted into boards.${dropped ? ` ${dropped} extra keywords were left out (max ${MAX_BULK_KEYWORDS}).` : ""} Review, then save the plan.` });

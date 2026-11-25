@@ -10,6 +10,9 @@ import type { UsageEntry } from "@/lib/usage/ledger";
 import { estimateTextCost } from "@/lib/usage/pricing";
 import type { GenerateResponse } from "@/lib/types";
 
+// Non-English pins can take over a minute on the free text model.
+export const maxDuration = 150;
+
 export async function POST(request: Request) {
   const limitedRes = rateLimited(request, "generate");
   if (limitedRes) return limitedRes;
@@ -41,9 +44,11 @@ export async function POST(request: Request) {
       tokens.output += r.usage?.output_tokens ?? 0;
       return r;
     };
+    const started = Date.now();
     let result: GenerateResponse = await run();
-    // One bounded retry if the model returned near-duplicates.
-    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0) result = await run();
+    // One bounded retry if the model returned near-duplicates, only when the first call was quick
+    // (a second slow call would keep the user waiting minutes).
+    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0 && Date.now() - started < 25_000) result = await run();
 
     const cost = estimateTextCost(result.model, tokens.input, tokens.output);
     await ctx.ledger.record({ ...usageBase, model: result.model, input_tokens: tokens.input, output_tokens: tokens.output, est_cost_usd: cost, status: "ok", error: null });

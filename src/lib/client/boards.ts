@@ -8,7 +8,7 @@ import {
   type PinFacts,
 } from "@/lib/boards/automation";
 import type { Store } from "@/lib/store";
-import type { PinDraft, WorkspaceKind } from "@/lib/types";
+import type { Category, PinDraft, WorkspaceKind } from "@/lib/types";
 
 export interface BoardSource {
   boards: Board[];
@@ -53,13 +53,13 @@ export interface AssignResult {
 }
 
 /** Asks the server for board + category picks, 50 pins per request. */
-export async function requestAssignments(kind: WorkspaceKind, pins: PinFacts[], settings: BoardSettings): Promise<AssignResult> {
+export async function requestAssignments(kind: WorkspaceKind, pins: PinFacts[], settings: BoardSettings, categories: string[] = []): Promise<AssignResult> {
   const out: AssignResult = { assignments: [], boards: [], sampleBoards: false, engine: "none", note: null };
   for (let i = 0; i < pins.length; i += 50) {
     const res = await fetch("/api/boards/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: kind, pins: pins.slice(i, i + 50), settings }),
+      body: JSON.stringify({ workspace: kind, pins: pins.slice(i, i + 50), settings, categories: categories.slice(0, 200) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error ?? `Board assignment failed (${res.status})`);
@@ -86,8 +86,28 @@ export async function autoPlanBoards(store: Store, workspaceId: string, kind: Wo
   if (!drafts.length) return 0;
   const settings = await store.getBoardSettings(workspaceId);
   if (settings.mode === "custom") return 0;
-  const r = await requestAssignments(kind, drafts.map(draftFacts), settings);
+  const categories = await store.listCategories(workspaceId).catch(() => [] as Category[]);
+  const r = await requestAssignments(kind, drafts.map(draftFacts), settings, categories.map((c) => c.name));
   const plans = r.assignments.map(toPlan).filter((p): p is BoardPlan => p !== null);
   await store.saveBoardPlans(workspaceId, plans);
+  await fillCategories(store, workspaceId, drafts, r.assignments, categories);
   return plans.length;
+}
+
+/**
+ * Pins saved without a category get the category the board picker chose,
+ * when it is one of the workspace's own, so the library filter finds them.
+ * Pins that already have a category, or are scheduled or published, are left alone.
+ */
+export async function fillCategories(store: Store, workspaceId: string, drafts: PinDraft[], assignments: Assignment[], categories: Category[]): Promise<number> {
+  const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const byKey = new Map(assignments.map((a) => [a.key, a]));
+  let n = 0;
+  for (const d of drafts) {
+    if (d.category_id || d.status === "scheduled" || d.status === "published") continue;
+    const id = byName.get((byKey.get(d.id)?.category ?? "").toLowerCase());
+    if (!id) continue;
+    await store.updateDraft(workspaceId, d.id, { category_id: id }).then(() => n++).catch(() => {});
+  }
+  return n;
 }

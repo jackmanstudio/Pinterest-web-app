@@ -163,8 +163,12 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined, style }),
+        // Never leave the user on "Writing pins…" forever.
+        signal: AbortSignal.timeout(150_000),
       });
-    } catch {
+    } catch (e) {
+      if ((e as Error).name === "TimeoutError")
+        throw new GenerateError("Writing the pins took more than 2½ minutes, so it was stopped. Please retry; pins in Urdu and other non-English languages take longer.", true);
       throw new GenerateError("Could not reach the server. Check your connection and retry.", true);
     }
     const body = await res.json().catch(() => ({}));
@@ -528,7 +532,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold">“{auto.idea}”</h2>
             <span className="text-sm text-zinc-600">
-              {auto.phase === "writing" && `Writing ${count} pin${count === 1 ? "" : "s"}…`}
+              {auto.phase === "writing" && `Writing ${count} pin${count === 1 ? "" : "s"}…${language && !/^(english|roman)/i.test(language) ? " Pins in " + language + " can take 1–2 minutes." : ""}`}
               {auto.phase === "saving" && "Saving drafts…"}
               {auto.phase === "images" && `Making images: ${auto.imagesDone} of ${auto.drafts.length} done…`}
               {auto.phase === "done" &&

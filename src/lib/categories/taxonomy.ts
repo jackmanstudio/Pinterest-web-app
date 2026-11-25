@@ -96,6 +96,28 @@ const HINTS: Record<string, string[]> = {
   "Self-Care & Daily Wellness": ["self care", "self-care", "wellness", "pamper", "morning routine", "night routine", "bath"],
 };
 
+/**
+ * Hints by the words a category's own name uses, so renamed or custom
+ * categories ("Seasonal trends", "Styling tips", "Outfit ideas") still match.
+ */
+const CONCEPTS: [RegExp, string[]][] = [
+  [/season|holiday|festive/, ["autumn", "fall", "winter", "summer", "spring", "christmas", "holiday", "eid", "ramadan", "halloween", "thanksgiving", "valentine", "easter", "back to school", "new year", "seasonal"]],
+  [/styl|how to wear|wear/, ["styling", "style", "layering", "layer", "how to wear", "wear", "pair", "pairing", "combine", "styled", "tips"]],
+  [/outfit|look|ootd|wardrobe/, ["outfit", "look", "ootd", "wardrobe", "capsule", "dress", "coat", "trench", "jacket", "jeans", "sweater", "knit", "blazer", "skirt", "boots", "shirt"]],
+  [/trend/, ["trend", "trending", "this season", "viral", "aesthetic"]],
+  [/accessor/, ["bag", "belt", "scarf", "hat", "jewelry", "jewellery", "sunglasses", "watch", "earrings"]],
+  [/beauty|makeup/, ["makeup", "lipstick", "skincare", "glow", "nails", "hair"]],
+  [/home|decor|interior/, ["decor", "living room", "bedroom", "cozy", "kitchen", "shelf"]],
+  [/food|recipe|cook/, ["recipe", "dinner", "lunch", "breakfast", "meal"]],
+  [/travel/, ["trip", "travel", "vacation", "packing", "itinerary", "destination"]],
+  [/gift/, ["gift", "gifts", "present", "presents", "gift guide"]],
+];
+
+function conceptHints(name: string): string[] {
+  const n = name.toLowerCase();
+  return CONCEPTS.filter(([re]) => re.test(n)).flatMap(([, words]) => words);
+}
+
 const STOP = new Set(["and", "the", "for", "with", "your", "you", "how", "to", "of", "in", "on", "a", "an", "ideas", "tips", "s"]);
 
 function norm(text: string): string {
@@ -121,13 +143,17 @@ export function detectCategory(text: string, categories: Category[]): DetectedCa
   const t = norm(text);
   let best: DetectedCategory | null = null;
   for (const c of categories) {
-    const words = new Set([...nameWords(c.name), ...(HINTS[c.name] ?? []).map((h) => h.toLowerCase())]);
+    const strong = new Set([...nameWords(c.name), ...(HINTS[c.name] ?? []).map((h) => h.toLowerCase())]);
+    // Concept words are weaker than the category's own name and hint words.
+    const words = new Set([...strong, ...conceptHints(c.name)]);
     const matched: string[] = [];
     let score = 0;
     for (const w of words) {
-      if (t.includes(` ${w} `)) {
+      // "trend" also matches "trends", and "outfits" also matches "outfit".
+      const forms = [w, w.endsWith("s") ? w.slice(0, -1) : `${w}s`];
+      if (forms.some((f) => f.length > 2 && t.includes(` ${f} `))) {
         matched.push(w);
-        score += w.includes(" ") ? 3 : 2;
+        score += (w.includes(" ") ? 3 : 2) - (strong.has(w) ? 0 : 1);
       }
     }
     // A sub-category's own name is a strong, specific signal.

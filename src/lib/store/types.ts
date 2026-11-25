@@ -2,7 +2,7 @@ import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { AuditEvent, BrandSettings, Category, DraftContent, DraftVersion, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
 
-export type DraftPatch = Partial<DraftContent> & { link?: string | null; archived_at?: string | null };
+export type DraftPatch = Partial<DraftContent> & { link?: string | null; archived_at?: string | null; category_id?: string | null };
 
 export interface TransitionOptions {
   boardId?: string;

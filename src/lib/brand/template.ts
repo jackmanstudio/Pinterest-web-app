@@ -30,6 +30,8 @@ export const FONT_FAMILY: Record<TemplateFont, string> = { sans: "Poppins", seri
 export const FONT_FILES = [
   "Poppins-Bold.ttf", "Poppins-Medium.ttf", "DMSerifDisplay-Regular.ttf", "BebasNeue-Regular.ttf",
   "PlayfairDisplay-Medium.ttf", "PlayfairDisplay-MediumItalic.ttf", "CormorantGaramond-SemiBold.ttf", "CormorantGaramond-MediumItalic.ttf",
+  // Urdu and Arabic headlines (the Latin fonts have no Arabic script; Poppins already covers Hindi).
+  "NotoNaskhArabic-Bold.ttf",
 ];
 /** Rough average glyph width as a share of font size, for line wrapping. */
 const CHAR_WIDTH: Record<TemplateFont, number> = { sans: 0.6, serif: 0.5, display: 0.42 };

@@ -56,7 +56,7 @@ export class CloudflareTextProvider implements TextProvider {
     this.name = `Cloudflare ${this.model.replace(/^@[^/]+\/[^/]+\//, "")}`;
   }
 
-  private async run(system: string, user: string, schema: z.ZodType, maxTokens: number) {
+  private async run(system: string, user: string, schema: z.ZodType, maxTokens: number, timeoutMs = 90_000) {
     const f = this.opts.fetchImpl ?? fetch;
     let res: Response;
     try {
@@ -72,9 +72,11 @@ export class CloudflareTextProvider implements TextProvider {
           max_tokens: maxTokens,
           temperature: 0.8,
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {
+      if ((e as Error).name === "TimeoutError" || (e as Error).name === "AbortError")
+        throw new ProviderError(`The text AI took longer than ${Math.round(timeoutMs / 1000)} seconds and was stopped. Please retry; non-English pins take longer.`, 504, true);
       throw new ProviderError(`Text AI unreachable: ${(e as Error).message}`, 502, true);
     }
     const body = (await res.json().catch(() => null)) as {
@@ -100,7 +102,9 @@ export class CloudflareTextProvider implements TextProvider {
   }
 
   async generateDrafts(req: GenerateRequest): Promise<GenerateResponse> {
-    const { out, usage } = await this.run(DRAFTS_SYSTEM, draftsUserPrompt(req), DraftSetSchema, 4000);
+    // Urdu, Arabic, Hindi etc. use several tokens per word: give them room so the JSON isn't cut off.
+    const nonEnglish = Boolean(req.language && !/^english$/i.test(req.language) && !/^roman/i.test(req.language));
+    const { out, usage } = await this.run(DRAFTS_SYSTEM, draftsUserPrompt(req), DraftSetSchema, nonEnglish ? 6500 : 4000, 100_000);
     const parsed = DraftSetSchema.safeParse(normalizeDrafts(out, anglesFor(req.style)));
     if (!parsed.success) throw new ProviderError("The AI returned incomplete drafts. Please retry.", 502, true);
     return { source: "ai", provider: this.name, model: this.model, drafts: parsed.data.drafts, usage };
