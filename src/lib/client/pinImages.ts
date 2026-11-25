@@ -10,7 +10,7 @@ export interface ImageResult {
 }
 
 /** Asks the server to make one draft's image and records the result in the store. */
-export async function generateDraftImage(kind: WorkspaceKind, store: Store, draft: PinDraft): Promise<ImageResult> {
+export async function generateDraftImage(kind: WorkspaceKind, store: Store, draft: PinDraft, opts: { sourceImage?: string } = {}): Promise<ImageResult> {
   let res: Response;
   try {
     // Demo storage lives in the browser, so the server needs the prompt, title and pin design sent along.
@@ -19,7 +19,7 @@ export async function generateDraftImage(kind: WorkspaceKind, store: Store, draf
     res = await fetch("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: kind, draftId: draft.id, ...demo }),
+      body: JSON.stringify({ workspace: kind, draftId: draft.id, ...demo, ...(opts.sourceImage ? { sourceImage: opts.sourceImage } : {}) }),
     });
   } catch {
     return { draft, error: "Could not reach the server. Check your connection and retry." };

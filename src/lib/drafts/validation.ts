@@ -37,6 +37,7 @@ export const GenerateRequestSchema = z.object({
   category: z.string().max(170).optional(),
   language: z.string().max(40).optional(),
   brand: BrandSchema,
+  context: z.string().max(2000).optional(),
 });
 
 /** Turn "a, b,  c" into ["a","b","c"] (trimmed, deduped, no empties). */

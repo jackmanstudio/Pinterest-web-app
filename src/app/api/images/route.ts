@@ -11,6 +11,9 @@ import { WORKSPACE_KINDS } from "@/lib/types";
 import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
 import { readTemplate } from "@/lib/brand/template";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
+import type { GeneratedImage } from "@/lib/ai/image/types";
+import { FetchBlocked, safeFetch } from "@/lib/tools/safeFetch";
+import sharp from "sharp";
 
 const Body = z.object({
   workspace: z.enum(WORKSPACE_KINDS),
@@ -21,7 +24,24 @@ const Body = z.object({
   angle: z.string().max(80).optional(),
   template: z.unknown().optional(),
   imageStyle: z.string().max(120).optional(),
+  /** Use this photo (e.g. from the source page) instead of generating one. Fetched with the SSRF guard. */
+  sourceImage: z.string().url().max(2048).optional(),
 });
+
+/** Downloads a page photo safely and checks it is a real, big-enough image. */
+async function pagePhoto(url: string): Promise<GeneratedImage> {
+  let r;
+  try {
+    r = await safeFetch(url, { accept: "image/avif,image/webp,image/jpeg,image/png,image/*", maxBytes: 12_000_000, timeoutMs: 15_000 });
+  } catch (e) {
+    throw new HttpError(422, e instanceof FetchBlocked ? e.message : "Couldn't download that photo.");
+  }
+  if (r.status >= 400) throw new HttpError(422, `The photo couldn't be downloaded (${r.status}).`);
+  const meta = await sharp(r.bytes).metadata().catch(() => null);
+  if (!meta?.width || !meta.height) throw new HttpError(422, "That link isn't a supported image.");
+  if (Math.min(meta.width, meta.height) < 300) throw new HttpError(422, "That photo is too small for a pin (under 300 px).");
+  return { bytes: r.bytes, contentType: `image/${meta.format}`, extension: "jpg", source: "manual", provider: "Photo from your page", model: null, est_cost_usd: 0 };
+}
 
 export async function POST(request: Request) {
   const limitedRes = rateLimited(request, "images");
@@ -74,16 +94,17 @@ export async function POST(request: Request) {
       const template = readTemplate(parsed.data.template);
       art = { template, logo: logoFromDataUrl(template.logo) };
     }
-    if (!prompt.trim()) throw new HttpError(400, "Add an image prompt first");
+    const source = parsed.data.sourceImage;
+    if (!source && !prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
-    await assertWithinBudget(ctx.ledger, provider.source === "ai");
+    if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
     const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
-    let attempts = 1;
-    const raw = await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
-    // Real AI images are always full size (1000×1500); only labelled placeholders are kept small.
+    let attempts = source ? 0 : 1;
+    const raw = source ? await pagePhoto(source) : await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
+    // Real images are always full size (1000×1500); only labelled placeholders are kept small.
     let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
-    if (image.source === "ai" && image.design.retryPhoto) {
+    if (!source && image.source === "ai" && image.design.retryPhoto) {
       // The photo itself was weak (blurry or badly exposed): make one more and keep the better pin.
       attempts = 2;
       const second = await brandPinImage(await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)), title, art, { angle }).catch(() => null);

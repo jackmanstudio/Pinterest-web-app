@@ -61,7 +61,7 @@ export function draftsUserPrompt(req: GenerateRequest): string {
   return `Workspace: ${req.workspace}
 ${lang}${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}
 Pin idea: ${req.idea}
-
+${req.context ? `\nThe pins promote this page. Use only facts from it; never invent prices, features, numbers or claims:\n${req.context}\n` : ""}
 Angles (one draft each, set "angle" to the angle label):
 ${angles}`;
 }

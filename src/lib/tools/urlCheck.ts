@@ -35,7 +35,7 @@ export function isPrivateAddress(ip: string): boolean {
   return true;
 }
 
-async function assertPublicHost(host: string) {
+export async function assertPublicHost(host: string) {
   const h = host.replace(/^\[|\]$/g, "");
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) throw new Error("private host");
   const addrs = isIP(h) ? [{ address: h }] : await lookup(h, { all: true });

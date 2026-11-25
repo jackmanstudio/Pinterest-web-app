@@ -2,7 +2,8 @@ export interface GeneratedImage {
   bytes: Uint8Array;
   contentType: string;
   extension: string;
-  source: "demo" | "ai";
+  /** "manual" = a photo from the user's own page or upload (not AI). */
+  source: "demo" | "ai" | "manual";
   provider: string;
   model: string | null;
   est_cost_usd: number;

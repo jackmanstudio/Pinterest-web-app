@@ -13,6 +13,7 @@ import { useWorkspace } from "./useWorkspace";
 import { AutoPinCard } from "./AutoPinCard";
 import { TrendIdeas } from "./TrendIdeas";
 import { downloadImage } from "@/lib/client/download";
+import { pageContext, type PageInfo } from "@/lib/tools/pageExtract";
 
 /** "" → null (no link); a valid http(s) URL → itself; anything else → false. */
 function normalizeLink(raw: string): string | null | false {
@@ -70,6 +71,34 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [batch, setBatch] = useState<Batch | null>(null);
+  // "From a link": read a blog post or product page and turn it into pins.
+  const [source, setSource] = useState<"idea" | "link">("idea");
+  const [pageUrl, setPageUrl] = useState("");
+  const [page, setPage] = useState<PageInfo | null>(null);
+  const [reading, setReading] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [usePhotos, setUsePhotos] = useState(true);
+
+  async function readPage() {
+    setReading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/tools/read-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: pageUrl }) });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Couldn't read that page.");
+      const p = body.page as PageInfo;
+      setPage(p);
+      setIdea(p.title.slice(0, 500));
+      setLink(p.canonical ?? p.url);
+      setPhotos(p.images.slice(0, 5).map((i) => i.url));
+      setUsePhotos(p.images.length > 0);
+    } catch (e) {
+      setPage(null);
+      setError({ message: (e as Error).message, retryable: true });
+    } finally {
+      setReading(false);
+    }
+  }
 
   useEffect(() => {
     if (!store || !workspace) return;
@@ -115,7 +144,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand }),
+        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined }),
       });
     } catch {
       throw new GenerateError("Could not reach the server. Check your connection and retry.", true);
@@ -181,10 +210,11 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       // Plan a board for each new pin in the background (spec 11). Failures never block pin making.
       autoPlanBoards(store, workspace.id, kind, saved).catch(() => {});
       setIdea("");
+      const pagePhotos = source === "link" && page && usePhotos ? photos : [];
       await runPool(
         saved,
         2,
-        (d) => generateDraftImage(kind, store, d),
+        (d, i) => generateDraftImage(kind, store, d, pagePhotos.length ? { sourceImage: pagePhotos[i % pagePhotos.length] } : {}),
         (r) =>
           update({
             drafts: run.drafts.map((x) => (x.id === r.draft.id ? r.draft : x)),
@@ -252,6 +282,77 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           Type a title or idea and get up to five complete pins: title, description, tags, alt text and image, saved as drafts. Nothing
           goes to Pinterest until you approve it in Review &amp; publish.
         </p>
+        <div className="mt-4 flex rounded-lg bg-zinc-100 p-0.5 text-sm sm:inline-flex" role="radiogroup" aria-label="Start from">
+          {(["idea", "link"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              role="radio"
+              aria-checked={source === m}
+              onClick={() => setSource(m)}
+              className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 font-medium ${source === m ? "bg-white shadow-sm" : "text-zinc-600"}`}
+            >
+              {m === "idea" ? "From an idea" : "From a link (blog post or product)"}
+            </button>
+          ))}
+        </div>
+        {source === "link" && (
+          <div className="mt-3 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-stone-50 p-3">
+            <form
+              className="flex flex-col gap-2 sm:flex-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                readPage();
+              }}
+            >
+              <label className="sr-only" htmlFor="page-url">Page address</label>
+              <input id="page-url" type="url" inputMode="url" className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2" placeholder="https://yourblog.com/post or a product page" value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} />
+              <button disabled={reading || pageUrl.trim().length < 4} className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{reading ? "Reading…" : "Read page"}</button>
+            </form>
+            {page && (
+              <div className="flex flex-col gap-2 text-sm">
+                <p>
+                  <span className="mr-2 rounded bg-white px-1.5 py-0.5 text-xs font-medium capitalize text-zinc-700 ring-1 ring-zinc-200">{page.kind}</span>
+                  <strong>{page.title}</strong>
+                  {page.price && <span className="ml-2 text-zinc-600">· {page.price}</span>}
+                </p>
+                {page.description && <p className="text-zinc-600">{page.description}</p>}
+                {page.images.length > 0 ? (
+                  <>
+                    <label className="flex items-center gap-2 text-xs">
+                      <input type="checkbox" checked={usePhotos} onChange={(e) => setUsePhotos(e.target.checked)} />
+                      Use photos from this page ({photos.length} picked). Use only photos you have the rights to. Untick to let AI make new images.
+                    </label>
+                    {usePhotos && (
+                      <div className="flex flex-wrap gap-2" role="group" aria-label="Page photos">
+                        {page.images.map((im) => {
+                          const on = photos.includes(im.url);
+                          return (
+                            <button
+                              key={im.url}
+                              type="button"
+                              aria-pressed={on}
+                              onClick={() => setPhotos((ps) => (on ? ps.filter((u) => u !== im.url) : [...ps, im.url]))}
+                              className={`relative h-20 w-16 overflow-hidden rounded-md ring-2 ${on ? "ring-red-700" : "ring-transparent opacity-60"}`}
+                              title={im.alt || "Page photo"}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element -- external page photo preview */}
+                              <img src={im.url} alt={im.alt} className="h-full w-full object-cover" referrerPolicy="no-referrer" loading="lazy" />
+                              {on && <span className="absolute right-0.5 top-0.5 rounded-full bg-red-700 px-1 text-[10px] text-white">✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-xs text-zinc-500">No usable photos on this page, so AI will make the images.</p>
+                )}
+                <p className="text-xs text-zinc-500">The title below and the link are filled in from the page. Pins only use facts from the page.</p>
+              </div>
+            )}
+          </div>
+        )}
         <form
           className="mt-4 flex flex-col gap-3 sm:flex-row"
           onSubmit={(e) => {

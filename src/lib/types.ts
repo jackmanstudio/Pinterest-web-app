@@ -121,6 +121,8 @@ export interface GenerateRequest {
   /** Output language chosen for this batch (e.g. "Urdu"). Empty = brand default / English. */
   language?: string;
   brand: BrandSettings;
+  /** Facts read from a source page (URL to pin). The AI must stay true to them. */
+  context?: string;
 }
 
 export interface GenerateResponse {
