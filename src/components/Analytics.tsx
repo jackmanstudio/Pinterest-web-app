@@ -1,9 +1,10 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useCallback, useEffect, useState } from "react";
 import { compactNumber, freshness } from "@/lib/analytics/parse";
 import { sampleSnapshots } from "@/lib/analytics/sample";
 import { METRIC_LABELS, type AccountAnalytics, type Insight, type PublishedPinStats, type Snapshot, type TopPin, type TrendKeyword } from "@/lib/analytics/types";
-import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import { type WorkspaceKind } from "@/lib/types";
 import { DailyBars } from "./DailyBars";
 import { auditPins, RATING_LABELS, type PinHealth, type PinRating } from "@/lib/analytics/audit";
 
@@ -95,14 +96,11 @@ export function Analytics({ kind }: { kind: WorkspaceKind }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} · Analytics</h1>
-          <p className="mt-1 text-sm text-zinc-600">Only verified data from the official Pinterest API, with its source, date range and freshness.</p>
-        </div>
+        <PageTitle kind={kind} title="Pin" accent="analytics" sub="Only verified data from the official Pinterest API, with its source, date range and freshness." />
         <div className="flex items-center gap-2">
-          <div className="flex rounded-lg bg-zinc-100 p-1" role="group" aria-label="Date range">
+          <div className="au-glass flex rounded-full p-0.5" role="group" aria-label="Date range">
             {([7, 30, 90] as const).map((d) => (
-              <button key={d} onClick={() => setDays(d)} className={`rounded-md px-3 py-1 text-sm ${days === d ? "bg-white font-medium shadow-sm" : "text-zinc-600"}`}>{d} days</button>
+              <button key={d} onClick={() => setDays(d)} className={`rounded-full px-3 py-1 text-[13px] font-semibold ${days === d ? "bg-[#fff] text-[#0b0912]" : "text-white/60 hover:text-white"}`}>{d} days</button>
             ))}
           </div>
           <button

@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useEffect, useState } from "react";
 import type { UsageEntry } from "@/lib/usage/ledger";
 import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
@@ -33,9 +34,10 @@ export function Usage({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTitle title="Usage &" accent="cost" sub="AI spend this month across all workspaces, against your monthly budget." />
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h1 className="text-lg font-semibold">AI spend this month (all workspaces)</h1>
-        <p className="mt-1 text-2xl font-semibold">
+        <h2 className="text-[15px] font-semibold">AI spend this month</h2>
+        <p className="mt-2 text-4xl font-bold tabular-nums">
           {usd(data.spent_usd)} <span className="text-base font-normal text-zinc-500">of {usd(data.budget_usd)} budget</span>
         </p>
         <div className="mt-3 h-2 w-full rounded-full bg-zinc-100" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>

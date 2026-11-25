@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionInfo } from "@/lib/pinterest/connections";
@@ -89,12 +90,14 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTitle
+        kind={kind}
+        title="Pinterest"
+        accent="account"
+        sub="Each workspace connects its own Pinterest account. The app reads your boards and pins, and creates a pin only when you approve and confirm it in Review & publish, or when you turn on Autopilot yourself. It never edits or deletes your existing pins."
+      />
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h1 className="text-lg font-semibold">{label} · Pinterest account</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Each workspace connects its own Pinterest account. The app reads your boards and pins, and creates a pin only when you approve and confirm it in
-          Review &amp; publish, or when you turn on Autopilot yourself. It never edits or deletes your existing pins.
-        </p>
+        <h2 className="text-[15px] font-semibold">{label} connection</h2>
 
         {error && <p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
         {notice && <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</p>}

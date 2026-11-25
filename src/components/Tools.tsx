@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useEffect, useMemo, useState } from "react";
 import type { AuditEvent, Category, PinDraft, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
@@ -29,7 +30,7 @@ export function Tools({ kind }: { kind: WorkspaceKind }) {
   if (!store || !workspace) return <p className="text-zinc-500">Loading tools…</p>;
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-xl font-semibold">{workspace.name || WORKSPACE_LABELS[kind]} · tools</h1>
+      <PageTitle kind={kind} title="Pin" accent="tools" sub="Check links, add UTM tags, manage affiliate links and import or export pins." />
       <div className="grid gap-6 lg:grid-cols-2">
         <LinkChecker />
         <UtmBuilder drafts={drafts} onApplied={setDrafts} apply={(id, link) => store.updateDraft(workspace.id, id, { link })} />

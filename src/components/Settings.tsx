@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useEffect, useState } from "react";
 import { parseList } from "@/lib/drafts/validation";
 import type { BrandSettings, Category, WorkspaceKind } from "@/lib/types";
@@ -151,9 +152,11 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <PageTitle kind={kind} title="Brand &" accent="categories" sub={`Used only for ${WORKSPACE_LABELS[kind]} generations. The other workspace has its own settings.`} />
+      </div>
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h1 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} brand settings</h1>
-        <p className="text-sm text-zinc-600">Used only for {WORKSPACE_LABELS[kind]} generations. The other workspace has its own settings.</p>
+        <h2 className="text-[15px] font-semibold">Brand settings</h2>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
           Account display name
           <input className={input} value={displayName} maxLength={40} onChange={(e) => setDisplayName(e.target.value)} />

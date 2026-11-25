@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -22,7 +23,7 @@ import {
 import { draftFacts, fillCategories, loadBoardSource, requestAssignments, toPlan, type BoardSource } from "@/lib/client/boards";
 import { toCsv } from "@/lib/tools/csv";
 import { downloadFile } from "@/lib/client/download";
-import { WORKSPACE_LABELS, type Category, type PinDraft, type WorkspaceKind } from "@/lib/types";
+import { type Category, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
 
 /** One editable row: a pin or a bulk keyword with its board. */
@@ -195,13 +196,12 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} · Boards & categories</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          AI reads each pin (keyword, title, description, tags and image description) and picks its category and the best board on your account. Nothing is
-          posted or created on Pinterest from here without your OK.
-        </p>
-      </div>
+      <PageTitle
+        kind={kind}
+        title="Boards &"
+        accent="categories"
+        sub="AI reads each pin (keyword, title, description, tags and image description) and picks its category and the best board on your account. Nothing is posted or created on Pinterest from here without your OK."
+      />
 
       {src.sample ? (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

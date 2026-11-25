@@ -1,8 +1,9 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { ContentSources, type SourceRow } from "./ContentSources";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import { type WorkspaceKind } from "@/lib/types";
 
 const CONSENT = "AUTO PUBLISH";
 
@@ -147,14 +148,14 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTitle
+        kind={kind}
+        title="Run on"
+        accent="Autopilot"
+        chips={<span className={`rounded-full border px-3 py-1 font-bold ${s?.enabled ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-200" : "border-white/15 bg-white/[0.06] text-white/70"}`}>{s?.enabled ? "ON" : "OFF"}</span>}
+      />
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} Autopilot</h1>
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${s?.enabled ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700"}`}>
-            {s?.enabled ? "ON" : "OFF"}
-          </span>
-        </div>
-        <p className="mt-1 max-w-3xl text-sm text-zinc-600">
+        <p className="max-w-3xl text-sm text-zinc-600">
           Add titles or ideas to the queue. Every hour, Autopilot turns the next idea into a full set of 5 pins, one per angle (AI text; photos from your page or AI images), then posts them to your
           board one at a time, up to your daily limit, within the monthly AI budget. <strong>Pins are published without asking you first.</strong>{" "}
           Pause it any time.

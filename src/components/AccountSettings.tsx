@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PasswordField, postAuth } from "@/components/auth/AuthUi";
@@ -64,10 +65,7 @@ export function AccountSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Account</h1>
-        <p className="mt-1 text-sm text-zinc-600">Your profile, sign-in, notifications and connected Pinterest accounts.</p>
-      </div>
+      <PageTitle title="Your" accent="account" sub="Your profile, sign-in, notifications and connected Pinterest accounts." />
       {!isSupabaseConfigured ? (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Demo mode: there are no accounts, so name, email and password settings are off. Connect Supabase to turn them on.
