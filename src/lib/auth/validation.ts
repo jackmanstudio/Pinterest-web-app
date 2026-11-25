@@ -86,7 +86,7 @@ export function fieldErrors(err: z.ZodError): Record<string, string> {
  * Only same-site relative paths are allowed after sign-in, so a crafted
  * ?next= link can't send someone to another website (open redirect).
  */
-export function safeNext(next: string | null | undefined, fallback = "/w/fashion"): string {
+export function safeNext(next: string | null | undefined, fallback = "/dashboard"): string {
   if (!next || typeof next !== "string") return fallback;
   if (!next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\") || /[\r\n]/.test(next)) return fallback;
   if (/^\/(login|signup|forgot-password|auth\/|api\/)/.test(next)) return fallback;

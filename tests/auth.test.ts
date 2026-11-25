@@ -43,7 +43,7 @@ describe("signup validation", () => {
 describe("safe redirects after sign-in", () => {
   it("keeps same-site paths", () => expect(safeNext("/w/macro/boards?x=1")).toBe("/w/macro/boards?x=1"));
   it.each(["https://evil.com", "//evil.com", "/\\evil.com", "javascript:alert(1)", "/login", "/api/auth/login", null])("blocks %s", (v) => {
-    expect(safeNext(v as string | null)).toBe("/w/fashion");
+    expect(safeNext(v as string | null)).toBe("/dashboard");
   });
 });
 

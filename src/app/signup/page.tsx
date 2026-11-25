@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { demoSignIn } from "@/lib/auth/demo";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { Alert, AuthShell, Field, GoogleButton, PasswordField, SubmitButton, postAuth } from "@/components/auth/AuthUi";
 import { SignupSchema, fieldErrors } from "@/lib/auth/validation";
 
@@ -26,6 +28,11 @@ export default function SignupPage() {
     }
     setFields({});
     setBusy(true);
+    if (!isSupabaseConfigured) {
+      demoSignIn({ name: local.data.fullName, email: local.data.email });
+      window.location.assign("/dashboard");
+      return;
+    }
     try {
       const r = await postAuth<{ verify: boolean }>("/api/auth/signup", body);
       if (r.verify) setSentTo(local.data.email);

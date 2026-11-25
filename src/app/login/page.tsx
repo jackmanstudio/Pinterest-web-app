@@ -2,7 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AuthShell, Field, GoogleButton, PasswordField, SubmitButton, postAuth } from "@/components/auth/AuthUi";
-import { safeNext } from "@/lib/auth/validation";
+import { EmailSchema, safeNext } from "@/lib/auth/validation";
+import { demoSignIn } from "@/lib/auth/demo";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +14,7 @@ export default function LoginPage() {
   const [fields, setFields] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
-  const [next, setNext] = useState("/w/fashion");
+  const [next, setNext] = useState("/dashboard");
 
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
@@ -28,6 +30,17 @@ export default function LoginPage() {
     setError(null);
     setInfo(null);
     setFields({});
+    if (!isSupabaseConfigured) {
+      // Demo sign-in: this browser only, nothing is checked against a server.
+      if (!EmailSchema.safeParse(email).success) {
+        setFields({ email: "Enter a valid email address." });
+        setBusy(false);
+        return;
+      }
+      demoSignIn({ email });
+      window.location.assign(next);
+      return;
+    }
     try {
       await postAuth("/api/auth/login", { email, password, remember });
       // A full navigation so every page loads with the new session cookies.
@@ -69,6 +82,18 @@ export default function LoginPage() {
           Remember me on this device
         </label>
         <SubmitButton busy={busy}>{busy ? "Signing in…" : "Sign in"}</SubmitButton>
+        {!isSupabaseConfigured && (
+          <button
+            type="button"
+            onClick={() => {
+              demoSignIn({ name: "Demo user", email: "demo@example.com" });
+              window.location.assign(next);
+            }}
+            className="text-sm font-medium text-[#b3262e] hover:underline"
+          >
+            Skip and continue as a demo user
+          </button>
+        )}
       </form>
     </AuthShell>
   );

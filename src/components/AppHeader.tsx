@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { clearRememberCookie, getBrowserSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { demoSignOut } from "@/lib/auth/demo";
 import { WORKSPACE_KINDS, WORKSPACE_LABELS, isWorkspaceKind } from "@/lib/types";
 import { StatusBar } from "./StatusBar";
 
@@ -16,6 +17,11 @@ export function AppHeader() {
   const section = seg[3] ?? "";
 
   const signOut = async () => {
+    if (!isSupabaseConfigured) {
+      demoSignOut();
+      window.location.assign("/login");
+      return;
+    }
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     await getBrowserSupabase().auth.signOut({ scope: "local" }).catch(() => {});
     clearRememberCookie();
@@ -35,7 +41,7 @@ export function AppHeader() {
   return (
     <header className="border-b border-zinc-200 bg-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-3">
-        <Link href={`/w/${kind}`} className="text-lg font-semibold text-red-700">
+        <Link href="/dashboard" className="text-lg font-semibold text-red-700">
           Pinterest AI Studio
         </Link>
         <nav className="flex gap-1 rounded-lg bg-zinc-100 p-1" aria-label="Workspace">
@@ -63,17 +69,18 @@ export function AppHeader() {
           {tab(`/w/${kind}/tools`, "Tools", section === "tools")}
         </nav>
         <div className="ml-auto flex items-center gap-3">
+          <Link href="/dashboard" className={`text-sm ${path === "/dashboard" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
+            Dashboard
+          </Link>
           <Link href="/overview" className={`text-sm ${path === "/overview" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
             All accounts
           </Link>
           <Link href="/account" className={`text-sm ${path === "/account" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
             Account
           </Link>
-          {isSupabaseConfigured && (
-            <button onClick={signOut} className="text-sm text-zinc-600 hover:text-zinc-900">
-              Sign out
-            </button>
-          )}
+          <button onClick={signOut} className="text-sm text-zinc-600 hover:text-zinc-900">
+            Sign out
+          </button>
         </div>
       </div>
       <div className="mx-auto max-w-6xl px-4 pb-3">
