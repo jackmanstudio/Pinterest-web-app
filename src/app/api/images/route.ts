@@ -11,9 +11,7 @@ import { WORKSPACE_KINDS } from "@/lib/types";
 import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
 import { readTemplate } from "@/lib/brand/template";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
-import type { GeneratedImage } from "@/lib/ai/image/types";
-import { FetchBlocked, safeFetch } from "@/lib/tools/safeFetch";
-import sharp from "sharp";
+import { PhotoError, pagePhoto as fetchPagePhoto } from "@/lib/tools/pagePhoto";
 
 const Body = z.object({
   workspace: z.enum(WORKSPACE_KINDS),
@@ -28,19 +26,12 @@ const Body = z.object({
   sourceImage: z.string().url().max(2048).optional(),
 });
 
-/** Downloads a page photo safely and checks it is a real, big-enough image. */
-async function pagePhoto(url: string): Promise<GeneratedImage> {
-  let r;
+async function pagePhoto(url: string) {
   try {
-    r = await safeFetch(url, { accept: "image/avif,image/webp,image/jpeg,image/png,image/*", maxBytes: 12_000_000, timeoutMs: 15_000 });
+    return await fetchPagePhoto(url);
   } catch (e) {
-    throw new HttpError(422, e instanceof FetchBlocked ? e.message : "Couldn't download that photo.");
+    throw new HttpError(422, e instanceof PhotoError ? e.message : "Couldn't download that photo.");
   }
-  if (r.status >= 400) throw new HttpError(422, `The photo couldn't be downloaded (${r.status}).`);
-  const meta = await sharp(r.bytes).metadata().catch(() => null);
-  if (!meta?.width || !meta.height) throw new HttpError(422, "That link isn't a supported image.");
-  if (Math.min(meta.width, meta.height) < 300) throw new HttpError(422, "That photo is too small for a pin (under 300 px).");
-  return { bytes: r.bytes, contentType: `image/${meta.format}`, extension: "jpg", source: "manual", provider: "Photo from your page", model: null, est_cost_usd: 0 };
 }
 
 export async function POST(request: Request) {

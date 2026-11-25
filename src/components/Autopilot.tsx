@@ -1,4 +1,5 @@
 "use client";
+import { ContentSources, type SourceRow } from "./ContentSources";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
@@ -46,7 +47,7 @@ interface IdeaRow {
   idea: string;
   status: "queued" | "processing" | "done" | "failed";
   error: string | null;
-  source: "user" | "trends" | "agent";
+  source: "user" | "trends" | "agent" | "feed";
   created_at: string;
 }
 interface RecentPin {
@@ -59,7 +60,7 @@ interface RecentPin {
 }
 type Data =
   | { mode: "demo"; readiness: string[] }
-  | { mode: "supabase"; settings: Settings; bestTime: BestTimeInfo; ideas: IdeaRow[]; boards: { board_id: string; name: string }[]; recent: RecentPin[]; readiness: string[] };
+  | { mode: "supabase"; settings: Settings; bestTime: BestTimeInfo; ideas: IdeaRow[]; boards: { board_id: string; name: string }[]; recent: RecentPin[]; readiness: string[]; sources?: SourceRow[]; sourcesNeedMigration?: boolean };
 
 const IDEA_STYLE: Record<IdeaRow["status"], string> = {
   queued: "bg-zinc-100 text-zinc-700",
@@ -154,7 +155,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
           </span>
         </div>
         <p className="mt-1 max-w-3xl text-sm text-zinc-600">
-          Add titles or ideas to the queue. Every hour, Autopilot turns the next idea into 5 pins (AI text and AI image), then posts them to your
+          Add titles or ideas to the queue. Every hour, Autopilot turns the next idea into 5 pins (AI text; photos from your page or AI images), then posts them to your
           board one at a time, up to your daily limit, within the monthly AI budget. <strong>Pins are published without asking you first.</strong>{" "}
           Pause it any time.
         </p>
@@ -284,7 +285,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
               <li key={i.id} className="flex items-start gap-2 py-2">
                 <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${IDEA_STYLE[i.status]}`}>{i.status}</span>
                 <span className="flex-1">
-                  {i.source !== "user" && <span className="mr-1 rounded bg-violet-100 px-1 text-[10px] font-semibold uppercase text-violet-800">{i.source === "trends" ? "trend" : "winner remake"}</span>}
+                  {i.source !== "user" && <span className="mr-1 rounded bg-violet-100 px-1 text-[10px] font-semibold uppercase text-violet-800">{i.source === "trends" ? "trend" : i.source === "feed" ? "from your site" : "winner remake"}</span>}
                   {i.idea}
                   {i.error && <span className="block text-xs text-red-700">{i.error}</span>}
                 </span>
@@ -299,6 +300,8 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
           </ul>
         </section>
       </div>
+
+      <ContentSources sources={live?.sources ?? []} needsMigration={Boolean(live?.sourcesNeedMigration)} disabled={!live || busy} post={post} />
 
       {live && live.recent.length > 0 && (
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">

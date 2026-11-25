@@ -25,6 +25,69 @@ import { analyticsCalls, saveSnapshot } from "@/lib/analytics/server";
 import { parseTopPins, parseTrends } from "@/lib/analytics/parse";
 import type { PublishedPinStats, TopPin, TrendKeyword } from "@/lib/analytics/types";
 import { ensureAccessToken } from "@/lib/pinterest/sync";
+import { createHash } from "node:crypto";
+import { extractPage, pageContext } from "@/lib/tools/pageExtract";
+import { listSource } from "@/lib/tools/sourceList";
+import { safeFetch } from "@/lib/tools/safeFetch";
+import { pagePhoto } from "@/lib/tools/pagePhoto";
+import { isMissingTable } from "@/lib/supabase/compat";
+
+const urlRef = (u: string) => createHash("md5").update(u).digest("hex");
+
+/** Reads one page for facts and photos. Failures just mean "no extra facts". */
+async function readPage(url: string) {
+  try {
+    const r = await safeFetch(url, { accept: "text/html", maxBytes: 4_000_000 });
+    if (r.status >= 400 || !/html/.test(r.contentType)) return null;
+    return extractPage(new TextDecoder().decode(r.bytes), r.url);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Content auto-sync: the next new page from the account's feeds, sitemaps or
+ * Shopify stores, queued as an idea with its link, facts and photos.
+ */
+async function nextFromSources(admin: SupabaseClient, ws: AutopilotWorkspace): Promise<Idea | null> {
+  const src = await admin
+    .from("content_sources")
+    .select("id, url")
+    .eq("workspace_id", ws.workspace_id)
+    .eq("enabled", true)
+    .order("last_checked_at", { ascending: true, nullsFirst: true })
+    .limit(3);
+  if (src.error) {
+    if (isMissingTable(src.error)) return null;
+    throw new Error(src.error.message);
+  }
+  if (!src.data?.length) return null;
+  const used = await usedRefs(admin, ws.workspace_id, "feed", 3650);
+  for (const s of src.data) {
+    try {
+      const list = await listSource(s.url);
+      await admin.from("content_sources").update({ last_checked_at: new Date().toISOString(), last_error: list ? null : "Nothing to pin was found at this address.", kind: list?.source ?? null }).eq("id", s.id);
+      if (!list) continue;
+      const items = list.items.length ? list.items : list.urls.map((url) => ({ url, title: "", summary: "", image: null, published: null }));
+      const item = items.find((i) => !used.refs.has(urlRef(i.url)));
+      if (!item) continue;
+      const page = await readPage(item.url);
+      const title = (page?.title || item.title || item.url).slice(0, 480);
+      const photos = Array.from(new Set([...(item.image ? [item.image] : []), ...(page?.images.map((i) => i.url) ?? [])])).slice(0, 5);
+      const context = page ? pageContext(page) : `Source page: ${item.url}\nTitle: ${item.title}\nSummary: ${item.summary}`.slice(0, 2000);
+      const { data, error } = await admin
+        .from("autopilot_ideas")
+        .insert({ workspace_id: ws.workspace_id, idea: title.length >= 3 ? title : `New post: ${item.url}`.slice(0, 480), source: "feed", ref: urlRef(item.url), status: "processing", link: page?.canonical ?? item.url, context, image_urls: photos })
+        .select("id, idea, link, context, image_urls")
+        .single();
+      if (error) throw new Error(error.message);
+      return data as Idea;
+    } catch (err) {
+      await admin.from("content_sources").update({ last_checked_at: new Date().toISOString(), last_error: (err as Error).message.slice(0, 500) }).eq("id", s.id);
+    }
+  }
+  return null;
+}
 
 const DAY = 86_400_000;
 
@@ -204,7 +267,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
         .eq("autopilot", true)
         .eq("status", "approved")
         .eq("image_status", "ready")
-        .eq("image_source", "ai")
+        .in("image_source", ["ai", "manual"])
         .is("external_pin_id", null)
         .order("created_at")
         .limit(1)
@@ -219,7 +282,11 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
         const { data, error } = await admin.rpc("claim_autopilot_idea", { p_workspace: ws.workspace_id });
         if (error) throw new Error(error.message);
         const row = (data as Idea[] | null)?.[0];
-        if (row) return { id: row.id, idea: row.idea };
+        if (row) return { id: row.id, idea: row.idea, link: row.link ?? null, context: row.context ?? null, image_urls: row.image_urls ?? [] };
+
+        // New pages from your blog feed, sitemap or Shopify store.
+        const fromSources = await nextFromSources(admin, ws);
+        if (fromSources) return fromSources;
 
         if (ws.remix_winners) {
           const used = await usedRefs(admin, ws.workspace_id, "agent", 60);
@@ -256,7 +323,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       const brand: BrandSettings = { ...EMPTY_BRAND, ...((brandRes.data as Partial<BrandSettings> | null) ?? {}) };
 
       await assertWithinBudget(ledger, true);
-      const result = await withRetry(() => text.generateDrafts({ workspace: ws.kind, idea: idea.idea, brand }));
+      const result = await withRetry(() => text.generateDrafts({ workspace: ws.kind, idea: idea.idea, brand, context: idea.context ?? undefined }));
       const cost = estimateTextCost(result.model, result.usage?.input_tokens ?? 0, result.usage?.output_tokens ?? 0);
       await ledger.record({ workspace_id: ws.workspace_id, kind: "text", provider: result.provider, model: result.model, source: result.source, input_tokens: result.usage?.input_tokens ?? 0, output_tokens: result.usage?.output_tokens ?? 0, images: 0, est_cost_usd: cost, status: "ok", error: null });
 
@@ -267,7 +334,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
         .insert(
           result.drafts.map((d) => ({
             workspace_id: ws.workspace_id, batch_id: batchId, idea: idea.idea, angle: d.angle, concept: d.concept, title: d.title, description: d.description,
-            tags: d.tags, alt_text: d.alt_text, image_prompt: d.image_prompt, source: result.source, link: ws.link ?? (brand.website_url || null),
+            tags: d.tags, alt_text: d.alt_text, image_prompt: d.image_prompt, source: result.source, link: idea.link ?? ws.link ?? (brand.website_url || null),
             autopilot: true, status: "approved", approved_at: now, approved_by: ws.owner_id, review_note: "Auto-approved by Autopilot",
           })),
         )
@@ -276,16 +343,19 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       const art = await brandArtFor(admin, ws.workspace_id);
 
       let made = 0;
-      for (const d of ins.data ?? []) {
+      const photos = idea.image_urls ?? [];
+      for (const [i, d] of (ins.data ?? []).entries()) {
         try {
-          await assertWithinBudget(ledger, true);
+          // Photos from the source page first (free, and they show the real product); AI otherwise.
+          const fromPage = photos.length ? await pagePhoto(photos[i % photos.length]).catch(() => null) : null;
+          if (!fromPage) await assertWithinBudget(ledger, true);
           const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.kind, overlay: art.template.style, angle: d.angle, palette: art.template.palette, imageStyle: brand.image_style });
-          const img = await brandPinImage(await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE)), d.title, art, { angle: d.angle });
+          const img = await brandPinImage(fromPage ?? (await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE))), d.title, art, { angle: d.angle });
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
           if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);
           await admin.from("pin_drafts").update({ image_status: "ready", image_path: path, image_source: img.source }).eq("id", d.id);
-          await ledger.record({ workspace_id: ws.workspace_id, kind: "image", provider: img.provider, model: img.model, source: img.source, input_tokens: 0, output_tokens: 0, images: 1, est_cost_usd: img.est_cost_usd, status: "ok", error: null });
+          await ledger.record({ workspace_id: ws.workspace_id, kind: "image", provider: img.provider, model: img.model, source: img.source, input_tokens: 0, output_tokens: 0, images: fromPage ? 0 : 1, est_cost_usd: img.est_cost_usd, status: "ok", error: null });
           made++;
         } catch (err) {
           await admin.from("pin_drafts").update({ image_status: "failed" }).eq("id", d.id);

@@ -10,6 +10,9 @@ import { rateLimited } from "@/lib/server/rateLimit";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { WORKSPACE_KINDS, isWorkspaceKind } from "@/lib/types";
 import { audit } from "@/lib/workflow/server";
+import { isMissingColumn, isMissingTable } from "@/lib/supabase/compat";
+
+const NEEDS_SOURCES = "Content sources need a database update. Run supabase/migrations/0012_content_sources.sql in the Supabase SQL editor.";
 
 function fail(err: unknown) {
   if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
@@ -30,6 +33,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ mode: "demo", readiness: ["Connect Supabase (Autopilot runs on the server, so it needs a real database).", ...readiness] });
     }
     const workspaceId = (await workspaceIdFor(ctx, kind))!;
+    const sources = await ctx.db.from("content_sources").select("id, url, kind, enabled, last_checked_at, last_error").eq("workspace_id", workspaceId).order("created_at");
     const [settings, ideas, boards, recent] = await Promise.all([
       ctx.db.from("autopilot_settings").select("enabled, board_id, board_name, pins_per_day, link, enabled_at, paused_reason, last_run_at, timezone, best_time, remix_winners, auto_trends, trend_interest").eq("workspace_id", workspaceId).maybeSingle(),
       ctx.db.from("autopilot_ideas").select("id, idea, status, error, source, created_at, processed_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50),
@@ -55,6 +59,8 @@ export async function GET(request: Request) {
       },
       bestTime,
       ideas: ideas.data,
+      sources: sources.error ? [] : sources.data,
+      sourcesNeedMigration: isMissingTable(sources.error),
       boards: boards.data,
       recent: recent.data,
       readiness,
@@ -88,6 +94,17 @@ const Body = z.discriminatedUnion("action", [
     trendInterest: z.enum(["womens_fashion", "mens_fashion", "beauty", "home_decor", "food_and_drinks", "travel", "art", "design"]).nullable().default(null),
   }),
   z.object({ action: z.literal("add_ideas"), workspace: z.enum(WORKSPACE_KINDS), ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
+  z.object({
+    action: z.literal("add_pages"),
+    workspace: z.enum(WORKSPACE_KINDS),
+    pages: z
+      .array(z.object({ idea: z.string().trim().min(3).max(500), link: z.url().max(2048), context: z.string().max(2000).optional(), image_urls: z.array(z.url().max(2048)).max(6).default([]) }))
+      .min(1)
+      .max(50),
+  }),
+  z.object({ action: z.literal("add_source"), workspace: z.enum(WORKSPACE_KINDS), url: z.string().trim().min(8).max(2048) }),
+  z.object({ action: z.literal("toggle_source"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid(), enabled: z.boolean() }),
+  z.object({ action: z.literal("delete_source"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
   z.object({ action: z.literal("delete_idea"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
   z.object({ action: z.literal("run_now"), workspace: z.enum(WORKSPACE_KINDS) }),
   z.object({ action: z.literal("pause"), workspace: z.enum(WORKSPACE_KINDS) }),
@@ -136,6 +153,32 @@ export async function POST(request: Request) {
       const res = await ctx.db.from("autopilot_ideas").insert(b.ideas.map((idea) => ({ workspace_id: workspaceId, idea })));
       if (res.error) throw new Error(res.error.message);
       return NextResponse.json({ ok: true, added: b.ideas.length });
+    }
+    if (b.action === "add_pages") {
+      const res = await ctx.db.from("autopilot_ideas").insert(b.pages.map((p) => ({ workspace_id: workspaceId, idea: p.idea, link: p.link, context: p.context ?? null, image_urls: p.image_urls })));
+      if (res.error) throw new Error(isMissingColumn(res.error) ? NEEDS_SOURCES : res.error.message);
+      return NextResponse.json({ ok: true, added: b.pages.length });
+    }
+    if (b.action === "add_source") {
+      let url: URL;
+      try {
+        url = new URL(/^https?:\/\//i.test(b.url) ? b.url : `https://${b.url}`);
+      } catch {
+        throw new HttpError(400, "That isn't a valid web address.");
+      }
+      const res = await ctx.db.from("content_sources").insert({ workspace_id: workspaceId, url: url.toString() });
+      if (res.error) {
+        if (isMissingTable(res.error)) throw new HttpError(409, NEEDS_SOURCES);
+        if (res.error.code === "23505") throw new HttpError(409, "That source is already added.");
+        throw new HttpError(400, /at most 10/.test(res.error.message) ? "You can add up to 10 sources per account." : res.error.message);
+      }
+      return NextResponse.json({ ok: true });
+    }
+    if (b.action === "toggle_source" || b.action === "delete_source") {
+      const q = b.action === "toggle_source" ? ctx.db.from("content_sources").update({ enabled: b.enabled }) : ctx.db.from("content_sources").delete();
+      const res = await q.eq("id", b.id).eq("workspace_id", workspaceId);
+      if (res.error) throw new Error(res.error.message);
+      return NextResponse.json({ ok: true });
     }
     if (b.action === "delete_idea") {
       const res = await ctx.db.from("autopilot_ideas").delete().eq("id", b.id).eq("workspace_id", workspaceId);

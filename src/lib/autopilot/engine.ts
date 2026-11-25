@@ -32,6 +32,12 @@ export interface AutopilotWorkspace {
 export interface Idea {
   id: string;
   idea: string;
+  /** The page these pins promote (pins from a link / content source). */
+  link?: string | null;
+  /** Facts read from that page; the AI must stay true to them. */
+  context?: string | null;
+  /** Photos from that page, used instead of AI images. */
+  image_urls?: string[];
 }
 
 /** Where ideas come from. Today: the user's queue. Later: trends, analytics, an agent. */
