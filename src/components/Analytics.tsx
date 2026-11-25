@@ -5,6 +5,7 @@ import { sampleSnapshots } from "@/lib/analytics/sample";
 import { METRIC_LABELS, type AccountAnalytics, type Insight, type PublishedPinStats, type Snapshot, type TopPin, type TrendKeyword } from "@/lib/analytics/types";
 import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
 import { DailyBars } from "./DailyBars";
+import { auditPins, RATING_LABELS, type PinHealth, type PinRating } from "@/lib/analytics/audit";
 
 interface ApiData {
   mode: "demo" | "supabase";
@@ -213,6 +214,8 @@ export function Analytics({ kind }: { kind: WorkspaceKind }) {
         </section>
       </div>
 
+      <PinHealthCheck kind={kind} published={published} sample={sample} card={card} />
+
       <section className={card}>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-lg font-semibold">Pinterest Trends</h2>
@@ -297,5 +300,78 @@ export function Analytics({ kind }: { kind: WorkspaceKind }) {
         </section>
       </div>
     </div>
+  );
+}
+
+const RATING_TONE: Record<PinRating, string> = {
+  strong: "bg-emerald-100 text-emerald-800",
+  steady: "bg-zinc-100 text-zinc-700",
+  weak: "bg-amber-100 text-amber-900",
+  too_new: "bg-sky-100 text-sky-800",
+  no_data: "bg-zinc-100 text-zinc-500",
+};
+const ORDER: PinRating[] = ["weak", "strong", "steady", "too_new", "no_data"];
+
+/** Per-pin health check: strong, weak and too-new pins with one suggested step each. */
+function PinHealthCheck({ kind, published, sample, card }: { kind: WorkspaceKind; published: Snapshot<PublishedPinStats[]> | undefined; sample: boolean; card: string }) {
+  const [filter, setFilter] = useState<PinRating | "all">("all");
+  // The snapshot's own date keeps this stable between renders.
+  const rows = published ? auditPins(published.data, new Date(published.fetched_at)) : [];
+  const counts = Object.fromEntries(ORDER.map((r) => [r, rows.filter((x) => x.rating === r).length])) as Record<PinRating, number>;
+  const shown = rows.filter((r) => filter === "all" || r.rating === filter).sort((a, b) => ORDER.indexOf(a.rating) - ORDER.indexOf(b.rating) || b.score - a.score);
+  const remake = (h: PinHealth) =>
+    `/w/${kind}?from=${encodeURIComponent(h.draft_id)}&idea=${encodeURIComponent(
+      h.action === "rework" ? `Better version of "${h.title}": clearer keyword-first title, bolder image` : `Fresh design of our proven pin "${h.title}"`,
+    )}`;
+  return (
+    <section className={card}>
+      <h2 className="text-lg font-semibold">Pin health check</h2>
+      <p className="mt-1 text-sm text-zinc-600">
+        Each pin published from this studio, compared with your own other pins. Strong pins can get a fresh design; weak ones get a reworked version. New
+        versions go through review like any other pin, and nothing is deleted from Pinterest from here.
+      </p>
+      {!published ? (
+        <p className="mt-2 text-sm text-zinc-600">Refresh analytics first.</p>
+      ) : rows.length === 0 ? (
+        <p className="mt-2 text-sm text-zinc-600">Nothing published from this workspace yet.</p>
+      ) : (
+        <>
+          <Source s={published} sample={sample} />
+          <div className="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter by rating">
+            {(["all", ...ORDER] as const).map((r) => (
+              <button key={r} onClick={() => setFilter(r)} className={`rounded-full border px-3 py-0.5 text-xs ${filter === r ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300"}`}>
+                {r === "all" ? `All ${rows.length}` : `${RATING_LABELS[r]} ${counts[r]}`}
+              </button>
+            ))}
+          </div>
+          <ul className="mt-3 flex flex-col divide-y divide-zinc-100">
+            {shown.map((h) => (
+              <li key={h.pin_id} className="flex flex-col gap-1 py-2.5 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    <span className={`mr-2 rounded px-1.5 py-0.5 text-xs font-semibold ${RATING_TONE[h.rating]}`}>{RATING_LABELS[h.rating]}</span>
+                    {h.title}
+                    {h.ageDays !== null && <span className="ml-2 text-xs font-normal text-zinc-500">{h.ageDays} days live</span>}
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-600">{h.reason}</p>
+                  <p className="text-xs text-zinc-800">Next: {h.actionNote}</p>
+                </div>
+                <div className="flex flex-none gap-3 text-xs">
+                  {["repin_fresh", "refresh_now", "rework"].includes(h.action) &&
+                    (sample ? (
+                      <span className="text-zinc-400">{h.action === "rework" ? "Make a better version" : "Make a fresh design"}</span>
+                    ) : (
+                      <a className="font-medium text-red-700 underline" href={remake(h)}>{h.action === "rework" ? "Make a better version" : "Make a fresh design"}</a>
+                    ))}
+                  {!sample && (
+                    <a className="text-zinc-600 underline" href={`https://www.pinterest.com/pin/${h.pin_id}/`} target="_blank" rel="noreferrer">Open on Pinterest</a>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }

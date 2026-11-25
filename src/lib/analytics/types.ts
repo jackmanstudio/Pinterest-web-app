@@ -32,6 +32,8 @@ export interface PublishedPinStats {
   draft_id: string;
   title: string;
   summary: Record<string, number>;
+  /** When the pin went live (missing in snapshots saved before this field existed). */
+  published_at?: string | null;
   error?: string;
 }
 

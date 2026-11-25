@@ -115,6 +115,20 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         setLanguage((l) => l || b.language || "");
       })
       .catch(() => {});
+    // ?from=<draft id> (a fresh version of a published pin): keep its link and category.
+    const from = new URLSearchParams(window.location.search).get("from");
+    if (from && /^[0-9a-f-]{36}$/i.test(from)) {
+      store
+        .getDraft(workspace.id, from)
+        .then((d) => {
+          if (d.link) setLink(d.link);
+          if (d.category_id) {
+            setCatMode("manual");
+            setCategoryId(d.category_id);
+          }
+        })
+        .catch(() => {});
+    }
   }, [store, workspace]);
 
   const detected = useMemo(() => (idea.trim().length >= 3 ? detectCategory(idea, categories) : null), [idea, categories]);

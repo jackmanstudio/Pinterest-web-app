@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   // Pins this studio published in this workspace.
   const { data: published } = await admin
     .from("pin_drafts")
-    .select("id, title, external_pin_id")
+    .select("id, title, external_pin_id, published_at")
     .eq("workspace_id", workspaceId)
     .not("external_pin_id", "is", null)
     .order("published_at", { ascending: false })
@@ -70,9 +70,9 @@ export async function POST(request: Request) {
   const stats: PublishedPinStats[] = [];
   for (const p of published ?? []) {
     try {
-      stats.push({ pin_id: p.external_pin_id, draft_id: p.id, title: p.title, summary: parsePinSummary(await calls.pin(token, p.external_pin_id, start, end)) });
+      stats.push({ pin_id: p.external_pin_id, draft_id: p.id, title: p.title, published_at: p.published_at, summary: parsePinSummary(await calls.pin(token, p.external_pin_id, start, end)) });
     } catch (err) {
-      stats.push({ pin_id: p.external_pin_id, draft_id: p.id, title: p.title, summary: {}, error: describePinterestError(err) });
+      stats.push({ pin_id: p.external_pin_id, draft_id: p.id, title: p.title, published_at: p.published_at, summary: {}, error: describePinterestError(err) });
     }
   }
   await saveSnapshot(admin, { workspaceId, kind: "published_pins", source: "Pinterest API v5 · GET /pins/{id}/analytics", environment: env, start, end, data: stats });
