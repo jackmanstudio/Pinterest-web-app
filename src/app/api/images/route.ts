@@ -10,6 +10,7 @@ import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { WORKSPACE_KINDS } from "@/lib/types";
 import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
 import { readTemplate } from "@/lib/brand/template";
+import { buildImagePrompt } from "@/lib/ai/image/prompt";
 
 const Body = z.object({
   workspace: z.enum(WORKSPACE_KINDS),
@@ -17,6 +18,7 @@ const Body = z.object({
   // Only used in Demo storage mode, where the server can't read the draft or brand.
   prompt: z.string().max(2000).optional(),
   title: z.string().max(200).optional(),
+  angle: z.string().max(80).optional(),
   template: z.unknown().optional(),
 });
 
@@ -42,13 +44,14 @@ export async function POST(request: Request) {
     workspaceId = await workspaceIdFor(ctx, workspace);
     let prompt = parsed.data.prompt ?? "";
     let title = parsed.data.title ?? "";
+    let angle = parsed.data.angle;
     let art: BrandArt;
 
     if (ctx.mode === "supabase") {
       // Read the draft through RLS: proves it belongs to this user and workspace.
       const { data: draft, error } = await ctx.db
         .from("pin_drafts")
-        .select("id, title, image_prompt, image_status, image_path")
+        .select("id, title, angle, image_prompt, image_status, image_path")
         .eq("workspace_id", workspaceId)
         .eq("id", draftId)
         .single();
@@ -56,6 +59,7 @@ export async function POST(request: Request) {
       if (draft.image_status === "pending") throw new HttpError(409, "An image is already being generated for this draft");
       prompt = draft.image_prompt;
       title = draft.title;
+      angle = draft.angle;
       art = await brandArtFor(ctx.db, workspaceId!);
       await ctx.db.from("pin_drafts").update({ image_status: "pending" }).eq("id", draftId).eq("workspace_id", workspaceId);
       markFailed = async () => {
@@ -69,7 +73,8 @@ export async function POST(request: Request) {
     if (!prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
     await assertWithinBudget(ctx.ledger, provider.source === "ai");
-    const raw = await withRetry(() => provider.generate(prompt, PIN_IMAGE_SIZE));
+    const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle });
+    const raw = await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
     // Title overlay, brand colours and logo are drawn on the server, then saved as one JPEG.
     const image = await brandPinImage(raw, title, art, { demo: ctx.mode === "demo" });
 

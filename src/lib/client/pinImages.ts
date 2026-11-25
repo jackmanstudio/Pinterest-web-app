@@ -11,7 +11,7 @@ export async function generateDraftImage(kind: WorkspaceKind, store: Store, draf
   let res: Response;
   try {
     // Demo storage lives in the browser, so the server needs the prompt, title and pin design sent along.
-    const demo = store.mode === "demo" ? { prompt: draft.image_prompt, title: draft.title, template: (await store.getBrand(draft.workspace_id)).pin_template } : {};
+    const demo = store.mode === "demo" ? { prompt: draft.image_prompt, title: draft.title, angle: draft.angle, template: (await store.getBrand(draft.workspace_id)).pin_template } : {};
     res = await fetch("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

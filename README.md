@@ -100,7 +100,8 @@ In Studio, type a title and press **Make 5 complete pins**. The app writes 5 dis
 
 ## Pin design, links and trends
 
-- **Pin design** (*Brand & categories*): style (bold band, minimal fade, elegant card, or none), font, brand and text colours, handle, logo. Every new image is cropped to 1000×1500 and gets the title drawn on it in that design, as a JPEG. Fonts (Poppins, DM Serif Display, Bebas Neue, SIL OFL) live in `public/fonts`.
+- **Pin design** (*Brand & categories*): style (bold band, minimal fade, elegant card, magazine headline, or none), font, brand and text colours, handle, logo. Every new image is cropped to 1000×1500 and gets the title drawn on it in that design, as a JPEG. Fonts (Poppins, DM Serif Display, Bebas Neue, SIL OFL) live in `public/fonts`.
+- **Image prompts** (`src/lib/ai/image/prompt.ts`): every image prompt names the pin title, adds a premium editorial aesthetic, a different art direction per pin (flat lay, street style, cinematic, colour-block studio, seasonal set), lighting and composition cues, keeps the overlay area calm, and lists what to avoid (text, collages, distorted hands, stock-photo clichés).
 - **Destination link**: Studio has a link box (defaults to the brand website); Autopilot has its own. Pinterest sends clicks there.
 - **Trend finder**: chips under the Studio box. Live Pinterest Trends if fetched; otherwise seasonal calendar ideas, labelled as such.
 

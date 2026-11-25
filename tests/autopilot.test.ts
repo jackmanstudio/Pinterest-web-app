@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { getImageProvider } from "@/lib/ai/image";
 import { CloudflareImageProvider } from "@/lib/ai/image/cloudflare";
 import { FalImageProvider } from "@/lib/ai/image/fal";
-import { OpenAIImageProvider, pinImagePrompt } from "@/lib/ai/image/openai";
+import { OpenAIImageProvider } from "@/lib/ai/image/openai";
+import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { ProviderError } from "@/lib/ai/text/types";
 import { runAutopilotStep, spacingMs, type AutopilotDeps, type AutopilotWorkspace, type Idea } from "@/lib/autopilot/engine";
 
@@ -46,7 +47,12 @@ describe("OpenAI image adapter", () => {
     await expect(bad.generate("x")).rejects.toMatchObject({ retryable: false });
   });
   it("never asks for logos or watermarks", () => {
-    expect(pinImagePrompt("x")).toMatch(/No watermarks, no logos/);
+    const p = buildImagePrompt({ title: "7 Linen Outfits for Summer", scene: "Vertical 2:3 grid of linen outfits, bold number badges", kind: "fashion", overlay: "elegant" });
+    expect(p).toContain('titled "7 Linen Outfits for Summer"');
+    expect(p).toMatch(/Avoid: any text, letters, words, numbers/);
+    expect(p).toMatch(/upper third/);
+    expect(p).not.toMatch(/number badges/);
+    expect(p).toMatch(/fashion editorial/i);
   });
 });
 

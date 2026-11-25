@@ -10,16 +10,6 @@ export type ImageQuality = "low" | "medium" | "high";
  */
 export const OPENAI_IMAGE_COST: Record<ImageQuality, number> = { low: 0.02, medium: 0.07, high: 0.25 };
 
-/** Steers every image toward a clean vertical pin, whatever the draft prompt says. */
-export function pinImagePrompt(prompt: string): string {
-  return [
-    prompt.trim(),
-    "",
-    "Format: vertical 2:3 Pinterest pin, photorealistic or editorial style, strong focal subject, natural light, high detail.",
-    "No watermarks, no logos, no brand names, no text overlays unless the description above asks for text.",
-  ].join("\n");
-}
-
 interface Options {
   apiKey: string;
   model?: string;
@@ -53,7 +43,7 @@ export class OpenAIImageProvider implements ImageProvider {
         headers: { Authorization: `Bearer ${this.opts.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           model: this.model,
-          prompt: pinImagePrompt(prompt),
+          prompt,
           size: "1024x1536",
           quality: this.quality,
           output_format: "jpeg",

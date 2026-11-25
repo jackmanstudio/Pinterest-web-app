@@ -12,7 +12,10 @@ The five drafts must be meaningfully different: different hook, different promis
 Respect Pinterest limits: title <= ${LIMITS.title} characters, description <= ${LIMITS.description} characters, alt text <= ${LIMITS.alt_text} characters, 3-${LIMITS.tags} tags.
 Descriptions read naturally, include relevant search keywords, and end with a soft call to save or click. No hashtags inside descriptions.
 Alt text literally describes what the image shows for screen-reader users.
-The image prompt describes a vertical 2:3 image a designer or image model could produce.
+The image prompt (2-4 sentences) is for a photo-realistic image model and must literally depict the subject of that draft's title: who or what is shown, the setting, styling, colours, mood and camera framing.
+Describe ONE cohesive photographic scene. Never ask for collages, grids, split screens, before/after layouts, numbered panels, text, words, numbers or logos: the title is added on top of the image later.
+Make the five image prompts visually distinct, e.g. a styled flat lay, a person wearing or using it in a real setting, a close-up detail shot, a location or lifestyle scene, and a seasonal set-up.
+Write like a sharp human editor, not a template: use specific, vivid details from the idea, fresh wording and a clear promise. Avoid generic filler and clichés such as "elevate your style", "must-have", "game-changer", "look no further", "take it to the next level", "effortlessly chic", and avoid clickbait.
 Never use any word from the brand's banned list. Do not invent facts, prices, or claims about products.`;
 
 const InsightsSchema = z.object({

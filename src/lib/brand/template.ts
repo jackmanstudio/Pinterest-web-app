@@ -4,7 +4,7 @@ import { z } from "zod";
  * Brand pin template: how the title, handle and logo are laid over each pin
  * image. Pure code, shared by the server compositor and the browser preview.
  */
-export const TEMPLATE_STYLES = ["bold", "minimal", "elegant", "none"] as const;
+export const TEMPLATE_STYLES = ["bold", "minimal", "elegant", "editorial", "none"] as const;
 export const TEMPLATE_FONTS = ["sans", "serif", "display"] as const;
 export type TemplateStyle = (typeof TEMPLATE_STYLES)[number];
 export type TemplateFont = (typeof TEMPLATE_FONTS)[number];
@@ -13,6 +13,7 @@ export const STYLE_LABELS: Record<TemplateStyle, string> = {
   bold: "Bold band",
   minimal: "Minimal fade",
   elegant: "Elegant card",
+  editorial: "Magazine headline",
   none: "No text on image",
 };
 export const FONT_LABELS: Record<TemplateFont, string> = { sans: "Modern sans", serif: "Classic serif", display: "Tall display" };
@@ -92,7 +93,11 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
   const family = FONT_FAMILY[t.font];
   const weight = t.font === "sans" ? 700 : 400;
   const parts: string[] = [];
-  const handleFont = `font-family="Poppins" font-weight="500" font-size="${30 * s}"`;
+  const handleFont = `font-family="Poppins" font-weight="500" font-size="${30 * s}" letter-spacing="${1.5 * s}"`;
+  parts.push(
+    `<defs><filter id="lift" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="${8 * s}" stdDeviation="${14 * s}" flood-color="#000" flood-opacity="0.28"/></filter>` +
+      `<filter id="glow" x="-5%" y="-20%" width="110%" height="140%"><feDropShadow dx="0" dy="${2 * s}" stdDeviation="${6 * s}" flood-color="#000" flood-opacity="0.55"/></filter></defs>`,
+  );
   if (t.style === "none" || !title.trim()) {
     if (!logoHref) return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"/>`;
   } else if (t.style === "bold") {
@@ -102,7 +107,10 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
     const handleH = t.handle ? 52 * s : 0;
     const blockH = pad * 2 + lines.length * lh + handleH;
     const top = H - 40 * s - blockH;
-    parts.push(`<rect x="${40 * s}" y="${top}" width="${W - 80 * s}" height="${blockH}" rx="${28 * s}" fill="${t.primary_color}" fill-opacity="0.94"/>`);
+    parts.push(
+      `<rect x="${40 * s}" y="${top}" width="${W - 80 * s}" height="${blockH}" rx="${28 * s}" fill="${t.primary_color}" fill-opacity="0.95" filter="url(#lift)"/>`,
+      `<rect x="${W / 2 - 36 * s}" y="${top + 22 * s}" width="${72 * s}" height="${4 * s}" rx="${2 * s}" fill="${t.text_color}" fill-opacity="0.55"/>`,
+    );
     lines.forEach((l, i) =>
       parts.push(`<text x="${W / 2}" y="${top + pad + size * 0.85 + i * lh}" text-anchor="middle" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}">${esc(l)}</text>`),
     );
@@ -115,12 +123,28 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
     const bottom = H - 72 * s - handleH;
     const firstBaseline = bottom - (lines.length - 1) * lh;
     parts.push(
-      `<defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.78"/></linearGradient></defs>`,
-      `<rect x="0" y="${H * 0.42}" width="${W}" height="${H * 0.58}" fill="url(#fade)"/>`,
+      `<defs><linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0.85"/></linearGradient></defs>`,
+      `<rect x="0" y="${H * 0.4}" width="${W}" height="${H * 0.6}" fill="url(#fade)"/>`,
       `<rect x="${x}" y="${firstBaseline - size * 0.95 - 28 * s}" width="${96 * s}" height="${10 * s}" rx="${5 * s}" fill="${t.primary_color}"/>`,
     );
-    lines.forEach((l, i) => parts.push(`<text x="${x}" y="${firstBaseline + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}">${esc(l)}</text>`));
+    lines.forEach((l, i) => parts.push(`<text x="${x}" y="${firstBaseline + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`));
     if (t.handle) parts.push(`<text x="${x}" y="${H - 64 * s}" ${handleFont} fill="${t.text_color}" fill-opacity="0.85">${esc(t.handle)}</text>`);
+  } else if (t.style === "editorial") {
+    // Magazine cover: dark fade from the top, small kicker, big headline, brand-colour rule.
+    const x = 64 * s;
+    const kicker = t.handle ? t.handle.toUpperCase() : "";
+    const top = (kicker ? 150 : 110) * s;
+    const { size, lines } = fitTitle(title, W - x * 2, t.font, s * 1.08, 4);
+    const lh = size * (t.font === "display" ? 0.98 : 1.12);
+    parts.push(
+      `<defs><linearGradient id="topfade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.82"/><stop offset="0.6" stop-color="#000" stop-opacity="0.35"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>`,
+      `<rect x="0" y="0" width="${W}" height="${top + lines.length * lh + 260 * s}" fill="url(#topfade)"/>`,
+    );
+    if (kicker) parts.push(`<text x="${x}" y="${96 * s}" font-family="Poppins" font-weight="500" font-size="${26 * s}" letter-spacing="${6 * s}" fill="${t.text_color}" fill-opacity="0.85">${esc(kicker)}</text>`);
+    lines.forEach((l, i) =>
+      parts.push(`<text x="${x}" y="${top + size * 0.85 + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`),
+    );
+    parts.push(`<rect x="${x}" y="${top + size * 0.85 + (lines.length - 1) * lh + 34 * s}" width="${120 * s}" height="${8 * s}" rx="${4 * s}" fill="${t.primary_color}"/>`);
   } else {
     // elegant: light card near the top, dark text, thin brand-colour rule.
     const pad = 52 * s;
@@ -132,7 +156,8 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
     const top = 96 * s;
     const ink = t.text_color.toLowerCase() === "#ffffff" ? "#1c1917" : t.text_color;
     parts.push(
-      `<rect x="${cardX}" y="${top}" width="${W - cardX * 2}" height="${cardH}" rx="${10 * s}" fill="#ffffff" fill-opacity="0.93"/>`,
+      `<rect x="${cardX}" y="${top}" width="${W - cardX * 2}" height="${cardH}" rx="${10 * s}" fill="#ffffff" fill-opacity="0.94" filter="url(#lift)"/>`,
+      `<rect x="${cardX + 14 * s}" y="${top + 14 * s}" width="${W - cardX * 2 - 28 * s}" height="${cardH - 28 * s}" rx="${6 * s}" fill="none" stroke="${t.primary_color}" stroke-opacity="0.35" stroke-width="${2 * s}"/>`,
       `<rect x="${W / 2 - 60 * s}" y="${top + pad}" width="${120 * s}" height="${5 * s}" fill="${t.primary_color}"/>`,
     );
     lines.forEach((l, i) =>
@@ -142,8 +167,9 @@ export function overlaySvg({ width: W, height: H, title, template: t, logoHref }
   }
   if (logoHref) {
     const size = 120 * s;
-    const x = t.style === "elegant" ? W - size - 48 * s : 48 * s;
-    const y = t.style === "elegant" ? H - size - 48 * s : 48 * s;
+    const bottom = t.style === "elegant" || t.style === "editorial";
+    const x = bottom ? W - size - 48 * s : 48 * s;
+    const y = bottom ? H - size - 48 * s : 48 * s;
     parts.push(
       `<rect x="${x - 10 * s}" y="${y - 10 * s}" width="${size + 20 * s}" height="${size + 20 * s}" rx="${22 * s}" fill="#ffffff" fill-opacity="0.92"/>`,
       `<image x="${x}" y="${y}" width="${size}" height="${size}" href="${esc(logoHref)}" preserveAspectRatio="xMidYMid meet"/>`,

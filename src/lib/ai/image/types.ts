@@ -12,6 +12,7 @@ export interface GeneratedImage {
 export interface ImageProvider {
   readonly name: string;
   readonly source: "demo" | "ai";
+  /** `prompt` is the full, final prompt (see buildImagePrompt). */
   generate(prompt: string, size: { width: number; height: number }): Promise<GeneratedImage>;
 }
 

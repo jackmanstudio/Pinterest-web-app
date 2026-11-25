@@ -10,6 +10,7 @@ import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { EMPTY_BRAND, type BrandSettings } from "@/lib/types";
 import { brandArtFor, brandPinImage } from "@/lib/brand/server";
+import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import type { UsageEntry, UsageLedger } from "@/lib/usage/ledger";
 import { estimateTextCost, startOfMonthUtc } from "@/lib/usage/pricing";
@@ -267,7 +268,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
             autopilot: true, status: "approved", approved_at: now, approved_by: ws.owner_id, review_note: "Auto-approved by Autopilot",
           })),
         )
-        .select("id, title, image_prompt");
+        .select("id, title, angle, image_prompt");
       if (ins.error) throw new Error(ins.error.message);
       const art = await brandArtFor(admin, ws.workspace_id);
 
@@ -275,7 +276,8 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       for (const d of ins.data ?? []) {
         try {
           await assertWithinBudget(ledger, true);
-          const img = await brandPinImage(await withRetry(() => images.generate(d.image_prompt, PIN_IMAGE_SIZE)), d.title, art);
+          const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.kind, overlay: art.template.style, angle: d.angle });
+          const img = await brandPinImage(await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE)), d.title, art);
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
           if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);

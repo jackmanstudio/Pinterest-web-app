@@ -1,5 +1,4 @@
 import { ProviderError } from "@/lib/ai/text/types";
-import { pinImagePrompt } from "./openai";
 import type { GeneratedImage, ImageProvider } from "./types";
 
 export const FAL_DEFAULT_MODEL = "blackforestlabs/flux-3/klein/text-to-image";
@@ -36,7 +35,7 @@ export class FalImageProvider implements ImageProvider {
 
   async generate(prompt: string): Promise<GeneratedImage> {
     const f = this.opts.fetchImpl ?? fetch;
-    const body: Record<string, unknown> = { prompt: pinImagePrompt(prompt), num_images: 1, output_format: "jpeg", sync_mode: true };
+    const body: Record<string, unknown> = { prompt, num_images: 1, output_format: "jpeg", sync_mode: true };
     // Nano Banana takes an aspect ratio; FLUX models take an explicit size.
     if (this.model.includes("nano-banana")) body.aspect_ratio = "2:3";
     else body.image_size = { width: 1024, height: 1536 };

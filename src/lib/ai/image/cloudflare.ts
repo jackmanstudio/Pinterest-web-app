@@ -1,5 +1,4 @@
 import { ProviderError } from "@/lib/ai/text/types";
-import { pinImagePrompt } from "./openai";
 import type { GeneratedImage, ImageProvider } from "./types";
 
 /** 2:3 portrait; both sides are multiples of 16 and inside the model's 256–1920 range. */
@@ -39,7 +38,7 @@ export class CloudflareImageProvider implements ImageProvider {
   async generate(prompt: string): Promise<GeneratedImage> {
     const f = this.opts.fetchImpl ?? fetch;
     const form = new FormData();
-    form.set("prompt", pinImagePrompt(prompt));
+    form.set("prompt", prompt);
     form.set("width", String(CLOUDFLARE_PIN_SIZE.width));
     form.set("height", String(CLOUDFLARE_PIN_SIZE.height));
     let res: Response;
