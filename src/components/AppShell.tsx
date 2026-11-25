@@ -91,22 +91,22 @@ export function AppShell({ children }: { children: ReactNode }) {
       key={href}
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`group flex items-center gap-3 rounded-full px-3.5 py-2 text-[14px] font-semibold transition-colors ${active ? "bg-[#111] text-white" : "text-[#3d3d3d] hover:bg-[#efefef]"}`}
+      className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-[14px] font-medium transition-colors ${active ? "bg-[#2a2a2a] text-white" : "text-[#b9b6af] hover:bg-[#1f1f1f] hover:text-white"}`}
     >
-      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-white" : "text-[#767676] group-hover:text-[#111]"}`} />
+      <Icon name={icon} className={`h-[18px] w-[18px] shrink-0 ${active ? "text-[#ff3355]" : "text-[#77746e] group-hover:text-[#d8d6d0]"}`} />
       {label}
     </Link>
   );
 
   const switcher = (
-    <div className="grid grid-cols-2 gap-1 rounded-full bg-[#efefef] p-1" role="tablist" aria-label="Workspace">
+    <div className="grid grid-cols-2 gap-1 rounded-xl bg-[#262626] p-1" role="tablist" aria-label="Workspace">
       {WORKSPACE_KINDS.map((k) => (
         <Link
           key={k}
           role="tab"
           aria-selected={k === kind}
           href={`/w/${k}${section ? `/${section}` : ""}`}
-          className={`rounded-full px-3 py-1.5 text-center text-[13px] font-bold transition-colors ${k === kind ? "bg-[#111] text-white" : "text-[#5f5f5f] hover:text-[#111]"}`}
+          className={`rounded-lg px-3 py-1.5 text-center text-[13px] font-bold transition-colors ${k === kind ? "bg-[#e60023] text-white" : "text-[#9a978f] hover:text-white"}`}
         >
           {WORKSPACE_LABELS[k]}
         </Link>
@@ -124,20 +124,20 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {GROUPS.map((g) => (
           <div key={g.title} className="flex flex-col gap-0.5">
-            <p className="px-3.5 pb-1 text-[12px] font-semibold text-[#9a9a9a]">{g.title}</p>
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[#5f5c56]">{g.title}</p>
             {g.items.map((it) => navLink(`/w/${kind}${it.section ? `/${it.section}` : ""}`, it.label, it.icon, section === it.section))}
           </div>
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-3 px-3 pt-6">
-        <div className="rounded-2xl bg-[#f6f6f6] p-3">
-          <p className="mb-2 text-[12px] font-semibold text-[#767676]">System</p>
+        <div className="rounded-xl bg-[#1f1f1f] p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#5f5c56]">System</p>
           <StatusSummary dark />
         </div>
         <div className="flex flex-col gap-0.5">
           {navLink("/account", "Account", "user", path === "/account")}
-          <button onClick={signOut} className="flex items-center gap-3 rounded-full px-3.5 py-2 text-left text-[14px] font-semibold text-[#3d3d3d] hover:bg-[#efefef]">
-            <Icon name="out" className="h-[18px] w-[18px] text-[#767676]" />
+          <button onClick={signOut} className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-[14px] font-medium text-[#b9b6af] hover:bg-[#1f1f1f] hover:text-white">
+            <Icon name="out" className="h-[18px] w-[18px] text-[#77746e]" />
             Sign out
           </button>
         </div>
@@ -146,12 +146,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const logo = (size: string) => (
-    <span className={`grid ${size} shrink-0 place-items-center rounded-full bg-[#e60023] text-white`}>
+    <span className={`grid ${size} shrink-0 place-items-center rounded-xl bg-[#e60023] text-white`}>
       <Icon name="pin" className="h-4 w-4" />
     </span>
   );
   const brand = (
-    <Link href="/dashboard" className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[16px] font-bold tracking-tight text-[#111]">
+    <Link href="/dashboard" className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[16px] font-extrabold tracking-tight text-white">
       {logo("h-9 w-9")}
       <span>Pinterest AI Studio</span>
     </Link>
@@ -168,9 +168,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   return (
-    <div className="pw-body flex min-h-full flex-1">
+    <div className="bb-body flex min-h-full flex-1">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-[#f0f0f0] bg-white py-5 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-[#141414] py-5 lg:flex">
         <div className="mb-5 px-5">{brand}</div>
         {nav}
         <div className="h-4 shrink-0" />
@@ -178,10 +178,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Phone / tablet top bar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 bg-white/95 px-4 py-2.5 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center gap-3 bg-[#141414] px-4 py-2.5 lg:hidden">
           <Link href="/dashboard" aria-label="Pinterest AI Studio home">{logo("h-8 w-8")}</Link>
           <div className="w-44">{switcher}</div>
-          <button onClick={() => setOpen(true)} className="ml-auto rounded-full p-2.5 text-[#111] hover:bg-[#efefef]" aria-label="Open menu" aria-expanded={open}>
+          <button onClick={() => setOpen(true)} className="ml-auto rounded-xl p-2.5 text-white hover:bg-[#262626]" aria-label="Open menu" aria-expanded={open}>
             <Icon name="menu" className="h-5 w-5" />
           </button>
         </header>
@@ -189,9 +189,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="app-main mx-auto w-full max-w-6xl flex-1 px-4 pb-24 pt-5 sm:px-6 lg:px-10 lg:pb-12 lg:pt-8">
           {crumb && (
             <div className="mb-5 flex items-center gap-2 text-xs font-medium text-zinc-500">
-              <span className="text-[#767676]">{crumb[0]}</span>
-              <span aria-hidden className="text-[#c4c4c4]">/</span>
-              <span className="font-semibold text-[#111]">{crumb[1]}</span>
+              <span className="text-[#77746e]">{crumb[0]}</span>
+              <span aria-hidden className="text-[#c9c4ba]">/</span>
+              <span className="font-semibold text-[#141414]">{crumb[1]}</span>
             </div>
           )}
           {children}
@@ -202,10 +202,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
           <button className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 right-0 flex w-[min(19rem,86vw)] flex-col overflow-y-auto rounded-l-3xl bg-white py-4 shadow-2xl">
+          <div className="absolute inset-y-0 right-0 flex w-[min(19rem,86vw)] flex-col overflow-y-auto bg-[#141414] py-4 shadow-2xl">
             <div className="mb-4 flex items-center justify-between px-6">
-              <span className="text-base font-bold text-[#111]">Menu</span>
-              <button onClick={() => setOpen(false)} className="rounded-full p-2 text-[#111] hover:bg-[#efefef]" aria-label="Close menu">
+              <span className="text-base font-bold text-white">Menu</span>
+              <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-white hover:bg-[#262626]" aria-label="Close menu">
                 <Icon name="close" className="h-5 w-5" />
               </button>
             </div>
@@ -216,16 +216,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       {/* Phone bottom tabs */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 bg-white/95 px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_-4px_20px_rgba(0,0,0,0.06)] backdrop-blur-xl lg:hidden" aria-label="Quick">
+      <nav className="fixed inset-x-3 bottom-3 z-30 grid grid-cols-5 rounded-2xl bg-[#141414] px-1 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.5)] lg:hidden" aria-label="Quick">
         {bottom.map((b) => (
-          <Link key={b.label} href={b.href} className={`relative flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-semibold transition-colors ${b.active ? "text-[#111]" : "text-[#767676]"}`}>
-            <span className={`grid h-8 w-12 place-items-center rounded-full ${b.active ? "bg-[#111] text-white" : ""}`}>
+          <Link key={b.label} href={b.href} className={`relative flex flex-col items-center gap-0.5 py-1 text-[11px] font-semibold transition-colors ${b.active ? "text-white" : "text-[#8a877f]"}`}>
+            <span className={`grid h-8 w-12 place-items-center rounded-xl ${b.active ? "bg-[#e60023] text-white" : ""}`}>
               <Icon name={b.icon} className="h-5 w-5" />
             </span>
             {b.label}
           </Link>
         ))}
-        <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-semibold text-[#767676]">
+        <button onClick={() => setOpen(true)} className="flex flex-col items-center gap-0.5 py-1 text-[11px] font-semibold text-[#8a877f]">
           <span className="grid h-8 w-12 place-items-center"><Icon name="menu" className="h-5 w-5" /></span>
           More
         </button>

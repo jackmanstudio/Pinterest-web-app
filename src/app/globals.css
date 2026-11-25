@@ -18,24 +18,28 @@ body {
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-SemiBold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
 @font-face { font-family: "Cormorant Garamond"; src: url("/fonts/CormorantGaramond-MediumItalic.ttf") format("truetype"); font-weight: 500; font-style: italic; font-display: swap; }
 
-/* ================= Pin Wall theme (signed-in app) =================
-   White, Pinterest-like: rounded pills, bold black, Pinterest red #e60023. */
+/* ================= Bold Bento theme (signed-in app) =================
+   Warm paper page, black sidebar, colourful tiles, Pinterest red #e60023,
+   heavy Inter Tight numbers. */
 @theme inline {
   --font-display: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
 }
-.pw-body { background: #fff; color: #111; font-family: var(--font-inter), system-ui, sans-serif; }
-.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.02em; color: #111; }
-.app-main h1 { font-weight: 700; }
+.bb-body { background: #f3f1ec; color: #141414; font-family: var(--font-inter), system-ui, sans-serif; }
+.app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.025em; color: #141414; }
+.app-main h1 { font-weight: 800; }
 .app-main .bg-red-700, .app-main .bg-red-600 { background-color: #e60023; }
 .app-main .hover\:bg-red-800:hover { background-color: #cc001f; }
 .app-main .text-red-700 { color: #e60023; }
-.app-main :is(.rounded-xl, .rounded-2xl).bg-white.border-zinc-200 { border-color: #ececec; border-radius: 1.25rem; }
-.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #111; box-shadow: 0 0 0 3px rgb(0 0 0 / 0.08); }
+.app-main :is(.rounded-xl, .rounded-2xl).bg-white.border-zinc-200 { border-color: #e4e0d8; border-radius: 1.25rem; box-shadow: none; }
+.app-main .bg-zinc-50, .app-main .bg-stone-50 { background-color: #f7f5f1; }
+.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):focus { outline: none; border-color: #141414; box-shadow: 0 0 0 3px rgb(20 20 20 / 0.08); }
 .app-main input[type="checkbox"], .app-main input[type="radio"] { accent-color: #e60023; }
-.pw-wall { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
-@media (min-width: 640px) { .pw-wall { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 16px; } }
-@media (min-width: 1024px) { .pw-wall { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-@media (min-width: 1280px) { .pw-wall { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
-@keyframes pw-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
-.pw-wall > * { animation: pw-in 0.4s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .pw-wall > * { animation: none; } }
+.bb-num { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.04em; line-height: 0.9; font-variant-numeric: tabular-nums; }
+.bb-tile { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s; }
+a.bb-tile:hover, .bb-tile.bb-hover:hover { transform: translateY(-3px); box-shadow: 0 16px 30px -18px rgb(20 20 20 / 0.45); }
+@keyframes bb-in { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+.bb-grid > * { animation: bb-in 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.bb-grid > *:nth-child(2) { animation-delay: 0.04s; } .bb-grid > *:nth-child(3) { animation-delay: 0.08s; }
+.bb-grid > *:nth-child(4) { animation-delay: 0.12s; } .bb-grid > *:nth-child(5) { animation-delay: 0.16s; }
+.bb-grid > *:nth-child(n+6) { animation-delay: 0.2s; }
+@media (prefers-reduced-motion: reduce) { .bb-grid > *, .bb-tile { animation: none; transition: none; } }
