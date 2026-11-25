@@ -1,3 +1,4 @@
+import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { AuditEvent, BrandSettings, Category, DraftContent, DraftVersion, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
 
@@ -59,4 +60,11 @@ export interface Store {
   listVersions(workspaceId: string, draftId: string): Promise<DraftVersion[]>;
   /** Workspace activity log (workflow, publishing, autopilot), newest first. */
   listActivity(workspaceId: string, limit?: number): Promise<AuditEvent[]>;
+  /** Board automation mode, rules and bulk keyword plan (spec 11). */
+  getBoardSettings(workspaceId: string): Promise<BoardSettings>;
+  saveBoardSettings(workspaceId: string, settings: BoardSettings): Promise<void>;
+  /** The planned board for each pin. Publishing still re-checks the board on the server. */
+  listBoardPlans(workspaceId: string): Promise<BoardPlan[]>;
+  saveBoardPlans(workspaceId: string, plans: BoardPlan[]): Promise<void>;
+  deleteBoardPlan(workspaceId: string, draftId: string): Promise<void>;
 }

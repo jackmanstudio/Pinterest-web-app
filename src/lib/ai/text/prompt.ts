@@ -69,3 +69,31 @@ ${angles}`;
 export function insightsUserPrompt(input: InsightsInput): string {
   return `Workspace: ${input.workspace}\nDate range (UTC): ${input.dateRange.start} to ${input.dateRange.end}\n\nData:\n${JSON.stringify(input.data)}`;
 }
+
+export const BOARDS_SYSTEM = `You organise Pinterest pins into boards for a content studio.
+For each pin, read its keyword, title, description, tags and image description (alt text) and decide what the pin is really about.
+Rules:
+- category: the pin's content category. Prefer one of the given categories; use another short name only if none fits.
+- board_id: the single most relevant board from the given list, by meaning (not just shared words). Use only ids from the list. Use null if no board is genuinely related: never force a pin into an unrelated board.
+- confidence: 0-100, how sure you are the board fits.
+- reason: one short sentence a non-technical user understands.
+- new_board: only when board_id is null (or confidence is below 60), suggest a new board: a clear, searchable name (max 50 chars), an SEO description (1-2 sentences with natural keywords) and 3-6 keywords. Never suggest a board whose name matches an existing board; otherwise null.
+- Return exactly one assignment per pin, with the pin's key unchanged.`;
+
+export interface BoardsPromptInput {
+  workspace: string;
+  categories: string[];
+  boards: { board_id: string; name: string; description?: string | null }[];
+  pins: { key: string; keyword: string; title?: string; description?: string; tags?: string[]; alt_text?: string }[];
+}
+
+export function boardsUserPrompt(input: BoardsPromptInput): string {
+  return [
+    `Workspace: ${input.workspace}`,
+    `Categories: ${input.categories.join("; ")}`,
+    "Boards (id | name | description):",
+    ...input.boards.map((b) => `- ${b.board_id} | ${b.name} | ${(b.description ?? "").slice(0, 160)}`),
+    "Pins (JSON):",
+    JSON.stringify(input.pins.map((p) => ({ ...p, description: p.description?.slice(0, 300) }))),
+  ].join("\n");
+}

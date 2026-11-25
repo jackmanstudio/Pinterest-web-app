@@ -1,4 +1,5 @@
 "use client";
+import { autoPlanBoards } from "@/lib/client/boards";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
@@ -177,6 +178,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: cat.id, source: result.source, link: cleanLink })),
       );
       update({ phase: "images", drafts: saved });
+      // Plan a board for each new pin in the background (spec 11). Failures never block pin making.
+      autoPlanBoards(store, workspace.id, kind, saved).catch(() => {});
       setIdea("");
       await runPool(
         saved,
@@ -221,10 +224,11 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     setBusy("saving");
     setError(null);
     try {
-      await store.saveDrafts(
+      const savedDrafts = await store.saveDrafts(
         workspace.id,
         chosen.map((d) => ({ ...d, idea: batch.idea, batch_id: batch.id, category_id: batch.categoryId, source: batch.result.source, link: cleanLink || null })),
       );
+      autoPlanBoards(store, workspace.id, kind, savedDrafts).catch(() => {});
       setNotice(
         `Saved ${chosen.length} draft${chosen.length === 1 ? "" : "s"} to ${WORKSPACE_LABELS[kind]}${store.mode === "demo" ? " (Demo storage: this browser only)" : ""}.`,
       );

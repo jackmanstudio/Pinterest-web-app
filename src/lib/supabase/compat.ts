@@ -20,6 +20,8 @@ export function isMissingTable(e: DbError | null | undefined): boolean {
 
 export const NEEDS_MIGRATION = "This needs the latest database update. Run supabase/migrations/0008_spec_v18.sql in the Supabase SQL editor.";
 
+export const NEEDS_BOARD_MIGRATION = "Board automation needs a database update. Run supabase/migrations/0009_board_automation.sql in the Supabase SQL editor.";
+
 /** Brand columns added in migration 0008. */
 export const BRAND_V8_KEYS = ["image_style", "cta", "language", "region"] as const;
 export const BRAND_BASE_COLUMNS = "brand_name, voice, audience, website_url, focus_keywords, banned_words";

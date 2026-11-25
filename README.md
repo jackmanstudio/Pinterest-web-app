@@ -118,6 +118,17 @@ In Studio, type a title and press **Make 5 complete pins**. The app writes 5 dis
 - **Tools:** destination link checker (public addresses only, follows up to 5 redirects, compares page title with the pin), UTM builder that keeps existing parameters, CSV import with a validation preview and partial import, activity log.
 - **All accounts:** health numbers and prioritised next steps for every workspace, and one button to pause Autopilot everywhere.
 
+## Boards & categories (spec 11)
+
+Run `supabase/migrations/0009_board_automation.sql` once on the live database. Until then, the Boards page still works for reading, but saving board settings or plans asks for the update.
+
+- **Boards** come from the connected account's sync (`/api/pinterest/sync`). Until Pinterest is connected, labelled demo sample boards are used.
+- **Per-pin picks:** the text AI reads each pin's keyword, title, description, tags and image description (alt text), and picks a content category and the most relevant board (`/api/boards/assign`). The server only accepts board ids from the account's own list. Picks below 45% confidence are not auto-assigned. Without a text AI key, keyword matching is used and labelled as such.
+- **Modes:** Automatic (default; new Studio pins get a planned board in the background), Manual (one board for all), Keyword rules (your rules first, AI for the rest), and Custom (AI suggests, you choose each pin's board).
+- **New boards:** suggested with a name, SEO description and keywords. A board is created on Pinterest only after you click Create and confirm. This needs the `boards:write` scope. The server re-reads the live board list and refuses duplicate names.
+- **Bulk:** up to 50 keywords, each categorised and grouped by board. Rows are editable, the plan can be saved and downloaded as CSV, and pins later made from a planned keyword use its board.
+- **Pre-schedule checks** on Review & publish confirm that a board is chosen, is valid, belongs to the connected account, is available, and is related to the pin. The server also refuses to schedule to a board that isn't in the account's synced boards, and it takes the board name from the sync.
+
 ## Autopilot (opt-in automatic publishing)
 
 The brief requires approval before publishing. Autopilot is the owner's standing approval: it is **off by default**, turning it on requires typing `AUTO PUBLISH` (enforced by a database constraint), and pausing clears that consent.

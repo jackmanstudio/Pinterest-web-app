@@ -4,12 +4,16 @@ import type { Store } from "@/lib/store";
 import { STATUS_LABELS, WORKSPACE_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { publishBlockers } from "@/lib/workflow/checks";
 import { recommendBoard } from "@/lib/publishing/boards";
+import { boardChecks, METHOD_LABELS, type BoardPlan } from "@/lib/boards/automation";
+import { draftFacts, loadBoardSource } from "@/lib/client/boards";
 import { ACTION_LABELS, type WorkflowAction } from "@/lib/workflow/transitions";
 import { SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 
-interface Board { board_id: string; name: string; description?: string | null }
+interface Board { board_id: string; name: string; description?: string | null; privacy?: string | null }
 interface PinterestInfo {
+  /** Demo sample boards (no real boards synced yet). */
+  sample: boolean;
   ready: boolean;
   env: "sandbox" | "production";
   username: string | null;
@@ -37,8 +41,9 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
   const [drafts, setDrafts] = useState<PinDraft[] | null>(null);
   const [chosenTab, setTab] = useState<DraftStatus | null>(null);
   const [bulk, setBulk] = useState<string | null>(null);
-  const [pin, setPin] = useState<PinterestInfo>({ ready: false, env: "sandbox", username: null, active: false, scopes: [], boards: [] });
+  const [pin, setPin] = useState<PinterestInfo>({ sample: true, ready: false, env: "sandbox", username: null, active: false, scopes: [], boards: [] });
   const [error, setError] = useState<string | null>(null);
+  const [plans, setPlans] = useState<Map<string, BoardPlan>>(new Map());
 
   const reload = useCallback(async () => {
     if (!store || !workspace) return;
@@ -52,19 +57,13 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       .listDrafts(workspace.id)
       .then((d) => !cancelled && setDrafts(d))
       .catch((e: Error) => !cancelled && setError(e.message));
-    fetch(`/api/pinterest/status?workspace=${kind}`)
-      .then((r) => r.json())
-      .then((s) => {
-        if (cancelled || s.error) return;
-        setPin({
-          ready: Boolean(s.config?.ready),
-          env: s.config?.env ?? "sandbox",
-          username: s.connection?.username ?? null,
-          active: s.connection?.status === "active",
-          scopes: s.connection?.scopes ?? [],
-          boards: (s.boards ?? []).map((b: Board) => ({ board_id: b.board_id, name: b.name, description: b.description ?? null })),
-        });
-      })
+    loadBoardSource(kind).then((b) => {
+      if (cancelled) return;
+      setPin({ sample: b.sample, ready: b.ready, env: b.env, username: b.username, active: b.active, scopes: b.scopes, boards: b.boards });
+    });
+    store
+      .listBoardPlans(workspace.id)
+      .then((p) => !cancelled && setPlans(new Map(p.map((x) => [x.draft_id, x]))))
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -147,7 +146,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {visible.map((d) => (
-            <PinCard key={d.id} kind={kind} store={store} draft={d} pin={pin} onChanged={reload} />
+            <PinCard key={d.id} kind={kind} store={store} draft={d} pin={pin} plan={plans.get(d.id) ?? null} onChanged={reload} />
           ))}
         </div>
       )}
@@ -155,14 +154,16 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
   );
 }
 
-function PinCard({ kind, store, draft, pin, onChanged }: { kind: WorkspaceKind; store: Store; draft: PinDraft; pin: PinterestInfo; onChanged: () => Promise<void> }) {
+function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: WorkspaceKind; store: Store; draft: PinDraft; pin: PinterestInfo; plan: BoardPlan | null; onChanged: () => Promise<void> }) {
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [confirming, setConfirming] = useState<WorkflowAction | null>(null);
   const [note, setNote] = useState("");
   const [link, setLink] = useState(draft.link ?? "");
-  const [boardId, setBoardId] = useState(draft.board_id ?? "");
+  const [chosenBoard, setBoardId] = useState<string | null>(null);
+  // The planned board (Boards page / Automatic mode) is used unless you pick another one.
+  const boardId = chosenBoard ?? draft.board_id ?? (plan && pin.boards.some((b) => b.board_id === plan.board_id) ? plan.board_id : "");
   const [runAt, setRunAt] = useState(() => localInputValue(new Date(Date.now() + 60 * 60_000)));
   const [log, setLog] = useState<AuditEvent[] | null>(null);
 
@@ -176,13 +177,15 @@ function PinCard({ kind, store, draft, pin, onChanged }: { kind: WorkspaceKind; 
 
   const board = pin.boards.find((b) => b.board_id === boardId);
   const suggested = recommendBoard(pin.boards, { title: draft.title, tags: draft.tags, category: draft.idea });
+  const checks = boardChecks(boardId || null, pin.boards, { connectedUsername: pin.username, demo: pin.sample, facts: draftFacts(draft), plan: plan && plan.board_id === boardId ? plan : chosenBoard ? { board_id: chosenBoard, method: "custom", confidence: null } : null });
+  const boardProblems = checks.filter((c) => !c.ok && (c.id === "valid" || c.id === "owned")).map((c) => c.label);
   const blockers =
     draft.status === "approved"
       ? store.mode === "demo"
         ? ["Publishing needs Supabase and a connected Pinterest account."]
         : !pin.ready
           ? ["Pinterest isn't configured on the server."]
-          : publishBlockers({ ...draft, link: link || null }, { connected: Boolean(pin.username), connectionActive: pin.active, grantedScopes: pin.scopes, boardId: boardId || null })
+          : [...publishBlockers({ ...draft, link: link || null }, { connected: Boolean(pin.username), connectionActive: pin.active, grantedScopes: pin.scopes, boardId: boardId || null }), ...boardProblems]
       : [];
 
   async function act(action: WorkflowAction) {
@@ -290,7 +293,22 @@ function PinCard({ kind, store, draft, pin, onChanged }: { kind: WorkspaceKind; 
               <option key={b.board_id} value={b.board_id}>{b.name}{suggested?.board.board_id === b.board_id ? " (suggested)" : ""}</option>
             ))}
           </select>
-          {suggested && suggested.board.board_id !== boardId && (
+          {pin.sample && <p className="text-xs text-amber-800">Demo sample boards. Connect Pinterest and sync to see your real boards.</p>}
+          {plan && plan.board_id === boardId && (
+            <p className="text-xs text-zinc-600">
+              {METHOD_LABELS[plan.method]}
+              {plan.category ? ` · ${plan.category}` : ""}
+              {plan.reason ? ` · ${plan.reason}` : ""}
+            </p>
+          )}
+          {boardId && (
+            <ul className="flex flex-col gap-0.5 text-xs" aria-label="Board checks">
+              {checks.map((c) => (
+                <li key={c.id} className={c.ok ? "text-emerald-700" : "text-amber-800"}>{c.ok ? "✓" : "⚠"} {c.label}</li>
+              ))}
+            </ul>
+          )}
+          {!plan && suggested && suggested.board.board_id !== boardId && (
             <p className="text-xs text-zinc-600">
               Suggested: <strong>{suggested.board.name}</strong> ({suggested.reason}).{" "}
               <button className="underline" onClick={() => setBoardId(suggested.board.board_id)}>Use it</button>

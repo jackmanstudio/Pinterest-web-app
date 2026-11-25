@@ -126,6 +126,17 @@ export class PinterestApi {
     return (await res.json()) as PinterestPin;
   }
 
+  /** POST /v5/boards: creates a board. Only called after the user approved it (spec 11). */
+  async createBoard(accessToken: string, body: { name: string; description?: string; privacy?: "PUBLIC" | "SECRET" }): Promise<PinterestBoard> {
+    const res = await this.fetchFn(this.cfg.apiBase + "/boards", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw await toError(res, "Create board");
+    return (await res.json()) as PinterestBoard;
+  }
+
   account(accessToken: string) {
     return this.get<PinterestAccount>(accessToken, "/user_account");
   }

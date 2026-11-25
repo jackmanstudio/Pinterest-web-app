@@ -1,3 +1,4 @@
+import { DEFAULT_BOARD_SETTINGS, type BoardPlan, type BoardSettings } from "@/lib/boards/automation";
 import { defaultCategories } from "@/lib/categories/taxonomy";
 import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
@@ -17,6 +18,8 @@ interface WorkspaceData {
   drafts: PinDraft[];
   audit?: (AuditEvent & { draft_id: string })[];
   versions?: DraftVersion[];
+  boardSettings?: BoardSettings;
+  boardPlans?: BoardPlan[];
 }
 
 export interface KeyValue {
@@ -253,8 +256,34 @@ export class LocalStore implements Store {
   async listActivity(workspaceId: string, limit = 200) {
     return [...(this.byId(workspaceId).audit ?? [])].reverse().slice(0, limit).map((e) => ({ ...e, target_type: "pin_draft" }));
   }
+  async getBoardSettings(workspaceId: string) {
+    return { ...DEFAULT_BOARD_SETTINGS, ...(this.byId(workspaceId).boardSettings ?? {}) };
+  }
+  async saveBoardSettings(workspaceId: string, settings: BoardSettings) {
+    if (settings.mode === "manual" && !settings.manual_board_id) throw new Error("Choose the board for Manual mode.");
+    const d = this.byId(workspaceId);
+    d.boardSettings = settings;
+    this.write(d);
+  }
+  async listBoardPlans(workspaceId: string) {
+    return this.byId(workspaceId).boardPlans ?? [];
+  }
+  async saveBoardPlans(workspaceId: string, plans: BoardPlan[]) {
+    const d = this.byId(workspaceId);
+    const ids = new Set(d.drafts.map((p) => p.id));
+    if (plans.some((p) => !ids.has(p.draft_id))) throw new Error("Draft not found in this workspace");
+    const incoming = new Set(plans.map((p) => p.draft_id));
+    d.boardPlans = [...(d.boardPlans ?? []).filter((p) => !incoming.has(p.draft_id)), ...plans];
+    this.write(d);
+  }
+  async deleteBoardPlan(workspaceId: string, draftId: string) {
+    const d = this.byId(workspaceId);
+    d.boardPlans = (d.boardPlans ?? []).filter((p) => p.draft_id !== draftId);
+    this.write(d);
+  }
   async deleteDraft(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);
+    d.boardPlans = (d.boardPlans ?? []).filter((p) => p.draft_id !== id);
     const path = d.drafts.find((p) => p.id === id)?.image_path;
     if (this.images && path?.startsWith("idb:")) await this.images.remove(path).catch(() => {});
     d.drafts = d.drafts.filter((p) => p.id !== id);

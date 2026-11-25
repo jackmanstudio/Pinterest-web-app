@@ -2,9 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { DraftSetSchema } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { ProviderError, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
+import { ProviderError, type BoardsOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
-import { DRAFTS_SYSTEM as SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, draftsUserPrompt, insightsUserPrompt } from "./prompt";
+import { BOARDS_SYSTEM, DRAFTS_SYSTEM as SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
+import { AiAssignmentSetSchema } from "@/lib/boards/automation";
 
 export class AnthropicTextProvider implements TextProvider {
   readonly name = "Claude (Anthropic)";
@@ -38,6 +39,32 @@ export class AnthropicTextProvider implements TextProvider {
       if (!response.parsed_output) throw new ProviderError("The AI response was incomplete. Please retry.", 502, true);
       return {
         insights: response.parsed_output.insights,
+        model: response.model,
+        usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
+      };
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("The AI provider is rate limiting requests. Retry shortly.", 429, true);
+      if (err instanceof Anthropic.APIError) throw new ProviderError(`The AI provider returned an error (${err.status ?? "network"}).`, 502, true);
+      throw err;
+    }
+  }
+
+  async assignBoards(input: BoardsPromptInput): Promise<BoardsOutput> {
+    try {
+      const response = await this.client.beta.messages.parse({
+        model: this.model,
+        max_tokens: 16000,
+        system: BOARDS_SYSTEM,
+        messages: [{ role: "user", content: boardsUserPrompt(input) }],
+        output_config: { effort: "low", format: betaZodOutputFormat(AiAssignmentSetSchema) },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      });
+      if (response.stop_reason === "refusal") throw new ProviderError("The AI provider declined this request.", 422);
+      if (!response.parsed_output) throw new ProviderError("The AI board picks were incomplete. Please retry.", 502, true);
+      return {
+        assignments: response.parsed_output.assignments,
         model: response.model,
         usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
       };

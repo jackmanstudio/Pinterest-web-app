@@ -1,9 +1,10 @@
+import { DEFAULT_BOARD_SETTINGS, type BoardPlan, type BoardSettings } from "@/lib/boards/automation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
 import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
-import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn, isMissingTable, NEEDS_MIGRATION, type DbError } from "@/lib/supabase/compat";
+import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn, isMissingTable, NEEDS_BOARD_MIGRATION, NEEDS_MIGRATION, type DbError } from "@/lib/supabase/compat";
 
 type Res<T> = { data: T | null; error: DbError | null };
 
@@ -159,6 +160,34 @@ export class SupabaseStore implements Store {
         .limit(30);
     if (isMissingTable(res.error)) throw new Error(NEEDS_MIGRATION);
     return check(res) as DraftVersion[];
+  }
+  async getBoardSettings(workspaceId: string): Promise<BoardSettings> {
+    const res = await this.db.from("board_settings").select("mode, manual_board_id, manual_board_name, rules, keyword_plan").eq("workspace_id", workspaceId).maybeSingle();
+    if (isMissingTable(res.error)) return { ...DEFAULT_BOARD_SETTINGS };
+    if (res.error) throw new Error(res.error.message);
+    return { ...DEFAULT_BOARD_SETTINGS, ...((res.data ?? {}) as Partial<BoardSettings>) };
+  }
+  async saveBoardSettings(workspaceId: string, s: BoardSettings) {
+    const res = await this.db.from("board_settings").upsert({ workspace_id: workspaceId, ...s, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" });
+    if (isMissingTable(res.error)) throw new Error(NEEDS_BOARD_MIGRATION);
+    if (res.error) throw new Error(res.error.message);
+  }
+  async listBoardPlans(workspaceId: string): Promise<BoardPlan[]> {
+    const res = await this.db.from("draft_board_plans").select("draft_id, board_id, board_name, category, reason, method, confidence").eq("workspace_id", workspaceId);
+    if (isMissingTable(res.error)) return [];
+    if (res.error) throw new Error(res.error.message);
+    return (res.data ?? []) as BoardPlan[];
+  }
+  async saveBoardPlans(workspaceId: string, plans: BoardPlan[]) {
+    if (!plans.length) return;
+    const rows = plans.map((p) => ({ ...p, workspace_id: workspaceId, reason: p.reason?.slice(0, 300) ?? null, category: p.category?.slice(0, 80) ?? null }));
+    const res = await this.db.from("draft_board_plans").upsert(rows, { onConflict: "draft_id" });
+    if (isMissingTable(res.error)) throw new Error(NEEDS_BOARD_MIGRATION);
+    if (res.error) throw new Error(res.error.message);
+  }
+  async deleteBoardPlan(workspaceId: string, draftId: string) {
+    const res = await this.db.from("draft_board_plans").delete().eq("workspace_id", workspaceId).eq("draft_id", draftId);
+    if (res.error && !isMissingTable(res.error)) throw new Error(res.error.message);
   }
   async listActivity(workspaceId: string, limit = 200): Promise<AuditEvent[]> {
     return check(

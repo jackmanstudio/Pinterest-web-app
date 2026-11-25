@@ -91,6 +91,11 @@ export async function POST(request: Request) {
       boardId: b.boardId ?? null,
     });
     if (blockers.length) return NextResponse.json({ error: blockers.join(" "), blockers }, { status: 422 });
+    // Spec 11: the board must be one of this account's own synced boards. Its name comes from the sync, not the browser.
+    const ownBoard = await admin.from("pinterest_boards").select("board_id, name").eq("workspace_id", workspaceId).eq("board_id", b.boardId!).maybeSingle();
+    if (ownBoard.error) throw new Error(ownBoard.error.message);
+    if (!ownBoard.data) throw new HttpError(422, "That board isn't on the connected Pinterest account. Sync boards and choose again.");
+    b.boardName = ownBoard.data.name;
 
     let runAt = now;
     if (action === "schedule") {

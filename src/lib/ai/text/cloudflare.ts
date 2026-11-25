@@ -2,8 +2,9 @@ import { z } from "zod";
 import { PIN_ANGLES } from "@/lib/drafts/angles";
 import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, draftsUserPrompt, insightsUserPrompt } from "./prompt";
-import { ProviderError, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
+import { BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
+import { AiAssignmentSetSchema } from "@/lib/boards/automation";
+import { ProviderError, type BoardsOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
 export const CLOUDFLARE_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -110,5 +111,12 @@ export class CloudflareTextProvider implements TextProvider {
     const parsed = InsightsSchema.safeParse(out);
     if (!parsed.success) throw new ProviderError("The AI response was incomplete. Please retry.", 502, true);
     return { insights: parsed.data.insights, model: this.model, usage };
+  }
+
+  async assignBoards(input: BoardsPromptInput): Promise<BoardsOutput> {
+    const { out, usage } = await this.run(BOARDS_SYSTEM, boardsUserPrompt(input), AiAssignmentSetSchema, 4000);
+    const parsed = AiAssignmentSetSchema.safeParse(out);
+    if (!parsed.success) throw new ProviderError("The AI board picks were incomplete. Please retry.", 502, true);
+    return { assignments: parsed.data.assignments, model: this.model, usage };
   }
 }

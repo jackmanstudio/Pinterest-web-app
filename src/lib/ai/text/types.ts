@@ -1,3 +1,5 @@
+import type { AiAssignment } from "@/lib/boards/automation";
+import type { BoardsPromptInput } from "./prompt";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
 
 /**
@@ -12,6 +14,14 @@ export interface TextProvider {
   generateDrafts(req: GenerateRequest): Promise<GenerateResponse>;
   /** Analytics insights. Demo providers don't implement this: we never invent analysis. */
   generateInsights?(input: InsightsInput): Promise<InsightsOutput>;
+  /** Board & category picks (spec 11). Demo providers don't implement this; the keyword fallback is used instead. */
+  assignBoards?(input: BoardsPromptInput): Promise<BoardsOutput>;
+}
+
+export interface BoardsOutput {
+  assignments: AiAssignment[];
+  model: string | null;
+  usage: { input_tokens: number; output_tokens: number };
 }
 
 export interface InsightsInput {
