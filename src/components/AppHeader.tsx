@@ -51,6 +51,7 @@ export function AppHeader() {
           {tab(`/w/${kind}/drafts`, "Saved drafts", section === "drafts")}
           {tab(`/w/${kind}/settings`, "Brand & categories", section === "settings")}
           {tab(`/w/${kind}/usage`, "Usage & cost", section === "usage")}
+          {tab(`/w/${kind}/pinterest`, "Pinterest", section === "pinterest")}
         </nav>
         {isSupabaseConfigured && (
           <button onClick={signOut} className="ml-auto text-sm text-zinc-600 hover:text-zinc-900">

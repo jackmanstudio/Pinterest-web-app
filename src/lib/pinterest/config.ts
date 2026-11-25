@@ -1,0 +1,78 @@
+/**
+ * Pinterest API v5 configuration (verified against the official docs and
+ * OpenAPI spec, Nov 2026):
+ *  - authorize: https://www.pinterest.com/oauth/
+ *  - token:     POST {api}/v5/oauth/token, HTTP Basic client_id:client_secret
+ *  - sandbox:   api-sandbox.pinterest.com (Trial apps: created content is
+ *               visible only to you); production needs Standard access.
+ */
+export type PinterestEnv = "sandbox" | "production";
+
+/** Read-only scopes for Phase 3. Write scopes are requested in Phase 4. */
+export const DEFAULT_SCOPES = ["user_accounts:read", "boards:read", "pins:read"];
+
+export interface PinterestConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  env: PinterestEnv;
+  scopes: string[];
+  apiBase: string;
+  tokenUrl: string;
+  authorizeUrl: string;
+  encryptionKey: string;
+}
+
+export interface ConfigCheck {
+  ready: boolean;
+  missing: string[];
+  env: PinterestEnv;
+}
+
+type Env = Record<string, string | undefined>;
+
+export function pinterestEnv(env: Env = process.env): PinterestEnv {
+  return env.PINTEREST_ENV === "production" ? "production" : "sandbox";
+}
+
+export function checkPinterestConfig(env: Env = process.env): ConfigCheck {
+  const required = [
+    "PINTEREST_CLIENT_ID",
+    "PINTEREST_CLIENT_SECRET",
+    "PINTEREST_REDIRECT_URI",
+    "TOKEN_ENCRYPTION_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+  ];
+  const missing = required.filter((k) => !env[k]);
+  return { ready: missing.length === 0, missing, env: pinterestEnv(env) };
+}
+
+export function getPinterestConfig(env: Env = process.env): PinterestConfig {
+  const check = checkPinterestConfig(env);
+  if (!check.ready) throw new Error(`Pinterest is not configured. Missing: ${check.missing.join(", ")}`);
+  const host = check.env === "sandbox" ? "https://api-sandbox.pinterest.com" : "https://api.pinterest.com";
+  const scopes = env.PINTEREST_SCOPES ? env.PINTEREST_SCOPES.split(/[\s,]+/).filter(Boolean) : DEFAULT_SCOPES;
+  return {
+    clientId: env.PINTEREST_CLIENT_ID!,
+    clientSecret: env.PINTEREST_CLIENT_SECRET!,
+    redirectUri: env.PINTEREST_REDIRECT_URI!,
+    env: check.env,
+    scopes,
+    apiBase: `${host}/v5`,
+    tokenUrl: `${host}/v5/oauth/token`,
+    authorizeUrl: "https://www.pinterest.com/oauth/",
+    encryptionKey: env.TOKEN_ENCRYPTION_KEY!,
+  };
+}
+
+export function buildAuthorizeUrl(cfg: PinterestConfig, state: string): string {
+  const u = new URL(cfg.authorizeUrl);
+  u.searchParams.set("client_id", cfg.clientId);
+  u.searchParams.set("redirect_uri", cfg.redirectUri);
+  u.searchParams.set("response_type", "code");
+  u.searchParams.set("scope", cfg.scopes.join(","));
+  u.searchParams.set("state", state);
+  return u.toString();
+}

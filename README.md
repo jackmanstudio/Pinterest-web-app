@@ -10,7 +10,7 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
 | Image AI | **Pipeline built, no real provider yet.** Generates labelled DEMO placeholder images through the same route, storage and ledger a real provider will use. Adding a provider = one adapter in `src/lib/ai/image/`. |
 | Usage & budget | **Built.** Every AI call is logged with tokens and estimated cost; paid calls stop at `AI_MONTHLY_BUDGET_USD`. In Demo mode the ledger is in server memory. |
-| Pinterest API v5 | Not connected (Phase 3). Nothing is published, scheduled or synced. |
+| Pinterest API v5 | **OAuth + read-only sync built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Nothing is ever published, scheduled, edited or deleted on Pinterest yet. |
 
 ## Phase 1 scope (this build)
 
@@ -38,10 +38,29 @@ npm run dev                  # http://localhost:3000
 - Per-draft image status (pending / ready / failed) with visible errors; Usage & cost page per workspace
 - Text generation now records usage and shows estimated cost
 
+## Phase 3 (this build)
+
+- Per-workspace Pinterest OAuth (`/api/pinterest/connect` → Pinterest → `/api/pinterest/callback`), CSRF-protected with a signed, httpOnly, 10-minute state cookie bound to the signed-in user
+- Tokens encrypted with AES-256-GCM (`TOKEN_ENCRYPTION_KEY`) and stored in a table with no user-facing RLS policies; only the server (service role) reads them, and only after checking workspace ownership through the user's session
+- Automatic refresh when the access token is within 24h of expiry; "Reconnect needed" when Pinterest rejects the refresh
+- Shows connected account, Sandbox/Production, granted scopes and token expiry
+- Read-only sync of boards and pins with bookmark pagination (page cap, no pruning on partial syncs), one sync at a time, sync status and errors (401, 403 `PINNER_DATA_ACCESS_DENIED`, 429 with retry-after)
+- Disconnect removes stored tokens and synced copies only
+
+## Connect Pinterest
+
+Verified against the official Pinterest v5 docs and OpenAPI spec (Nov 2026).
+
+1. Create an app at <https://developers.pinterest.com/apps/> and wait for Trial access.
+2. Add the redirect URI exactly as in `PINTEREST_REDIRECT_URI` (e.g. `http://localhost:3000/api/pinterest/callback`, plus your production URL).
+3. Put the App ID / secret in `PINTEREST_CLIENT_ID` / `PINTEREST_CLIENT_SECRET`, generate `TOKEN_ENCRYPTION_KEY`, set `SUPABASE_SERVICE_ROLE_KEY`, and run migration `0003`.
+4. Keep `PINTEREST_ENV=sandbox` while on Trial access (content you create is visible only to you). Switch to `production` after Pinterest grants Standard access, which requires a demo video of the OAuth flow.
+5. Note: apps registered after 14 Sep 2026 may get `PINNER_DATA_ACCESS_DENIED` for non-business accounts until Pinterest authorises access.
+
 ## Connect Supabase
 
 1. Create a Supabase project.
-2. Run both files in `supabase/migrations/` in order in the SQL editor (or `supabase db push`).
+2. Run the files in `supabase/migrations/` in order in the SQL editor (or `supabase db push`).
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 4. In Supabase Auth → URL configuration, add `http://localhost:3000/auth/callback` (and your production URL) as a redirect URL.
 
@@ -68,7 +87,6 @@ npm run build
 ## Next phases
 
 2. Real image generation, usage/cost tracking and budget caps
-3. Pinterest OAuth (verify current v5 docs, scopes, access tier and rate limits first)
 4. Approval-based publishing with idempotency
 5. Analytics and agents (verified data only)
 6. Production hardening

@@ -5,7 +5,7 @@ interface Status {
   storage: "supabase" | "demo";
   text: { source: "demo" | "ai"; provider: string };
   image: { source: "demo" | "ai" | "error"; provider: string };
-  pinterest: { status: string };
+  pinterest: { configured: boolean; env: "sandbox" | "production" };
 }
 
 function Pill({ tone, children }: { tone: "ok" | "demo" | "off"; children: React.ReactNode }) {
@@ -40,7 +40,11 @@ export function StatusBar() {
       ) : (
         <Pill tone="off">Image AI: {s.image.provider}</Pill>
       )}
-      <Pill tone="off">Pinterest: not connected</Pill>
+      {s.pinterest.configured ? (
+        <Pill tone="ok">Pinterest app: {s.pinterest.env === "sandbox" ? "Sandbox" : "Production"}</Pill>
+      ) : (
+        <Pill tone="off">Pinterest: not configured</Pill>
+      )}
     </div>
   );
 }

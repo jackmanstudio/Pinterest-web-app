@@ -1,6 +1,7 @@
 import { connection, NextResponse } from "next/server";
 import { getImageProvider } from "@/lib/ai/image";
 import { getTextProvider } from "@/lib/ai/text";
+import { checkPinterestConfig } from "@/lib/pinterest/config";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /** Integration status for the UI. Never returns secret values. */
@@ -18,6 +19,9 @@ export async function GET() {
     storage: isSupabaseConfigured ? "supabase" : "demo",
     text: { source: text.source, provider: text.name },
     image,
-    pinterest: { status: "not_connected" },
+    pinterest: (() => {
+      const c = checkPinterestConfig();
+      return { configured: c.ready, env: c.env };
+    })(),
   });
 }
