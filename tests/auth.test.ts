@@ -71,7 +71,9 @@ describe("reset-link marker", () => {
     expect(verifyRecovery(v, "user-1", now + 1000)).toBe(true);
     expect(verifyRecovery(v, "user-2", now + 1000)).toBe(false);
     expect(verifyRecovery(v, "user-1", now + 61_000)).toBe(false);
-    expect(verifyRecovery(v.replace(/.$/, (c) => (c === "A" ? "B" : "A")), "user-1", now)).toBe(false);
+    // Change a middle character of the signature: the last base64 character can carry only padding bits.
+    const i = v.length - 10;
+    expect(verifyRecovery(v.slice(0, i) + (v[i] === "A" ? "B" : "A") + v.slice(i + 1), "user-1", now)).toBe(false);
     expect(verifyRecovery("user-1", "user-1", now)).toBe(false);
   });
 });
