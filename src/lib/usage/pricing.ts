@@ -7,6 +7,8 @@ export const TEXT_PRICES: Record<string, { input: number; output: number }> = {
   "claude-opus-5-5": { input: 4, output: 20 },
   "claude-sonnet-5-5": { input: 2, output: 10 },
   "claude-haiku-5-5": { input: 0.1, output: 0.5 },
+  // Cloudflare Workers AI list price beyond the free daily allowance.
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast": { input: 0.29, output: 2.25 },
 };
 const FALLBACK = { input: 10, output: 50 };
 

@@ -151,7 +151,7 @@ export class OwnerLedger implements UsageLedger {
 /** Static readiness checks that don't need a database (shown in the UI too). */
 export function serverReadiness(env: Record<string, string | undefined> = process.env): string[] {
   const out: string[] = [];
-  if (getTextProvider(env).source !== "ai") out.push("Add TEXT_AI_API_KEY so pins are written by AI.");
+  if (getTextProvider(env).source !== "ai") out.push("Add text AI: free CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, or a Claude key in TEXT_AI_API_KEY.");
   if (getImageProvider(env).source !== "ai") out.push("Add image AI: free CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN, or a paid FAL_KEY (recommended) or OpenAI key.");
   const pc = checkPinterestConfig(env);
   if (!pc.ready) out.push(`Pinterest isn't configured on the server (missing ${pc.missing.join(", ")}).`);

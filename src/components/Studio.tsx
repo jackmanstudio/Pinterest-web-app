@@ -66,7 +66,9 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
 
   async function requestDrafts(): Promise<Batch["result"]> {
     const brand = await store!.getBrand(workspace!.id);
-    const category = categories.find((c) => c.id === categoryId)?.name;
+    const cat = categories.find((c) => c.id === categoryId);
+    const parent = cat?.parent_id ? categories.find((c) => c.id === cat.parent_id) : null;
+    const category = cat ? (parent ? `${parent.name} › ${cat.name}` : cat.name) : undefined;
     let res: Response;
     try {
       res = await fetch("/api/generate", {
@@ -219,9 +221,12 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <label className="sr-only" htmlFor="category">Category</label>
           <select id="category" className="rounded-md border border-zinc-300 px-3 py-2" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
             <option value="">No category</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+            {categories
+              .filter((c) => !c.parent_id)
+              .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
+              .map((c) => (
+                <option key={c.id} value={c.id}>{c.parent_id ? `   ${categories.find((p) => p.id === c.parent_id)?.name} › ${c.name}` : c.name}</option>
+              ))}
           </select>
           <button
             type="submit"

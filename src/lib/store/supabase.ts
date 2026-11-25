@@ -37,9 +37,9 @@ export class SupabaseStore implements Store {
   async listCategories(workspaceId: string): Promise<Category[]> {
     return check(await this.db.from("categories").select("id, name, parent_id").eq("workspace_id", workspaceId).order("name"));
   }
-  async addCategory(workspaceId: string, name: string): Promise<Category> {
+  async addCategory(workspaceId: string, name: string, parentId: string | null = null): Promise<Category> {
     return check(
-      await this.db.from("categories").insert({ workspace_id: workspaceId, name: name.trim() }).select("id, name, parent_id").single(),
+      await this.db.from("categories").insert({ workspace_id: workspaceId, name: name.trim(), parent_id: parentId }).select("id, name, parent_id").single(),
     );
   }
   async deleteCategory(workspaceId: string, id: string) {

@@ -72,20 +72,22 @@ export class LocalStore implements Store {
   async listCategories(workspaceId: string) {
     return this.byId(workspaceId).categories;
   }
-  async addCategory(workspaceId: string, name: string) {
+  async addCategory(workspaceId: string, name: string, parentId: string | null = null) {
     const d = this.byId(workspaceId);
     const trimmed = name.trim();
     if (!trimmed) throw new Error("Category name is required");
-    if (d.categories.some((c) => c.name.toLowerCase() === trimmed.toLowerCase())) throw new Error("Category already exists");
-    const cat = { id: uuid(), name: trimmed, parent_id: null };
+    if (parentId && !d.categories.some((c) => c.id === parentId)) throw new Error("Parent category does not belong to this workspace");
+    if (d.categories.some((c) => c.parent_id === parentId && c.name.toLowerCase() === trimmed.toLowerCase())) throw new Error("Category already exists");
+    const cat = { id: uuid(), name: trimmed, parent_id: parentId };
     d.categories.push(cat);
     this.write(d);
     return cat;
   }
   async deleteCategory(workspaceId: string, id: string) {
     const d = this.byId(workspaceId);
-    d.categories = d.categories.filter((c) => c.id !== id);
-    d.drafts = d.drafts.map((p) => (p.category_id === id ? { ...p, category_id: null } : p));
+    const gone = new Set([id, ...d.categories.filter((c) => c.parent_id === id).map((c) => c.id)]);
+    d.categories = d.categories.filter((c) => !gone.has(c.id));
+    d.drafts = d.drafts.map((p) => (p.category_id && gone.has(p.category_id) ? { ...p, category_id: null } : p));
     this.write(d);
   }
   async listDrafts(workspaceId: string) {

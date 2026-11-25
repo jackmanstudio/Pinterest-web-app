@@ -29,7 +29,8 @@ export interface Store {
   getBrand(workspaceId: string): Promise<BrandSettings>;
   saveBrand(workspaceId: string, brand: BrandSettings): Promise<void>;
   listCategories(workspaceId: string): Promise<Category[]>;
-  addCategory(workspaceId: string, name: string): Promise<Category>;
+  /** Adds a category, or a sub-category when parentId is given (same workspace only). */
+  addCategory(workspaceId: string, name: string, parentId?: string | null): Promise<Category>;
   deleteCategory(workspaceId: string, id: string): Promise<void>;
   listDrafts(workspaceId: string): Promise<PinDraft[]>;
   saveDrafts(workspaceId: string, drafts: NewDraft[]): Promise<PinDraft[]>;

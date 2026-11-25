@@ -13,6 +13,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   const [banned, setBanned] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCat, setNewCat] = useState("");
+  const [newParent, setNewParent] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => {
@@ -55,7 +56,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
 
   async function addCategory() {
     try {
-      const c = await store!.addCategory(workspace!.id, newCat);
+      const c = await store!.addCategory(workspace!.id, newCat, newParent || null);
       setCategories([...categories, c]);
       setNewCat("");
     } catch (e) {
@@ -66,7 +67,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   async function removeCategory(id: string) {
     try {
       await store!.deleteCategory(workspace!.id, id);
-      setCategories(categories.filter((c) => c.id !== id));
+      setCategories(categories.filter((c) => c.id !== id && c.parent_id !== id));
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
@@ -97,12 +98,28 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         <h2 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} categories</h2>
         {categories.length === 0 && <p className="text-sm text-zinc-600">No categories yet. Add the ones this workspace uses.</p>}
         <ul className="flex flex-col divide-y divide-zinc-100">
-          {categories.map((c) => (
-            <li key={c.id} className="flex items-center justify-between py-2 text-sm">
-              {c.name}
-              <button onClick={() => removeCategory(c.id)} className="text-red-700 hover:underline">Remove</button>
-            </li>
-          ))}
+          {categories
+            .filter((c) => !c.parent_id)
+            .map((c) => (
+              <li key={c.id} className="py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{c.name}</span>
+                  <button onClick={() => removeCategory(c.id)} className="text-red-700 hover:underline">Remove</button>
+                </div>
+                {categories.some((s) => s.parent_id === c.id) && (
+                  <ul className="mt-1 flex flex-col gap-1 border-l border-zinc-200 pl-3">
+                    {categories
+                      .filter((s) => s.parent_id === c.id)
+                      .map((s) => (
+                        <li key={s.id} className="flex items-center justify-between text-zinc-700">
+                          {s.name}
+                          <button onClick={() => removeCategory(s.id)} className="text-xs text-red-700 hover:underline">Remove</button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </li>
+            ))}
         </ul>
         <form
           className="flex gap-2"
@@ -111,7 +128,13 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
             if (newCat.trim()) addCategory();
           }}
         >
-          <input className={input} placeholder="New category" value={newCat} maxLength={80} onChange={(e) => setNewCat(e.target.value)} />
+          <input className={input} placeholder={newParent ? "New sub-category" : "New category"} value={newCat} maxLength={80} onChange={(e) => setNewCat(e.target.value)} />
+          <select aria-label="Parent category" className="rounded-md border border-zinc-300 px-2 text-sm" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
+            <option value="">Top level</option>
+            {categories.filter((c) => !c.parent_id).map((c) => (
+              <option key={c.id} value={c.id}>Under {c.name}</option>
+            ))}
+          </select>
           <button className="rounded-md bg-zinc-900 px-3 py-2 text-sm text-white">Add</button>
         </form>
       </section>

@@ -46,6 +46,17 @@ describe("LocalStore workspace isolation", () => {
     expect(await store.listCategories((await store.getWorkspace("fashion")).id)).toHaveLength(5);
     expect(await store.listCategories((await store.getWorkspace("macro")).id)).toHaveLength(0);
   });
+
+  it("supports sub-categories inside one workspace only", async () => {
+    const f = await store.getWorkspace("fashion");
+    const m = await store.getWorkspace("macro");
+    const shoes = await store.addCategory(f.id, "Shoes");
+    const boots = await store.addCategory(f.id, "Boots", shoes.id);
+    expect(boots.parent_id).toBe(shoes.id);
+    await expect(store.addCategory(m.id, "Sneaky", shoes.id)).rejects.toThrow(/workspace/);
+    await store.deleteCategory(f.id, shoes.id);
+    expect((await store.listCategories(f.id)).some((c) => c.id === boots.id)).toBe(false);
+  });
 });
 
 describe("LocalStore images", () => {
