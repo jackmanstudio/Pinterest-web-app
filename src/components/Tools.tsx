@@ -5,6 +5,7 @@ import { WORKSPACE_LABELS } from "@/lib/types";
 import { buildUtmUrl, slugify, UTM_DEFAULTS, type UtmFields } from "@/lib/tools/utm";
 import { IMPORT_TEMPLATE, validateImport, type ImportReport } from "@/lib/tools/csv";
 import type { UrlCheckResult } from "@/lib/tools/urlCheck";
+import { AMAZON_STORES, DEFAULT_AFFILIATE, addDisclosure, applyAmazonTag, looksAffiliate, replaceInLink, validTag, type AffiliateSettings } from "@/lib/tools/affiliate";
 import { CopyButton } from "./CopyButton";
 import { downloadFile } from "@/lib/client/download";
 import { useWorkspace } from "./useWorkspace";
@@ -33,6 +34,12 @@ export function Tools({ kind }: { kind: WorkspaceKind }) {
         <LinkChecker />
         <UtmBuilder drafts={drafts} onApplied={setDrafts} apply={(id, link) => store.updateDraft(workspace.id, id, { link })} />
       </div>
+      <AffiliateTools
+        kind={kind}
+        drafts={drafts}
+        onApplied={setDrafts}
+        apply={(id, patch) => store.updateDraft(workspace.id, id, patch)}
+      />
       <CsvImport
         kind={kind}
         categories={categories}
@@ -288,6 +295,166 @@ function ActivityLog({ load, drafts, demo }: { load: () => Promise<AuditEvent[]>
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+type AffPatch = { link?: string; description?: string };
+const editable = (d: PinDraft) => ["draft", "in_review", "approved"].includes(d.status) && !d.archived_at;
+
+function AffiliateTools({ kind, drafts, apply, onApplied }: { kind: WorkspaceKind; drafts: PinDraft[]; apply: (id: string, patch: AffPatch) => Promise<PinDraft>; onApplied: (d: PinDraft[]) => void }) {
+  const key = `pas-affiliate-${kind}`;
+  // Mounted only after the workspace loads in the browser, so localStorage is available here.
+  const [s, setS] = useState<AffiliateSettings>(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? { ...DEFAULT_AFFILIATE, ...JSON.parse(raw) } : DEFAULT_AFFILIATE;
+    } catch {
+      return DEFAULT_AFFILIATE;
+    }
+  });
+  const [find, setFind] = useState("");
+  const [repl, setRepl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  function save(next: AffiliateSettings) {
+    setS(next);
+    try {
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {}
+  }
+  const badTags = Object.entries(s.amazonTags).filter(([, t]) => t.trim() && !validTag(t));
+
+  const tagChanges = useMemo(() => {
+    const out: { d: PinDraft; patch: AffPatch }[] = [];
+    for (const d of drafts.filter(editable)) {
+      const patch: AffPatch = {};
+      if (d.link) {
+        const l = applyAmazonTag(d.link, s.amazonTags);
+        if (l !== d.link) patch.link = l;
+      }
+      if (looksAffiliate(patch.link ?? d.link)) {
+        const desc = addDisclosure(d.description, s.disclosure);
+        if (desc !== d.description) patch.description = desc;
+      }
+      if (patch.link || patch.description) out.push({ d, patch });
+    }
+    return out;
+  }, [drafts, s]);
+
+  const replaceChanges = useMemo(() => {
+    if (!find) return { ok: [] as { d: PinDraft; patch: AffPatch }[], bad: 0 };
+    let bad = 0;
+    const ok: { d: PinDraft; patch: AffPatch }[] = [];
+    for (const d of drafts.filter(editable)) {
+      if (!d.link || !d.link.includes(find)) continue;
+      const l = replaceInLink(d.link, find, repl);
+      if (l === null) bad++;
+      else if (l !== d.link) ok.push({ d, patch: { link: l } });
+    }
+    return { ok, bad };
+  }, [drafts, find, repl]);
+
+  async function run(list: { d: PinDraft; patch: AffPatch }[], what: string) {
+    setBusy(true);
+    setMsg(null);
+    let next = drafts;
+    let done = 0;
+    try {
+      for (const { d, patch } of list) {
+        const u = await apply(d.id, patch);
+        next = next.map((x) => (x.id === u.id ? u : x));
+        done++;
+      }
+      setMsg(`${what} on ${done} pin${done === 1 ? "" : "s"}. Approved pins go back to draft for a new review.`);
+    } catch (e) {
+      setMsg(`Stopped after ${done} pin${done === 1 ? "" : "s"}: ${e instanceof Error ? e.message : "save failed"}`);
+    } finally {
+      onApplied(next);
+      setBusy(false);
+    }
+  }
+  const btn = "self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-50 disabled:opacity-50";
+  return (
+    <section className={card}>
+      <h2 className="text-lg font-semibold">Affiliate links</h2>
+      <p className="text-sm text-zinc-600">
+        Add your Amazon tag per country and an #ad disclosure to unpublished pins, or change a link in bulk. Your links are always kept; only pins not yet
+        published are changed, and only when you press a button. Settings are saved in this browser.
+      </p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Amazon tags</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {AMAZON_STORES.map((st) => (
+              <label key={st.domain} className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+                {st.label} <span className="font-normal text-zinc-500">{st.domain}</span>
+                <input
+                  className={input}
+                  placeholder="yourtag-20"
+                  value={s.amazonTags[st.domain] ?? ""}
+                  onChange={(e) => save({ ...s, amazonTags: { ...s.amazonTags, [st.domain]: e.target.value } })}
+                />
+              </label>
+            ))}
+          </div>
+          {badTags.length > 0 && <p className="text-sm text-red-700">These tags look wrong (3–40 letters, numbers or dashes): {badTags.map(([dm]) => dm).join(", ")}</p>}
+          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+            Disclosure added to affiliate pins
+            <input className={input} value={s.disclosure} onChange={(e) => save({ ...s, disclosure: e.target.value })} />
+          </label>
+          {tagChanges.length > 0 ? (
+            <>
+              <ul className="max-h-48 overflow-y-auto rounded-md bg-zinc-50 p-2 text-xs">
+                {tagChanges.slice(0, 30).map(({ d, patch }) => (
+                  <li key={d.id} className="py-0.5">
+                    <span className="font-medium">{d.title}</span>
+                    {patch.link && <span className="text-zinc-600"> · tag added</span>}
+                    {patch.description && <span className="text-zinc-600"> · disclosure added</span>}
+                  </li>
+                ))}
+                {tagChanges.length > 30 && <li className="py-0.5 text-zinc-500">…and {tagChanges.length - 30} more</li>}
+              </ul>
+              <button className={btn} disabled={busy} onClick={() => run(tagChanges, "Updated tags and disclosure")}>
+                Apply to {tagChanges.length} unpublished pin{tagChanges.length === 1 ? "" : "s"}
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-zinc-500">No unpublished pins need a tag or disclosure right now.</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold">Change links in bulk</h3>
+          <p className="text-xs text-zinc-600">For a moved site, a changed shop domain or a new affiliate ID. Exact text match inside each link.</p>
+          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+            Find
+            <input className={input} placeholder="old-shop.com or oldtag-20" value={find} onChange={(e) => setFind(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-zinc-700">
+            Replace with
+            <input className={input} placeholder="new-shop.com or newtag-20" value={repl} onChange={(e) => setRepl(e.target.value)} />
+          </label>
+          {find && (
+            <>
+              <ul className="max-h-48 overflow-y-auto rounded-md bg-zinc-50 p-2 text-xs break-all">
+                {replaceChanges.ok.slice(0, 20).map(({ d, patch }) => (
+                  <li key={d.id} className="py-0.5">
+                    <span className="font-medium">{d.title}</span> → {patch.link}
+                  </li>
+                ))}
+                {replaceChanges.ok.length === 0 && <li className="text-zinc-500">No unpublished pin links contain this text.</li>}
+              </ul>
+              {replaceChanges.bad > 0 && <p className="text-sm text-amber-700">{replaceChanges.bad} link{replaceChanges.bad === 1 ? "" : "s"} would break and will be skipped.</p>}
+              {replaceChanges.ok.length > 0 && (
+                <button className={btn} disabled={busy} onClick={() => run(replaceChanges.ok, "Changed links")}>
+                  Change {replaceChanges.ok.length} link{replaceChanges.ok.length === 1 ? "" : "s"}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+      {msg && <p className="text-sm text-emerald-700">{msg}</p>}
     </section>
   );
 }
