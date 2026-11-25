@@ -56,3 +56,17 @@ describe("text provider fallback", () => {
     expect(getTextProvider({ TEXT_AI_PROVIDER: "anthropic" }).source).toBe("demo");
   });
 });
+
+describe("brand analysis and timeouts", () => {
+  it("parses a brand analysis", async () => {
+    const brand = { voice: "Warm, practical.", audience: "Busy parents.", focus_keywords: ["easy dinners"], image_style: "Bright kitchen light.", cta: "Save for later" };
+    const p = new CloudflareTextProvider({ accountId: "a", apiToken: "t", fetchImpl: (async () => new Response(JSON.stringify({ success: true, result: { response: brand } }))) as unknown as typeof fetch });
+    const out = await p.analyzeBrand("Title: Easy Dinners");
+    expect(out.brand.focus_keywords).toEqual(["easy dinners"]);
+  });
+  it("reports a timeout as a retryable error instead of hanging", async () => {
+    const err = Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    const p = new CloudflareTextProvider({ accountId: "a", apiToken: "t", fetchImpl: (async () => { throw err; }) as unknown as typeof fetch });
+    await expect(p.analyzeBrand("x")).rejects.toMatchObject({ retryable: true, status: 504 });
+  });
+});

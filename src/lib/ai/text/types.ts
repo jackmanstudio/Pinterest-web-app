@@ -1,5 +1,5 @@
 import type { AiAssignment } from "@/lib/boards/automation";
-import type { BoardsPromptInput } from "./prompt";
+import type { BoardsPromptInput, BrandAnalysis } from "./prompt";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
 
 /**
@@ -16,6 +16,14 @@ export interface TextProvider {
   generateInsights?(input: InsightsInput): Promise<InsightsOutput>;
   /** Board & category picks (spec 11). Demo providers don't implement this; the keyword fallback is used instead. */
   assignBoards?(input: BoardsPromptInput): Promise<BoardsOutput>;
+  /** Brand voice, audience, keywords, image style and CTA from a website's text. */
+  analyzeBrand?(pageText: string): Promise<BrandOutput>;
+}
+
+export interface BrandOutput {
+  brand: BrandAnalysis;
+  model: string | null;
+  usage: { input_tokens: number; output_tokens: number };
 }
 
 export interface BoardsOutput {

@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { DraftSetSchema } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { ProviderError, type BoardsOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
+import { ProviderError, type BrandOutput, type BoardsOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
-import { BOARDS_SYSTEM, DRAFTS_SYSTEM as SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
+import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFTS_SYSTEM as SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
 import { AiAssignmentSetSchema } from "@/lib/boards/automation";
 
 export class AnthropicTextProvider implements TextProvider {
@@ -42,6 +42,28 @@ export class AnthropicTextProvider implements TextProvider {
         model: response.model,
         usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
       };
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("The AI provider is rate limiting requests. Retry shortly.", 429, true);
+      if (err instanceof Anthropic.APIError) throw new ProviderError(`The AI provider returned an error (${err.status ?? "network"}).`, 502, true);
+      throw err;
+    }
+  }
+
+  async analyzeBrand(pageText: string): Promise<BrandOutput> {
+    try {
+      const response = await this.client.beta.messages.parse({
+        model: this.model,
+        max_tokens: 4000,
+        system: BRAND_SYSTEM,
+        messages: [{ role: "user", content: brandUserPrompt(pageText) }],
+        output_config: { effort: "low", format: betaZodOutputFormat(BrandAnalysisSchema) },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      });
+      if (response.stop_reason === "refusal") throw new ProviderError("The AI provider declined this request.", 422);
+      if (!response.parsed_output) throw new ProviderError("The AI brand analysis was incomplete. Please retry.", 502, true);
+      return { brand: response.parsed_output, model: response.model, usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens } };
     } catch (err) {
       if (err instanceof ProviderError) throw err;
       if (err instanceof Anthropic.RateLimitError) throw new ProviderError("The AI provider is rate limiting requests. Retry shortly.", 429, true);

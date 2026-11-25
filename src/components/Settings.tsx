@@ -57,7 +57,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
     setFilling(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/tools/brand-from-site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: brand!.website_url }) });
+      const res = await fetch("/api/tools/brand-from-site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: brand!.website_url, workspace: kind }) });
       const s = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(s.error ?? "Couldn't read your website.");
       const t = readTemplate(brand!.pin_template);
@@ -72,9 +72,18 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         next.brand_name = s.brand_name;
         filled.push("brand name");
       }
-      if (!next.audience && s.description) {
-        next.audience = `People interested in: ${s.description}`.slice(0, 500);
-        filled.push("audience");
+      const a = s.analysis as { voice: string; audience: string; image_style: string; cta: string } | null;
+      if (a) {
+        const fill = (k: "voice" | "audience" | "image_style" | "cta", v: string, label: string) => {
+          if (v?.trim() && !next[k]?.trim()) {
+            next[k] = v.trim();
+            filled.push(label);
+          }
+        };
+        fill("voice", a.voice, "brand voice");
+        fill("audience", a.audience, "audience");
+        fill("image_style", a.image_style, "image style");
+        fill("cta", a.cta, "call to action");
       }
       if (s.keywords?.length) {
         const merged = parseList([kw, ...s.keywords].filter(Boolean).join(", ")).slice(0, 15);
@@ -86,7 +95,9 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       if (logo && logo !== t.logo) filled.push("logo");
       setBrand(next);
       setDesignKey((k) => k + 1);
-      setMsg({ text: filled.length ? `Filled from your site: ${filled.join(", ")}. Check them, then Save.` : "Nothing new found on your site; your settings are unchanged.", ok: true });
+      const kept = "Fields you had already filled were kept.";
+      const base = filled.length ? `Filled from your site: ${filled.join(", ")}. ${kept} Check them, then Save.` : `Nothing new to fill: ${kept}`;
+      setMsg({ text: s.analysis_note ? `${base} ${s.analysis_note}` : base, ok: true });
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     } finally {

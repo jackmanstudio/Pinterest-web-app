@@ -2,9 +2,9 @@ import { z } from "zod";
 import { PIN_ANGLES, anglesFor } from "@/lib/drafts/angles";
 import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
+import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
 import { AiAssignmentSetSchema } from "@/lib/boards/automation";
-import { ProviderError, type BoardsOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
+import { ProviderError, type BoardsOutput, type BrandOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
 export const CLOUDFLARE_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
@@ -122,5 +122,12 @@ export class CloudflareTextProvider implements TextProvider {
     const parsed = AiAssignmentSetSchema.safeParse(out);
     if (!parsed.success) throw new ProviderError("The AI board picks were incomplete. Please retry.", 502, true);
     return { assignments: parsed.data.assignments, model: this.model, usage };
+  }
+
+  async analyzeBrand(pageText: string): Promise<BrandOutput> {
+    const { out, usage } = await this.run(BRAND_SYSTEM, brandUserPrompt(pageText), BrandAnalysisSchema, 1200, 45_000);
+    const parsed = BrandAnalysisSchema.safeParse(out);
+    if (!parsed.success) throw new ProviderError("The AI brand analysis was incomplete. Please retry.", 502, true);
+    return { brand: parsed.data, model: this.model, usage };
   }
 }

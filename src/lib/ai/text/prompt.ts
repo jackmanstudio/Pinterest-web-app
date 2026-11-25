@@ -97,3 +97,25 @@ export function boardsUserPrompt(input: BoardsPromptInput): string {
     JSON.stringify(input.pins.map((p) => ({ ...p, description: p.description?.slice(0, 300) }))),
   ].join("\n");
 }
+
+export const BRAND_SYSTEM = `You analyse a business website for a Pinterest content studio and fill in its brand settings.
+Use only what the page text supports; do not invent products, claims or numbers. Write in English.
+Fields:
+- voice: 2-4 adjectives plus one short sentence on how the brand talks (e.g. "Warm, practical, confident. Speaks to busy parents like a helpful friend.").
+- audience: who the brand serves, in one sentence (age/life stage, needs, interests). Not a copy of the meta description.
+- focus_keywords: 5-10 short Pinterest search phrases people would type to find this brand's content (lowercase, 1-4 words each, no brand name).
+- image_style: one sentence describing the photo style that fits the brand (lighting, setting, colours, mood).
+- cta: one short call to action suitable for pins (max 40 characters).`;
+
+export const BrandAnalysisSchema = z.object({
+  voice: z.string().max(300),
+  audience: z.string().max(400),
+  focus_keywords: z.array(z.string().max(40)).max(12),
+  image_style: z.string().max(300),
+  cta: z.string().max(60),
+});
+export type BrandAnalysis = z.infer<typeof BrandAnalysisSchema>;
+
+export function brandUserPrompt(page: string): string {
+  return `Website content:\n${page.slice(0, 4000)}`;
+}
