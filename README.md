@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Pinterest AI Studio
 
-## Getting Started
+Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pin drafts, edit, and save. Built in phases from the development brief.
 
-First, run the development server:
+## Integration status
+
+| Integration | Status |
+| --- | --- |
+| Supabase auth + database | **Built, not yet tested against a live project.** Without env vars the app runs in Demo mode (browser-only storage, clearly labelled). |
+| Text AI (Claude) | **Adapter built, not yet tested with a live key.** Without `TEXT_AI_API_KEY` drafts come from templates and are labelled **DEMO** everywhere. |
+| Image AI | Not connected (Phase 2). Image status shows "No image yet". |
+| Pinterest API v5 | Not connected (Phase 3). Nothing is published, scheduled or synced. |
+
+## Phase 1 scope (this build)
+
+- Email/password auth via Supabase (or Demo mode when unconfigured)
+- Separate **Fashion** and **Macro** workspaces, each with its own brand settings, categories and drafts
+- Category taxonomy (Fashion seeded with 5 categories; Macro starts empty)
+- Generate 5 drafts per idea, one per angle: how-to, list, inspiration, problem→solution, seasonal
+- Edit concept, title, description, tags, alt text and image prompt, with Pinterest length limits
+- Save selected drafts; edit and delete saved drafts
+- Integration status bar so nothing mocked is presented as live
+
+## Run locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local   # optional; leave empty for Demo mode
+npm run dev                  # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Connect Supabase
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Create a Supabase project.
+2. Run `supabase/migrations/0001_phase1_core.sql` in the SQL editor (or `supabase db push`).
+3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
+4. In Supabase Auth → URL configuration, add `http://localhost:3000/auth/callback` (and your production URL) as a redirect URL.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The migration creates both workspaces for every new user, enables row-level security on all tables, and uses composite foreign keys so a draft can't reference a category from the other workspace.
 
-## Learn More
+## Checks
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test          # unit tests (distinctness, demo provider, workspace isolation, provider selection)
+npm run typecheck
+npm run lint
+npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `src/lib/ai/text/` – server-side text provider adapters (`demo`, `anthropic`), chosen by env
+- `src/lib/drafts/` – angles, validation (zod), near-duplicate detection
+- `src/lib/store/` – workspace-scoped data access (`SupabaseStore`, demo `LocalStore`)
+- `src/app/api/generate` – draft generation route (auth-checked when Supabase is on)
+- `src/app/api/status` – integration status for the UI (never returns secrets)
+- `supabase/migrations/` – schema, RLS and signup bootstrap
 
-## Deploy on Vercel
+## Next phases
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. Real image generation, usage/cost tracking and budget caps
+3. Pinterest OAuth (verify current v5 docs, scopes, access tier and rate limits first)
+4. Approval-based publishing with idempotency
+5. Analytics and agents (verified data only)
+6. Production hardening
