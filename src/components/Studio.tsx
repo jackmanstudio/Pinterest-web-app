@@ -299,11 +299,10 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} studio</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Type a title or idea and get up to five complete pins: title, description, tags, alt text and image, saved as drafts. Nothing
-          goes to Pinterest until you approve it in Review &amp; publish.
+      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
+        <h1 className="text-xl font-semibold sm:text-2xl">{WORKSPACE_LABELS[kind]} studio</h1>
+        <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+          Type an idea and get finished pins with title, description, tags and image. They are saved as drafts; nothing goes to Pinterest until you approve it.
         </p>
         <div className="mt-4 flex rounded-lg bg-zinc-100 p-0.5 text-sm sm:inline-flex" role="radiogroup" aria-label="Start from">
           {(["idea", "link"] as const).map((m) => (
@@ -386,7 +385,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <label className="sr-only" htmlFor="idea">Pin title or idea</label>
           <input
             id="idea"
-            className="flex-1 rounded-md border border-zinc-300 px-3 py-2"
+            className="flex-1 rounded-lg border border-zinc-300 px-3.5 py-2.5 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-100"
             placeholder={kind === "fashion" ? "e.g. Layering a trench coat for autumn" : "Describe your pin idea"}
             value={idea}
             maxLength={500}
@@ -395,13 +394,15 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <button
             type="submit"
             disabled={busy !== "idle" || idea.trim().length < 3}
-            className="rounded-md bg-red-700 px-4 py-2 font-medium text-white disabled:opacity-50"
+            className="rounded-lg bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-800 disabled:opacity-50"
           >
             {busy === "auto" ? "Making pins…" : `Make ${count} complete pin${count === 1 ? "" : "s"}`}
           </button>
         </form>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+        <div className="mt-5 flex flex-col gap-4 rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
+        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
           <span className="font-medium">How many pins</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex rounded-full border border-zinc-200 bg-stone-50 p-0.5" role="radiogroup" aria-label="Number of pins">
             {[2, 3, 5].map((n) => (
               <button
@@ -436,18 +437,22 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             </select>
           )}
           <span className="text-xs text-zinc-500">Each pin gets its own angle, layout and colour story.</span>
+          </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
           <label htmlFor="pin-style" className="font-medium">Pin type</label>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <select id="pin-style" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={style} onChange={(e) => setStyle(e.target.value as PinStyle)}>
             {PIN_STYLE_KEYS.map((k) => (
               <option key={k} value={k}>{PIN_STYLES[k].label}</option>
             ))}
           </select>
           <span className="text-xs text-zinc-500">{PIN_STYLES[style].hint}</span>
+          </div>
         </div>
-        <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
+        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
           <span className="font-medium">Category</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex rounded-md bg-zinc-100 p-0.5" role="radiogroup" aria-label="Category mode">
             {(["auto", "manual", "custom"] as const).map((m) => (
               <button
@@ -490,29 +495,33 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               </label>
             </>
           )}
-          <label className="flex items-center gap-2 sm:ml-auto">
-            <span className="font-medium">Language</span>
-            <select className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+          </div>
+        </div>
+        <label className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
+          <span className="font-medium">Language</span>
+          <span className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <select className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
               <option value="">English</option>
               {LANGUAGES.filter((l) => l !== "English").map((l) => <option key={l} value={l}>{l}</option>)}
             </select>
-          </label>
-        </div>
-        <label className="mt-3 flex flex-col gap-1 text-sm text-zinc-700 sm:flex-row sm:items-center sm:gap-3">
+          </span>
+        </label>
+        <label className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
           <span className="font-medium">Link on these pins</span>
           <input
             type="url"
-            className="flex-1 rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
             placeholder="https://your-blog.com/post or a product page (optional)"
             value={link}
             onChange={(e) => setLink(e.target.value)}
           />
         </label>
+        </div>
         <button
           type="button"
           onClick={generate}
           disabled={busy !== "idle" || idea.trim().length < 3}
-          className="mt-2 text-sm text-zinc-600 underline decoration-zinc-300 hover:text-zinc-900 disabled:opacity-50"
+          className="mt-3 block text-left text-sm text-zinc-600 underline decoration-zinc-300 hover:text-zinc-900 disabled:opacity-50"
         >
           {busy === "generating" ? `Writing ${count} draft${count === 1 ? "" : "s"}…` : "Or: write text only, so I can edit before saving"}
         </button>

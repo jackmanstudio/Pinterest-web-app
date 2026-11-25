@@ -48,3 +48,33 @@ export function StatusBar() {
     </div>
   );
 }
+
+/** Compact status for the sidebar: short words and a dot; the model name is in the tooltip. */
+export function StatusSummary() {
+  const [s, setS] = useState<Status | null>(null);
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setS)
+      .catch(() => {});
+  }, []);
+  if (!s) return null;
+  const rows: { label: string; value: string; tone: "ok" | "demo" | "off"; title?: string }[] = [
+    { label: "Storage", value: s.storage === "supabase" ? "Cloud" : "Demo", tone: s.storage === "supabase" ? "ok" : "demo", title: s.storage === "supabase" ? "Supabase" : "Saved in this browser only" },
+    { label: "Text AI", value: s.text.source === "ai" ? "Live" : "Demo", tone: s.text.source === "ai" ? "ok" : "demo", title: s.text.provider },
+    { label: "Image AI", value: s.image.source === "ai" ? "Live" : s.image.source === "demo" ? "Demo" : "Off", tone: s.image.source === "ai" ? "ok" : s.image.source === "demo" ? "demo" : "off", title: s.image.provider },
+    { label: "Pinterest", value: s.pinterest.configured ? (s.pinterest.env === "sandbox" ? "Sandbox" : "Ready") : "Not set", tone: s.pinterest.configured ? "ok" : "off" },
+  ];
+  const dot = { ok: "bg-emerald-500", demo: "bg-amber-500", off: "bg-zinc-300" };
+  return (
+    <ul className="flex flex-col gap-1 px-3 text-xs" aria-label="Integration status">
+      {rows.map((r) => (
+        <li key={r.label} className="flex items-center gap-1.5" title={r.title}>
+          <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot[r.tone]}`} aria-hidden />
+          <span className="text-zinc-500">{r.label}</span>
+          <span className="ml-auto font-medium text-zinc-800">{r.value}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
