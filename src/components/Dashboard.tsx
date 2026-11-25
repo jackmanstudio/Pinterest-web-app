@@ -111,17 +111,20 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="overflow-hidden rounded-2xl bg-gradient-to-br from-red-700 via-red-600 to-rose-500 p-6 text-white shadow-sm sm:p-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <section className="relative overflow-hidden rounded-3xl bg-[#1f0f12] p-6 text-white shadow-[0_24px_48px_-24px_rgba(31,15,18,0.7)] sm:p-9">
+        <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-rose-600/40 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 left-1/3 h-72 w-72 rounded-full bg-amber-500/20 blur-3xl" />
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07]" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.9) 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="text-sm text-red-100">{hello}</p>
-            <h1 className="mt-1 text-2xl font-semibold sm:text-3xl">{name ? `${name}, ready to make some pins?` : "Ready to make some pins?"}</h1>
-            <p className="mt-2 max-w-xl text-sm text-red-50">Type a keyword or product idea and the studio writes, designs and organises the pins for you.</p>
+            <p className="text-sm font-medium text-rose-200/80">{hello}</p>
+            <h1 className="mt-1 text-[1.75rem] font-semibold leading-tight !text-white sm:text-4xl">{name ? `${name}, ready to make some pins?` : "Ready to make some pins?"}</h1>
+            <p className="mt-3 max-w-xl text-sm text-white/65 sm:text-base">Type a keyword or product idea and the studio writes, designs and organises the pins for you.</p>
           </div>
-          {mode === "demo" && <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-medium">Demo mode · saved in this browser</span>}
+          {mode === "demo" && <span className="rounded-full bg-amber-400/15 px-3 py-1 text-xs font-medium text-amber-200 ring-1 ring-amber-300/30">Demo mode · saved in this browser</span>}
         </div>
-        <form onSubmit={create} className="mt-5 flex flex-col gap-2 sm:flex-row">
-          <div className="flex shrink-0 gap-1 rounded-lg bg-white/15 p-1" role="radiogroup" aria-label="Workspace for the new pins">
+        <form onSubmit={create} className="relative mt-7 flex flex-col gap-2 rounded-2xl bg-white/[0.06] p-2 ring-1 ring-white/10 backdrop-blur sm:flex-row">
+          <div className="flex shrink-0 gap-1 rounded-xl bg-black/20 p-1" role="radiogroup" aria-label="Workspace for the new pins">
             {WORKSPACE_KINDS.map((k) => (
               <button
                 key={k}
@@ -129,7 +132,7 @@ export function Dashboard() {
                 role="radio"
                 aria-checked={target === k}
                 onClick={() => setTarget(k)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium ${target === k ? "bg-white text-red-700" : "text-white hover:bg-white/10"}`}
+                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all ${target === k ? "bg-gradient-to-br from-rose-500 to-red-700 text-white shadow-md shadow-rose-950/50" : "text-white/60 hover:text-white"}`}
               >
                 {WORKSPACE_LABELS[k]}
               </button>
@@ -140,9 +143,9 @@ export function Dashboard() {
             onChange={(e) => setIdea(e.target.value)}
             placeholder="e.g. summer linen outfits, budget meal prep"
             aria-label="Pin idea"
-            className="min-w-0 flex-1 rounded-lg border-0 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-white/60"
+            className="min-w-0 flex-1 rounded-xl border-0 bg-white px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400"
           />
-          <button className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800">Create pins</button>
+          <button className="rounded-xl bg-gradient-to-br from-amber-300 to-amber-500 px-5 py-2.5 text-sm font-bold text-[#2a1416] shadow-lg shadow-amber-900/30 transition hover:brightness-105">✦ Create pins</button>
         </form>
       </section>
 
@@ -150,14 +153,20 @@ export function Dashboard() {
 
       <section aria-label="Overview" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
-          { label: "Pins made", value: total.made, href: `/w/${target}/drafts`, note: "All workspaces" },
-          { label: "In review", value: total.review, href: `/w/${target}/publish`, note: "Waiting for your OK" },
-          { label: "Scheduled", value: total.scheduled, href: `/w/${target}/calendar`, note: "Queued for Pinterest" },
-          { label: "Published", value: total.published, href: `/w/${target}/analytics`, note: "Live on Pinterest" },
+          { label: "Pins made", value: total.made, href: `/w/${target}/drafts`, note: "All workspaces", tile: "from-rose-500 to-red-700", d: "M4 4h6v7H4zM14 4h6v4h-6zM14 12h6v8h-6zM4 15h6v5H4z" },
+          { label: "In review", value: total.review, href: `/w/${target}/publish`, note: "Waiting for your OK", tile: "from-amber-400 to-orange-600", d: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" },
+          { label: "Scheduled", value: total.scheduled, href: `/w/${target}/calendar`, note: "Queued for Pinterest", tile: "from-violet-500 to-indigo-700", d: "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" },
+          { label: "Published", value: total.published, href: `/w/${target}/analytics`, note: "Live on Pinterest", tile: "from-emerald-400 to-teal-700", d: "M4 12.5 9 17.5 20 6.5" },
         ].map((s) => (
-          <Link key={s.label} href={s.href} className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm hover:border-zinc-300">
-            <p className="text-sm text-zinc-600">{s.label}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums text-zinc-900">{rows ? s.value : "–"}</p>
+          <Link key={s.label} href={s.href} className="group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5">
+            <div aria-hidden className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-gradient-to-br ${s.tile} opacity-[0.08] transition-opacity group-hover:opacity-[0.16]`} />
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-zinc-600">{s.label}</p>
+              <span className={`grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br ${s.tile} text-white shadow-md`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden><path d={s.d} /></svg>
+              </span>
+            </div>
+            <p className="mt-3 text-4xl font-semibold tracking-tight tabular-nums text-zinc-900">{rows ? s.value : "–"}</p>
             <p className="mt-1 text-xs text-zinc-500">{s.note}</p>
           </Link>
         ))}
@@ -171,8 +180,14 @@ export function Dashboard() {
           </div>
           {!rows && !err && <p className="mt-4 text-sm text-zinc-500">Loading pins…</p>}
           {rows && recent.length === 0 && (
-            <div className="mt-4 rounded-lg border border-dashed border-zinc-300 p-6 text-center">
-              <p className="text-sm text-zinc-600">No pins yet. Type an idea above to make your first set.</p>
+            <div className="mt-4 flex flex-col items-center rounded-2xl bg-gradient-to-b from-rose-50/70 to-white px-6 py-10 text-center ring-1 ring-rose-100">
+              <div className="relative mb-4 h-20 w-24" aria-hidden>
+                <div className="absolute left-1 top-3 h-16 w-11 -rotate-12 rounded-lg bg-gradient-to-br from-amber-200 to-amber-400 shadow-md" />
+                <div className="absolute right-1 top-3 h-16 w-11 rotate-12 rounded-lg bg-gradient-to-br from-violet-200 to-violet-400 shadow-md" />
+                <div className="absolute left-1/2 top-0 h-[4.5rem] w-12 -translate-x-1/2 rounded-lg bg-gradient-to-br from-rose-400 to-red-700 shadow-lg" />
+              </div>
+              <p className="font-semibold text-zinc-900">Your first pins will show up here</p>
+              <p className="mt-1 max-w-sm text-sm text-zinc-500">Type an idea in the box above and the studio makes a full set: title, description, tags and a designed image.</p>
             </div>
           )}
           {recent.length > 0 && (
@@ -180,7 +195,7 @@ export function Dashboard() {
               {recent.map(({ draft, kind, url }) => (
                 <li key={draft.id}>
                   <Link href={`/w/${kind}/drafts`} className="group block">
-                    <div className="aspect-[2/3] overflow-hidden rounded-lg bg-zinc-100">
+                    <div className="aspect-[2/3] overflow-hidden rounded-xl bg-zinc-100 shadow-sm ring-1 ring-zinc-900/5 transition group-hover:shadow-lg">
                       {url ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={url} alt={draft.alt_text || draft.title} className="h-full w-full object-cover transition group-hover:scale-[1.02]" />
@@ -212,8 +227,8 @@ export function Dashboard() {
                 <p className="mt-3 text-2xl font-semibold tabular-nums">
                   ${spent.toFixed(2)} <span className="text-sm font-normal text-zinc-500">of ${budget.toFixed(2)} budget</span>
                 </p>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-zinc-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Budget used">
-                  <div className={`h-full rounded-full ${pct >= 90 ? "bg-red-600" : pct >= 70 ? "bg-amber-500" : "bg-emerald-600"}`} style={{ width: `${pct}%` }} />
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-zinc-100" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Budget used">
+                  <div className={`h-full rounded-full bg-gradient-to-r ${pct >= 90 ? "from-rose-500 to-red-700" : pct >= 70 ? "from-amber-400 to-orange-500" : "from-emerald-400 to-teal-600"}`} style={{ width: `${pct}%` }} />
                 </div>
                 <p className="mt-2 text-xs text-zinc-500">
                   {pct}% used · {usage.recent.length} recent AI calls{usage.ledger !== "supabase" ? " · tracked in this browser" : ""}
@@ -248,16 +263,23 @@ export function Dashboard() {
 
       <section aria-label="Workspaces" className="grid gap-4 sm:grid-cols-2">
         {(rows ?? []).map((r) => (
-          <div key={r.kind} className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <div key={r.kind} className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-5">
+            <div aria-hidden className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${r.kind === "fashion" ? "from-rose-500 via-red-600 to-amber-400" : "from-violet-500 via-indigo-600 to-sky-400"}`} />
             <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">{r.name}</h2>
+              <div className="flex items-center gap-3">
+                <span className={`grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br text-sm font-bold text-white shadow-md ${r.kind === "fashion" ? "from-rose-500 to-red-700" : "from-violet-500 to-indigo-700"}`}>{r.name.charAt(0)}</span>
+                <div>
+                  <h2 className="text-lg font-semibold leading-tight">{r.name}</h2>
+                  <p className="text-xs text-zinc-500">{r.counts.made} pins · {r.brand ? "Brand set" : "Brand not set"}</p>
+                </div>
+              </div>
               <Link href={`/w/${r.kind}`} className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800">
                 Open studio
               </Link>
             </div>
             <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
               {([["Made", r.counts.made], ["Review", r.counts.review], ["Scheduled", r.counts.scheduled], ["Published", r.counts.published]] as const).map(([l, v]) => (
-                <div key={l} className="rounded-lg bg-zinc-50 py-2">
+                <div key={l} className="rounded-xl bg-zinc-50 py-2.5 ring-1 ring-zinc-900/[0.03]">
                   <dt className="text-[11px] text-zinc-500">{l}</dt>
                   <dd className="text-lg font-semibold tabular-nums">{v}</dd>
                 </div>

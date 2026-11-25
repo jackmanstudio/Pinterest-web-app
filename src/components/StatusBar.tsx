@@ -50,7 +50,7 @@ export function StatusBar() {
 }
 
 /** Compact status for the sidebar: short words and a dot; the model name is in the tooltip. */
-export function StatusSummary() {
+export function StatusSummary({ dark = false }: { dark?: boolean }) {
   const [s, setS] = useState<Status | null>(null);
   useEffect(() => {
     fetch("/api/status")
@@ -65,14 +65,14 @@ export function StatusSummary() {
     { label: "Image AI", value: s.image.source === "ai" ? "Live" : s.image.source === "demo" ? "Demo" : "Off", tone: s.image.source === "ai" ? "ok" : s.image.source === "demo" ? "demo" : "off", title: s.image.provider },
     { label: "Pinterest", value: s.pinterest.configured ? (s.pinterest.env === "sandbox" ? "Sandbox" : "Ready") : "Not set", tone: s.pinterest.configured ? "ok" : "off" },
   ];
-  const dot = { ok: "bg-emerald-500", demo: "bg-amber-500", off: "bg-zinc-300" };
+  const dot = { ok: "bg-emerald-400 shadow-[0_0_6px] shadow-emerald-400", demo: "bg-amber-400 shadow-[0_0_6px] shadow-amber-400", off: "bg-zinc-400" };
   return (
-    <ul className="flex flex-col gap-1 px-3 text-xs" aria-label="Integration status">
+    <ul className={`flex flex-col gap-1.5 text-xs ${dark ? "" : "px-3"}`} aria-label="Integration status">
       {rows.map((r) => (
         <li key={r.label} className="flex items-center gap-1.5" title={r.title}>
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dot[r.tone]}`} aria-hidden />
-          <span className="text-zinc-500">{r.label}</span>
-          <span className="ml-auto font-medium text-zinc-800">{r.value}</span>
+          <span className={dark ? "text-white/50" : "text-zinc-500"}>{r.label}</span>
+          <span className={`ml-auto font-medium ${dark ? "text-white/85" : "text-zinc-800"}`}>{r.value}</span>
         </li>
       ))}
     </ul>
