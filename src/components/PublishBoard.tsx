@@ -1,7 +1,8 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useCallback, useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
-import { STATUS_LABELS, WORKSPACE_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
+import { STATUS_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { publishBlockers } from "@/lib/workflow/checks";
 import { recommendBoard } from "@/lib/publishing/boards";
 import { boardChecks, METHOD_LABELS, type BoardPlan } from "@/lib/boards/automation";
@@ -102,12 +103,12 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} · Review & publish</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Draft → In review → Approved → Scheduled → Published. Nothing goes to Pinterest without an approval <em>and</em> a second confirmation.
-        </p>
-      </div>
+      <PageTitle
+        kind={kind}
+        title="Review &"
+        accent="publish"
+        sub={<>Draft → In review → Approved → Scheduled → Published. Nothing goes to Pinterest without an approval <em>and</em> a second confirmation.</>}
+      />
       {store.mode === "demo" && (
         <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Demo mode: you can try review and approval here (saved in this browser). Scheduling and publishing are disabled until Supabase and a Pinterest
@@ -116,18 +117,27 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       )}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
 
-      <nav className="flex flex-wrap gap-1 rounded-lg bg-zinc-100 p-1" aria-label="Status">
-        {ORDER.map((s) => (
-          <button
-            key={s}
-            onClick={() => setTab(s)}
-            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium ${tab === s ? "bg-white shadow-sm" : "text-zinc-600"}`}
-          >
-            {STATUS_LABELS[s]}
-            <span className={`rounded-full px-1.5 text-xs ${STATUS_TONE[s]}`}>{counts[s]}</span>
-          </button>
-        ))}
-      </nav>
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5" role="tablist" aria-label="Pins by status">
+        {ORDER.map((s) => {
+          const active = tab === s;
+          return (
+            <button
+              key={s}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTab(s)}
+              className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a45] ${active ? "border-[#ff7a45]/60 bg-gradient-to-br from-[#e60023]/25 to-[#ff7a45]/10 shadow-[0_14px_40px_-18px_rgba(255,90,60,0.8)]" : "border-white/10 bg-white/[0.05] hover:border-white/25 hover:bg-white/[0.09]"}`}
+            >
+              <span className="flex items-center gap-2 text-[13px] font-medium text-white/70 group-hover:text-white">
+                <span aria-hidden className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
+                {STATUS_LABELS[s]}
+              </span>
+              <span className="mt-2 block text-3xl font-bold leading-none tabular-nums text-white">{counts[s]}</span>
+              {active && <span aria-hidden className="absolute inset-x-4 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-[#e60023] to-[#ff9a5a]" />}
+            </button>
+          );
+        })}
+      </div>
 
       {bulkAction && visible.length > 1 && (
         <div className="flex flex-wrap items-center gap-3">
@@ -155,7 +165,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       )}
 
       {visible.length === 0 ? (
-        <p className="text-sm text-zinc-600">No pins are {STATUS_LABELS[tab].toLowerCase()}.</p>
+        <p className="au-glass rounded-2xl p-6 text-center text-sm text-white/60">No pins are {STATUS_LABELS[tab].toLowerCase()} right now.</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {visible.map((d) => (
@@ -166,6 +176,14 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
     </div>
   );
 }
+
+const STATUS_DOT: Record<DraftStatus, string> = {
+  draft: "bg-white/60",
+  in_review: "bg-amber-300",
+  approved: "bg-sky-400",
+  scheduled: "bg-violet-400",
+  published: "bg-emerald-400",
+};
 
 function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: WorkspaceKind; store: Store; draft: PinDraft; pin: PinterestInfo; plan: BoardPlan | null; onChanged: () => Promise<void> }) {
   const [url, setUrl] = useState<string | null>(null);

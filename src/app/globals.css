@@ -100,3 +100,22 @@ body {
 
 
 
+
+/* Dashboard standard on every page: glass cards, soft radii, pill-ish buttons */
+.app-main :is(section, div, article, form, details, li).border.bg-white { background-color: rgb(255 255 255 / 0.07); border-color: rgb(255 255 255 / 0.13); }
+.app-main :is(section, div, article, form, details).border.bg-white:is(.rounded-xl, .rounded-lg, .rounded-md) { border-radius: 1rem; }
+.app-main p.border:is(.rounded-md, .rounded-lg), .app-main div.border:is(.rounded-md):not(.bg-white) { border-radius: 0.875rem; }
+.app-main :is(button, a).rounded-md, .app-main :is(button, a).rounded { border-radius: 0.75rem; }
+.app-main :is(button, a).border.border-zinc-300 { background-color: rgb(255 255 255 / 0.06); font-weight: 600; }
+.app-main :is(button, a).border.border-zinc-300:hover { background-color: rgb(255 255 255 / 0.12); }
+.app-main :is(button, a).bg-zinc-900 { background-color: #fff; color: #0b0912; font-weight: 700; }
+.app-main :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]) { border-radius: 0.75rem; }
+
+/* Interaction states everywhere: smooth hover, clear keyboard focus, honest disabled */
+.app-main :is(button, a, summary, select) { transition: background-color .15s, border-color .15s, color .15s, transform .15s, box-shadow .15s; }
+.app-main :is(button, a, summary, [role="tab"]):focus-visible { outline: 2px solid #ff7a45; outline-offset: 2px; }
+.app-main button:not(:disabled):active { transform: translateY(1px) scale(0.99); }
+.app-main :is(button, a).bg-zinc-900:hover, .app-main :is(button, a).bg-\[\#fff\]:hover { box-shadow: 0 10px 30px -12px rgb(255 255 255 / 0.45); transform: translateY(-1px); }
+.app-main :is(button, a).bg-red-700:hover, .app-main :is(button, a).bg-red-600:hover { box-shadow: 0 10px 30px -10px rgb(255 90 60 / 0.7); transform: translateY(-1px); }
+.app-main :is(button, a).border.border-zinc-300:hover { border-color: rgb(255 255 255 / 0.32); transform: translateY(-1px); }
+.app-main button:disabled { cursor: not-allowed; }

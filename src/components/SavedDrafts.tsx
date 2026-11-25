@@ -1,8 +1,9 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, Category, DraftContent, DraftStatus, DraftVersion, PinDraft, WorkspaceKind } from "@/lib/types";
-import { STATUS_LABELS, WORKSPACE_LABELS } from "@/lib/types";
+import { STATUS_LABELS } from "@/lib/types";
 import { EMPTY_FILTER, filterDrafts, libraryDuplicates, type LibraryFilter } from "@/lib/library/filter";
 import { draftsToCsv } from "@/lib/tools/csv";
 import { DraftEditor, draftErrors } from "./DraftEditor";
@@ -174,8 +175,14 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-xl font-semibold">{workspace.name || WORKSPACE_LABELS[kind]} · pin library ({drafts.length - archivedCount}{archivedCount ? ` + ${archivedCount} archived` : ""})</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <PageTitle
+          kind={kind}
+          title="Pin"
+          accent="library"
+          chips={<span className="au-glass rounded-full px-3 py-1 font-medium text-white/75">{drafts.length - archivedCount} pins{archivedCount ? ` · ${archivedCount} archived` : ""}</span>}
+          sub="Every pin you made in this workspace. Search, filter, edit and export."
+        />
         <div className="flex gap-3 text-sm">
           <button onClick={() => downloadFile(`${kind}-pins.csv`, draftsToCsv(visible, catName))} disabled={!visible.length} className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-50 disabled:opacity-40">
             Export {visible.length} to CSV

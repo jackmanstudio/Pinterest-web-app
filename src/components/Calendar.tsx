@@ -1,8 +1,9 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, PinDraft, WorkspaceKind } from "@/lib/types";
-import { STATUS_LABELS, WORKSPACE_LABELS } from "@/lib/types";
+import { STATUS_LABELS } from "@/lib/types";
 import { calendarItems, dayKey, monthGrid, weekDays, type CalendarKind } from "@/lib/planning/calendar";
 import { seasonalIdeas } from "@/lib/ideas/seasonal";
 import { useWorkspace } from "./useWorkspace";
@@ -60,8 +61,8 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">{workspace.name || WORKSPACE_LABELS[kind]} · content calendar</h1>
+      <PageTitle kind={kind} title="Content" accent="calendar" sub="What is published, scheduled and still in draft, day by day." />
+      <div className="au-glass flex flex-wrap items-center gap-3 rounded-2xl p-2.5">
         <div className="flex rounded-md bg-zinc-100 p-0.5">
           {(["month", "week", "day"] as const).map((v) => (
             <button key={v} onClick={() => setView(v)} className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${view === v ? "bg-white shadow-sm" : "text-zinc-600"}`}>{v}</button>

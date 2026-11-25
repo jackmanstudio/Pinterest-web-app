@@ -1,4 +1,5 @@
 "use client";
+import { PageTitle } from "./PageTitle";
 import { autoPlanBoards } from "@/lib/client/boards";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -299,12 +300,9 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <PageTitle kind={kind} title="Create" accent="pins" sub="Type an idea and get finished pins with title, description, tags and image. They are saved as drafts; nothing goes to Pinterest until you approve it." />
       <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-        <h1 className="text-xl font-semibold sm:text-2xl">{WORKSPACE_LABELS[kind]} studio</h1>
-        <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-          Type an idea and get finished pins with title, description, tags and image. They are saved as drafts; nothing goes to Pinterest until you approve it.
-        </p>
-        <div className="mt-4 flex rounded-lg bg-zinc-100 p-0.5 text-sm sm:inline-flex" role="radiogroup" aria-label="Start from">
+        <div className="flex rounded-lg bg-zinc-100 p-0.5 text-sm sm:inline-flex" role="radiogroup" aria-label="Start from">
           {(["idea", "link"] as const).map((m) => (
             <button
               key={m}
