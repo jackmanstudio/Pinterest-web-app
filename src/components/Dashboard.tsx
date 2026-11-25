@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "./NavLink";
 import { useRouter } from "next/navigation";
-import { getStore } from "@/lib/store";
 import { getDemoUser } from "@/lib/auth/demo";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { WORKSPACE_KINDS, WORKSPACE_LABELS, type PinDraft, type WorkspaceKind } from "@/lib/types";
 
 interface Pin { draft: PinDraft; kind: WorkspaceKind }
@@ -46,7 +46,6 @@ export function Dashboard() {
   const [name, setName] = useState("");
   const [hello, setHello] = useState("Welcome back");
   const [today, setToday] = useState<Date | null>(null);
-  const [mode, setMode] = useState<"supabase" | "demo" | null>(null);
   const [pins, setPins] = useState<Pin[] | null>(null);
   const [urls, setUrls] = useState<Record<string, string | null>>({});
   const [spaces, setSpaces] = useState<WsInfo[]>([]);
@@ -73,12 +72,12 @@ export function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const store = getStore();
+      // Demo mode never needs the Supabase client, so it isn't downloaded there.
+      const store = isSupabaseConfigured ? (await import("@/lib/store")).getStore() : (await import("@/lib/store/demo")).getDemoStore();
       const now = new Date();
       const h = now.getHours();
       setToday(now);
       setHello(h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening");
-      setMode(store.mode);
       if (store.mode === "demo") setName(getDemoUser()?.name ?? "");
       else {
         const p: { full_name?: unknown } = await fetch("/api/auth/profile").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
@@ -145,12 +144,12 @@ export function Dashboard() {
   const FRAME = ["from-orange-300 to-rose-600", "from-fuchsia-400 to-violet-700", "from-amber-200 to-orange-600", "from-rose-300 to-red-700", "from-violet-300 to-indigo-700"];
 
   return (
-    <div className="au-in flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
       {/* Headline + create */}
       <section className="pt-2 sm:pt-4">
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="au-glass rounded-full px-3 py-1 font-medium text-white/75">{dateLabel}</span>
-          {mode === "demo" && <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 font-semibold text-amber-200">Demo mode · this browser</span>}
+          <span className="au-glass inline-block min-w-[11rem] rounded-full px-3 py-1 text-center font-medium text-white/75">{dateLabel || "\u00a0"}</span>
+          {!isSupabaseConfigured && <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 font-semibold text-amber-200">Demo mode · this browser</span>}
           <div className="au-glass ml-auto flex gap-0.5 rounded-full p-0.5" role="radiogroup" aria-label="Show workspace">
             {(["all", ...WORKSPACE_KINDS] as Filter[]).map((f) => (
               <button
@@ -165,12 +164,16 @@ export function Dashboard() {
             ))}
           </div>
         </div>
-        <h1 className="mt-6 text-[2.5rem] font-bold leading-[1.02] tracking-tight sm:text-6xl">
+        <p className="mt-6 h-6 text-base font-semibold text-white/80">
+          {hello}
+          {name ? <>, <span className="au-grad">{name}</span></> : ""}
+        </p>
+        <h1 className="mt-1 text-[2.5rem] font-bold leading-[1.02] tracking-tight sm:text-6xl">
           Ready to make
           <br />
-          some pins{name ? <>, <span className="au-grad">{name}</span></> : ""}?
+          some <span className="au-grad">pins</span>?
         </h1>
-        <p className="mt-3 max-w-lg text-[15px] text-white/60">{hello}. One idea in, finished pins out: title, description, tags and a designed image.</p>
+        <p className="mt-3 max-w-lg text-[15px] text-white/60">One idea in, finished pins out: title, description, tags and a designed image.</p>
         <form onSubmit={create} className={`${glass} mt-6 flex flex-col gap-2 p-2 shadow-[0_20px_60px_-20px_rgba(230,0,35,0.5)] sm:flex-row sm:items-center`}>
           <div className="flex shrink-0 gap-1 rounded-xl bg-black/25 p-1" role="radiogroup" aria-label="Workspace for new pins">
             {WORKSPACE_KINDS.map((k) => (
@@ -258,7 +261,7 @@ export function Dashboard() {
               <Link href={`/w/${ws}/usage`} className="text-xs text-white/50 hover:text-white">Details</Link>
             </div>
             <p className="mt-2 font-[family-name:var(--font-display)] text-3xl font-bold tabular-nums">
-              ${spent.toFixed(2)} <span className="text-sm font-medium text-white/45">/ ${budget.toFixed(2)}</span>
+              ${spent.toFixed(2)} <span className="text-sm font-medium text-white/70">/ ${budget.toFixed(2)}</span>
             </p>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Budget used">
               <div className="h-full rounded-full bg-gradient-to-r from-[#e60023] to-[#ff9a5a]" style={{ width: `${Math.max(pct, 2)}%` }} />
@@ -328,7 +331,7 @@ function Bars({ values, days }: { values: number[]; days: Date[] }) {
           </div>
         ))}
       </div>
-      <div className="mt-1.5 flex justify-between text-[11px] font-medium text-white/40" aria-hidden>
+      <div className="mt-1.5 flex justify-between text-[11px] font-medium text-white/65" aria-hidden>
         <span>{days[0]?.toLocaleDateString(undefined, { day: "numeric", month: "short" })}</span>
         <span>Today</span>
       </div>

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
 }
 
 body {
@@ -22,25 +22,27 @@ body {
    Deep night background lit by red, orange and purple glows; glass panels.
    Pages built with light utilities are remapped inside .app-main below. */
 @theme inline {
-  --font-display: var(--font-inter-tight), var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-inter), system-ui, sans-serif;
 }
-.au-body {
-  color: #efeaf6; font-family: var(--font-inter), system-ui, sans-serif; color-scheme: dark;
+.au-body { color: #efeaf6; font-family: var(--font-inter), system-ui, sans-serif; color-scheme: dark; background: #0b0912; position: relative; isolation: isolate; }
+/* The glow sits on its own fixed, composited layer: painted once, never repainted on scroll. */
+.au-body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; will-change: transform;
   background:
     radial-gradient(700px 480px at 12% -8%, rgb(230 0 35 / 0.42), transparent 70%),
     radial-gradient(760px 520px at 92% 4%, rgb(255 138 61 / 0.30), transparent 70%),
-    radial-gradient(800px 560px at 60% 105%, rgb(140 90 255 / 0.28), transparent 70%),
-    #0b0912;
-  background-attachment: fixed;
+    radial-gradient(800px 560px at 60% 105%, rgb(140 90 255 / 0.28), transparent 70%);
 }
-.au-glass { background: rgb(255 255 255 / 0.07); border: 1px solid rgb(255 255 255 / 0.13); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+/* Glass without backdrop blur: the background behind is already a soft gradient, so a
+   translucent fill looks the same and costs nothing to paint. */
+.au-glass { background: rgb(255 255 255 / 0.07); border: 1px solid rgb(255 255 255 / 0.13); }
 .au-grad { background-image: linear-gradient(90deg, #ff4d6a, #ff9a5a 50%, #b892ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .app-main { color: #efeaf6; }
 .app-main :is(h1, h2, h3) { font-family: var(--font-display); letter-spacing: -0.02em; color: #fff; }
 .app-main h1 { font-weight: 700; }
 
 /* surfaces */
-.app-main .bg-white, .app-main .bg-white\/90, .app-main .bg-white\/80 { background-color: rgb(255 255 255 / 0.06); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.app-main .bg-white, .app-main .bg-white\/90, .app-main .bg-white\/80 { background-color: rgb(255 255 255 / 0.06); }
 .app-main .bg-zinc-50, .app-main .bg-stone-50 { background-color: rgb(255 255 255 / 0.04); }
 .app-main .bg-zinc-100 { background-color: rgb(255 255 255 / 0.08); }
 .app-main .bg-zinc-200 { background-color: rgb(255 255 255 / 0.14); }
@@ -97,8 +99,4 @@ body {
 .app-main option { background: #16121f; color: #f3f1f4; }
 
 
-@keyframes au-in { from { opacity: 0; transform: translateY(10px); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
-.au-in > * { animation: au-in 0.5s ease-out both; }
-.au-in > *:nth-child(2) { animation-delay: 0.05s; } .au-in > *:nth-child(3) { animation-delay: 0.1s; }
-.au-in > *:nth-child(4) { animation-delay: 0.15s; } .au-in > *:nth-child(n+5) { animation-delay: 0.2s; }
-@media (prefers-reduced-motion: reduce) { .au-in > * { animation: none; } }
+

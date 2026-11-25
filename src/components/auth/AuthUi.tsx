@@ -1,11 +1,22 @@
 "use client";
 import Link from "next/link";
+import localFont from "next/font/local";
 import { useId, useState, type ReactNode } from "react";
-import { passwordProblems, passwordStrength } from "@/lib/auth/validation";
-import { getBrowserSupabase } from "@/lib/supabase/client";
+import { passwordProblems, passwordStrength } from "@/lib/auth/checks";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-const serif = { fontFamily: '"Playfair Display", Georgia, serif' };
+// Latin subset of Playfair Display 500 (OFL, see public/fonts/OFL-PlayfairDisplay.txt). Loaded under its own family
+// name so it doesn't merge with the full "Playfair Display" TTFs that globals.css declares for pin previews.
+const authSerif = localFont({
+  src: [
+    { path: "../../fonts/playfair-500-latin.woff2", weight: "500", style: "normal" },
+    { path: "../../fonts/playfair-500i-latin.woff2", weight: "500", style: "italic" },
+  ],
+  display: "optional",
+  preload: false,
+  fallback: ["Georgia", "serif"],
+});
+const serif = { fontFamily: authSerif.style.fontFamily };
 
 /** Split-screen frame for the sign-in pages: brand panel + form card. */
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer?: ReactNode }) {
@@ -201,6 +212,7 @@ export function GoogleButton({ next }: { next: string }) {
   async function go() {
     setBusy(true);
     setError(null);
+    const { getBrowserSupabase } = await import("@/lib/supabase/client");
     const { error: e } = await getBrowserSupabase().auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
@@ -227,7 +239,7 @@ export function GoogleButton({ next }: { next: string }) {
         Continue with Google
       </button>
       {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
-      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-400">
+      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-500">
         <span className="h-px flex-1 bg-zinc-200" />
         or
         <span className="h-px flex-1 bg-zinc-200" />
@@ -261,7 +273,7 @@ function GoogleDemo() {
         Continue with Google
       </button>
       <p className="mt-1.5 text-center text-[11px] text-zinc-500">Google sign-in turns on once Supabase is connected.</p>
-      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-400">
+      <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-zinc-500">
         <span className="h-px flex-1 bg-zinc-200" />
         or
         <span className="h-px flex-1 bg-zinc-200" />

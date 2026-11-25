@@ -29,7 +29,8 @@ const csp = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://www.pinterest.com",
-  ...(dev ? [] : ["upgrade-insecure-requests"]),
+  // LOCAL_HTTP=1 only for local audits over plain http://localhost; never set in deployments.
+  ...(dev || process.env.LOCAL_HTTP === "1" ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const securityHeaders = [

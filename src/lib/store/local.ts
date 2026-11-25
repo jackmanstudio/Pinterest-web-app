@@ -1,4 +1,8 @@
-import { DEFAULT_BOARD_SETTINGS, type BoardPlan, type BoardSettings } from "@/lib/boards/automation";
+import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
+
+// Same as DEFAULT_BOARD_SETTINGS in boards/automation; kept here so the browser
+// store doesn't pull that module's zod schemas into the page.
+const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [] };
 import { defaultCategories } from "@/lib/categories/taxonomy";
 import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";

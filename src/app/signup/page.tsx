@@ -5,7 +5,6 @@ import { useState } from "react";
 import { demoSignIn } from "@/lib/auth/demo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { Alert, AuthShell, Field, GoogleButton, PasswordField, SubmitButton, postAuth } from "@/components/auth/AuthUi";
-import { SignupSchema, fieldErrors } from "@/lib/auth/validation";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -21,6 +20,8 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
     const body = { ...form, acceptTerms: accept };
+    // zod is loaded only when the form is sent, keeping it off the first page load.
+    const { SignupSchema, fieldErrors } = await import("@/lib/auth/validation");
     const local = SignupSchema.safeParse(body);
     if (!local.success) {
       setFields(fieldErrors(local.error));

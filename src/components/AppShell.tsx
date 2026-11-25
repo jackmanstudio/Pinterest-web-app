@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "./NavLink";
 import { usePathname, useRouter } from "next/navigation";
-import { clearRememberCookie, getBrowserSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { demoSignOut } from "@/lib/auth/demo";
 import { WORKSPACE_KINDS, WORKSPACE_LABELS, isWorkspaceKind } from "@/lib/types";
@@ -80,6 +79,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // Loaded only when signing out, so the Supabase client isn't in every page's bundle.
+    const { clearRememberCookie, getBrowserSupabase } = await import("@/lib/supabase/client");
     await getBrowserSupabase().auth.signOut({ scope: "local" }).catch(() => {});
     clearRememberCookie();
     router.replace("/login");
@@ -124,14 +125,14 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {GROUPS.map((g) => (
           <div key={g.title} className="flex flex-col gap-0.5">
-            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/30">{g.title}</p>
+            <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/55">{g.title}</p>
             {g.items.map((it) => navLink(`/w/${kind}${it.section ? `/${it.section}` : ""}`, it.label, it.icon, section === it.section))}
           </div>
         ))}
       </nav>
       <div className="mt-auto flex flex-col gap-3 px-3 pt-6">
         <div className="au-glass rounded-xl p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/35">System</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-white/55">System</p>
           <StatusSummary dark />
         </div>
         <div className="flex flex-col gap-0.5">
@@ -170,7 +171,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="au-body flex min-h-full flex-1">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-white/[0.07] bg-white/[0.03] py-5 backdrop-blur-xl lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r border-white/[0.07] bg-white/[0.03] py-5 lg:flex">
         <div className="mb-5 px-5">{brand}</div>
         {nav}
         <div className="h-4 shrink-0" />
@@ -178,7 +179,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Phone / tablet top bar */}
-        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/[0.07] bg-[#0b0912]/60 px-4 py-2.5 backdrop-blur-xl lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/[0.07] bg-[#0b0912]/90 px-4 py-2.5 lg:hidden">
           <Link href="/dashboard" aria-label="Pinterest AI Studio home">{logo("h-8 w-8")}</Link>
           <div className="w-44">{switcher}</div>
           <button onClick={() => setOpen(true)} className="ml-auto rounded-xl p-2.5 text-white hover:bg-white/10" aria-label="Open menu" aria-expanded={open}>
@@ -201,8 +202,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Phone drawer */}
       {open && (
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <button className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 right-0 flex w-[min(19rem,86vw)] flex-col overflow-y-auto border-l border-white/10 bg-[#120e1c]/90 py-4 shadow-2xl backdrop-blur-2xl">
+          <button className="absolute inset-0 bg-black/60" aria-label="Close menu" onClick={() => setOpen(false)} />
+          <div className="absolute inset-y-0 right-0 flex w-[min(19rem,86vw)] flex-col overflow-y-auto border-l border-white/10 bg-[#120e1c] py-4 shadow-2xl">
             <div className="mb-4 flex items-center justify-between px-6">
               <span className="text-base font-bold text-white">Menu</span>
               <button onClick={() => setOpen(false)} className="rounded-xl p-2 text-white hover:bg-white/10" aria-label="Close menu">
@@ -216,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       {/* Phone bottom tabs */}
-      <nav className="au-glass fixed inset-x-3 bottom-3 z-30 grid grid-cols-5 rounded-2xl !bg-[#1a1426]/70 px-1 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] lg:hidden" aria-label="Quick">
+      <nav className="au-glass fixed inset-x-3 bottom-3 z-30 grid grid-cols-5 rounded-2xl !bg-[#1a1426]/95 px-1 py-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] shadow-[0_12px_30px_-10px_rgba(0,0,0,0.6)] lg:hidden" aria-label="Quick">
         {bottom.map((b) => (
           <Link key={b.label} href={b.href} className={`relative flex flex-col items-center gap-0.5 py-1 text-[11px] font-semibold transition-colors ${b.active ? "text-white" : "text-white/50"}`}>
             <span className={`grid h-8 w-12 place-items-center rounded-xl ${b.active ? "bg-gradient-to-r from-[#e60023] to-[#ff7a45] text-white" : ""}`}>

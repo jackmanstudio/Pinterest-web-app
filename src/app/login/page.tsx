@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Alert, AuthShell, Field, GoogleButton, PasswordField, SubmitButton, postAuth } from "@/components/auth/AuthUi";
-import { EmailSchema, safeNext } from "@/lib/auth/validation";
+import { looksLikeEmail, safeNext } from "@/lib/auth/checks";
 import { demoSignIn } from "@/lib/auth/demo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -32,7 +32,7 @@ export default function LoginPage() {
     setFields({});
     if (!isSupabaseConfigured) {
       // Demo sign-in: this browser only, nothing is checked against a server.
-      if (!EmailSchema.safeParse(email).success) {
+      if (!looksLikeEmail(email)) {
         setFields({ email: "Enter a valid email address." });
         setBusy(false);
         return;

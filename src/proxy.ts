@@ -5,7 +5,7 @@ import { readRemember, rememberOptions } from "@/lib/supabase/remember";
 import { DEMO_COOKIE } from "@/lib/auth/demo";
 
 /** Pages and routes that work without an account. Everything else needs sign-in. */
-const PUBLIC = [/^\/login/, /^\/signup/, /^\/forgot-password/, /^\/reset-password/, /^\/terms/, /^\/privacy/, /^\/auth\//, /^\/api\/auth\/(login|signup|forgot)$/, /^\/api\/cron\//];
+const PUBLIC = [/^\/robots\.txt$/, /^\/login/, /^\/signup/, /^\/forgot-password/, /^\/reset-password/, /^\/terms/, /^\/privacy/, /^\/auth\//, /^\/api\/auth\/(login|signup|forgot)$/, /^\/api\/cron\//];
 
 /** Refreshes the Supabase session and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
@@ -75,5 +75,5 @@ function demoGate(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|ttf|otf|woff|woff2|txt)$).*)"],
 };
