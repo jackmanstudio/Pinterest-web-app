@@ -58,7 +58,9 @@ export async function POST(request: Request) {
       try {
         await assertWithinBudget(ctx.ledger, true);
         const out = await p.analyzeBrand(pageContext(page));
-        analysis = out.brand;
+        // Small grammar fix the model sometimes misses ("a honest" → "an honest").
+        const an = (t: string) => t.replace(/\b([Aa]) (honest|hour|heir|honou?r)/g, (_m, a: string, w: string) => `${a}n ${w}`);
+        analysis = { ...out.brand, voice: an(out.brand.voice), audience: an(out.brand.audience), image_style: an(out.brand.image_style), cta: an(out.brand.cta) };
         await ctx.ledger
           .record({
             workspace_id: parsed.data.workspace ? ((await workspaceIdFor(ctx, parsed.data.workspace)) ?? null) : null, workspace_kind: parsed.data.workspace, kind: "text", provider: p.name, model: out.model, source: "ai", images: 0,

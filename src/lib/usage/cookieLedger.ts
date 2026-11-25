@@ -45,7 +45,7 @@ export function decodeUsage(raw: string | undefined, key = secret(), now = new D
 }
 
 const toCompact = (e: UsageEntry): Compact => [
-  Math.floor(Date.parse(e.created_at ?? new Date().toISOString()) / 1000), e.kind === "image" ? 1 : 0, e.provider.slice(0, 24), e.model?.replace(/^@[^/]+\/[^/]+\//, "").slice(0, 32) ?? null,
+  Math.floor(Date.parse(e.created_at ?? new Date().toISOString()) / 1000), e.kind === "image" ? 1 : 0, e.provider.slice(0, 40), e.model?.replace(/^@[^/]+\/[^/]+\//, "").slice(0, 48) ?? null,
   e.source === "ai" ? 1 : 0, e.input_tokens, e.output_tokens, e.images, Math.round(e.est_cost_usd * 1e6) / 1e6, e.status === "ok" ? 1 : 0, e.workspace_kind ?? "",
 ];
 const fromCompact = (c: Compact): UsageEntry => ({

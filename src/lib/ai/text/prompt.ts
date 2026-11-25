@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { glossaryHint } from "./glossary";
 import { anglesFor } from "@/lib/drafts/angles";
 import { LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest } from "@/lib/types";
@@ -58,7 +59,7 @@ export function draftsUserPrompt(req: GenerateRequest): string {
   const language = (req.language || b.language || "").trim();
   const lang =
     language && !/^english$/i.test(language)
-      ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English.\n`
+      ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English. Festivals, names and culture words use their standard ${language} spelling, never a sound-alike transliteration. Tags are short phrases with normal spaces between words and no # sign.\n${glossaryHint(language, `${req.idea} ${req.context ?? ""}`)}`
       : "";
   return `Workspace: ${req.workspace}
 ${lang}${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}

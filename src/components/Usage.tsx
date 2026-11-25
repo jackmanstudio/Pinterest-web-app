@@ -81,7 +81,7 @@ export function Usage({ kind }: { kind: WorkspaceKind }) {
                       {r.source === "demo" && <span className="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-900">DEMO</span>}
                     </td>
                     <td className="py-2 pr-3">{r.kind === "text" ? `${r.input_tokens} / ${r.output_tokens}` : `${r.images} image${r.images === 1 ? "" : "s"}`}</td>
-                    <td className="py-2 pr-3">{usd(r.est_cost_usd)}</td>
+                    <td className="py-2 pr-3">{r.est_cost_usd === 0 && r.source === "ai" && r.status === "ok" ? "$0 (free allowance)" : usd(r.est_cost_usd)}</td>
                     <td className={`py-2 ${r.status === "ok" ? "text-emerald-700" : "text-red-700"}`}>{r.status === "ok" ? "OK" : r.error ?? "Error"}</td>
                   </tr>
                 ))}
