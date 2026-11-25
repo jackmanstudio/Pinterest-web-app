@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import localFont from "next/font/local";
-import { useId, useState, type ReactNode } from "react";
+import { Suspense, useId, useState, type ReactNode } from "react";
 import { passwordProblems, passwordStrength } from "@/lib/auth/checks";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -22,6 +22,8 @@ const serif = { fontFamily: authSerif.style.fontFamily };
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle: string; children: ReactNode; footer?: ReactNode }) {
   return (
     <div className="fixed inset-0 z-10 grid overflow-y-auto bg-[#faf7f2] lg:grid-cols-[1.05fr_1fr]">
+      {/* Suspense boundaries let React hydrate the brand panel and the form as separate short tasks. */}
+      <Suspense>
       <aside className="relative hidden overflow-hidden bg-[#2a1416] p-12 text-[#f6efe6] lg:flex lg:flex-col lg:justify-between">
         <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#b3262e]/30 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-[#d8b48a]/20 blur-3xl" />
@@ -43,7 +45,9 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
         </div>
         <p className="relative text-xs text-[#c9b9a8]">Your Pinterest tokens are encrypted and never shown in the browser.</p>
       </aside>
+      </Suspense>
 
+      <Suspense>
       <section className="flex min-h-full items-center justify-center px-5 py-12">
         <div className="w-full max-w-[26rem]">
           <Link href="/" className="mb-8 block text-center text-lg font-semibold tracking-tight text-[#2a1416] lg:hidden">
@@ -64,6 +68,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
           {footer && <div className="mt-5 text-center text-sm text-zinc-600">{footer}</div>}
         </div>
       </section>
+      </Suspense>
     </div>
   );
 }
