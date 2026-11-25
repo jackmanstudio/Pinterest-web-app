@@ -1,0 +1,126 @@
+import { connection, NextResponse } from "next/server";
+import { z } from "zod";
+import { CONSENT_PHRASE, MAX_PINS_PER_DAY, runAutopilotStep } from "@/lib/autopilot/engine";
+import { enabledWorkspaces, serverReadiness, supabaseAutopilotDeps } from "@/lib/autopilot/server";
+import { getPinterestConfig } from "@/lib/pinterest/config";
+import { ConnectionRepo } from "@/lib/pinterest/connections";
+import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
+import { rateLimited } from "@/lib/server/rateLimit";
+import { getAdminSupabase } from "@/lib/supabase/admin";
+import { WORKSPACE_KINDS, isWorkspaceKind } from "@/lib/types";
+import { audit } from "@/lib/workflow/server";
+
+function fail(err: unknown) {
+  if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+  console.error("autopilot route failed", err);
+  return NextResponse.json({ error: (err as Error).message ?? "Something went wrong" }, { status: 500 });
+}
+
+export const maxDuration = 300;
+
+export async function GET(request: Request) {
+  await connection();
+  const kind = new URL(request.url).searchParams.get("workspace") ?? "";
+  if (!isWorkspaceKind(kind)) return NextResponse.json({ error: "Unknown workspace" }, { status: 400 });
+  try {
+    const ctx = await getRequestContext();
+    const readiness = serverReadiness();
+    if (ctx.mode === "demo") {
+      return NextResponse.json({ mode: "demo", readiness: ["Connect Supabase (Autopilot runs on the server, so it needs a real database).", ...readiness] });
+    }
+    const workspaceId = (await workspaceIdFor(ctx, kind))!;
+    const [settings, ideas, boards, recent] = await Promise.all([
+      ctx.db.from("autopilot_settings").select("enabled, board_id, board_name, pins_per_day, link, enabled_at, paused_reason, last_run_at").eq("workspace_id", workspaceId).maybeSingle(),
+      ctx.db.from("autopilot_ideas").select("id, idea, status, error, created_at, processed_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50),
+      ctx.db.from("pinterest_boards").select("board_id, name").eq("workspace_id", workspaceId).order("name"),
+      ctx.db.from("pin_drafts").select("id, title, status, external_pin_id, published_at, review_note, image_status").eq("workspace_id", workspaceId).eq("autopilot", true).order("created_at", { ascending: false }).limit(20),
+    ]);
+    for (const r of [settings, ideas, boards, recent]) if (r.error) throw new Error(r.error.message);
+    let connected = false;
+    try {
+      const info = await new ConnectionRepo(getAdminSupabase(), getPinterestConfig().encryptionKey).info(workspaceId);
+      connected = info?.status === "active";
+    } catch {
+      /* Pinterest not configured: reported in readiness */
+    }
+    if (!connected) readiness.push("Connect Pinterest to this workspace (Pinterest tab), then sync boards.");
+    return NextResponse.json({
+      mode: "supabase",
+      settings: settings.data ?? { enabled: false, board_id: null, board_name: null, pins_per_day: 3, link: null, enabled_at: null, paused_reason: null, last_run_at: null },
+      ideas: ideas.data,
+      boards: boards.data,
+      recent: recent.data,
+      readiness,
+    });
+  } catch (err) {
+    return fail(err);
+  }
+}
+
+const Body = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("save"),
+    workspace: z.enum(WORKSPACE_KINDS),
+    enabled: z.boolean(),
+    consent: z.string().max(40).optional(),
+    boardId: z.string().max(64).nullable(),
+    boardName: z.string().max(200).nullable(),
+    pinsPerDay: z.number().int().min(1).max(MAX_PINS_PER_DAY),
+    link: z.url().max(2000).nullable().or(z.literal("").transform(() => null)),
+  }),
+  z.object({ action: z.literal("add_ideas"), workspace: z.enum(WORKSPACE_KINDS), ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
+  z.object({ action: z.literal("delete_idea"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
+  z.object({ action: z.literal("run_now"), workspace: z.enum(WORKSPACE_KINDS) }),
+]);
+
+export async function POST(request: Request) {
+  const limited = rateLimited(request, "autopilot");
+  if (limited) return limited;
+  const parsed = Body.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid request" }, { status: 400 });
+  const b = parsed.data;
+  try {
+    const ctx = await getRequestContext();
+    if (ctx.mode === "demo") throw new HttpError(503, "Autopilot needs Supabase, Pinterest and AI keys on the server.");
+    const workspaceId = (await workspaceIdFor(ctx, b.workspace))!;
+
+    if (b.action === "save") {
+      const prev = await ctx.db.from("autopilot_settings").select("enabled").eq("workspace_id", workspaceId).maybeSingle();
+      const turningOn = b.enabled && !prev.data?.enabled;
+      if (turningOn && b.consent !== CONSENT_PHRASE) throw new HttpError(422, `Type ${CONSENT_PHRASE} to confirm automatic publishing.`);
+      if (b.enabled && !b.boardId) throw new HttpError(422, "Choose the board Autopilot should post to.");
+      const res = await ctx.db.from("autopilot_settings").upsert({
+        workspace_id: workspaceId, enabled: b.enabled, consent_text: b.enabled ? CONSENT_PHRASE : null,
+        board_id: b.boardId, board_name: b.boardName, pins_per_day: b.pinsPerDay, link: b.link,
+      });
+      if (res.error) throw new Error(res.error.message);
+      if (b.enabled !== Boolean(prev.data?.enabled)) {
+        await audit(getAdminSupabase(), {
+          workspaceId, actorId: ctx.user.id, action: b.enabled ? "autopilot_enabled" : "autopilot_paused", draftId: workspaceId,
+          details: { board_id: b.boardId, pins_per_day: b.pinsPerDay },
+        });
+      }
+      return NextResponse.json({ ok: true });
+    }
+    if (b.action === "add_ideas") {
+      const res = await ctx.db.from("autopilot_ideas").insert(b.ideas.map((idea) => ({ workspace_id: workspaceId, idea })));
+      if (res.error) throw new Error(res.error.message);
+      return NextResponse.json({ ok: true, added: b.ideas.length });
+    }
+    if (b.action === "delete_idea") {
+      const res = await ctx.db.from("autopilot_ideas").delete().eq("id", b.id).eq("workspace_id", workspaceId);
+      if (res.error) throw new Error(res.error.message);
+      return NextResponse.json({ ok: true });
+    }
+    // run_now: one Autopilot step for this workspace, same limits as the scheduler.
+    const again = rateLimited(request, "autopilotRun");
+    if (again) return again;
+    const admin = getAdminSupabase();
+    const [ws] = await enabledWorkspaces(admin, workspaceId);
+    if (!ws) throw new HttpError(409, "Turn Autopilot on first.");
+    const outcome = await runAutopilotStep(ws, supabaseAutopilotDeps(admin));
+    return NextResponse.json({ ok: true, outcome });
+  } catch (err) {
+    return fail(err);
+  }
+}

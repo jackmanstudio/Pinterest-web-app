@@ -1,9 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Category, DraftContent, GenerateResponse, WorkspaceKind } from "@/lib/types";
+import Link from "next/link";
+import type { Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
-import { DraftEditor, draftErrors } from "./DraftEditor";
+import { generateDraftImage, runPool } from "@/lib/client/pinImages";
+import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
+import { AutoPinCard } from "./AutoPinCard";
+
+class GenerateError extends Error {
+  constructor(message: string, readonly retryable: boolean) {
+    super(message);
+  }
+}
+
+interface AutoRun {
+  phase: "writing" | "saving" | "images" | "done";
+  idea: string;
+  result: GenerateResponse | null;
+  drafts: PinDraft[];
+  imageErrors: Record<string, string>;
+  imagesDone: number;
+}
 
 interface Batch {
   id: string;
@@ -19,7 +37,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [idea, setIdea] = useState("");
   const [categoryId, setCategoryId] = useState<string>("");
-  const [busy, setBusy] = useState<"idle" | "generating" | "saving">("idle");
+  const [busy, setBusy] = useState<"idle" | "generating" | "saving" | "auto">("idle");
+  const [auto, setAuto] = useState<AutoRun | null>(null);
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [batch, setBatch] = useState<Batch | null>(null);
@@ -29,25 +48,32 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     store.listCategories(workspace.id).then(setCategories).catch((e: Error) => setError({ message: e.message, retryable: false }));
   }, [store, workspace]);
 
+  async function requestDrafts(): Promise<Batch["result"]> {
+    const brand = await store!.getBrand(workspace!.id);
+    const category = categories.find((c) => c.id === categoryId)?.name;
+    let res: Response;
+    try {
+      res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspace: kind, idea, category, brand }),
+      });
+    } catch {
+      throw new GenerateError("Could not reach the server. Check your connection and retry.", true);
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new GenerateError(body.error ?? "Generation failed", Boolean(body.retryable));
+    return body as Batch["result"];
+  }
+
   async function generate() {
     if (!store || !workspace) return;
     setBusy("generating");
     setError(null);
     setNotice(null);
+    setAuto(null);
     try {
-      const brand = await store.getBrand(workspace.id);
-      const category = categories.find((c) => c.id === categoryId)?.name;
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea, category, brand }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError({ message: body.error ?? "Generation failed", retryable: Boolean(body.retryable) });
-        return;
-      }
-      const result = body as Batch["result"];
+      const result = await requestDrafts();
       setBatch({
         id: crypto.randomUUID(),
         idea: idea.trim(),
@@ -56,11 +82,65 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         drafts: result.drafts,
         selected: result.drafts.map(() => true),
       });
-    } catch {
-      setError({ message: "Could not reach the server. Check your connection and retry.", retryable: true });
+    } catch (e) {
+      setError({ message: (e as Error).message, retryable: e instanceof GenerateError && e.retryable });
     } finally {
       setBusy("idle");
     }
+  }
+
+  /** One step: title in, five saved pins with text and images out. Nothing is published. */
+  async function makeAll() {
+    if (!store || !workspace) return;
+    const theIdea = idea.trim();
+    setBusy("auto");
+    setError(null);
+    setNotice(null);
+    setBatch(null);
+    let run: AutoRun = { phase: "writing", idea: theIdea, result: null, drafts: [], imageErrors: {}, imagesDone: 0 };
+    const update = (patch: Partial<AutoRun>) => {
+      run = { ...run, ...patch };
+      setAuto(run);
+    };
+    update({});
+    try {
+      const result = await requestDrafts();
+      update({ phase: "saving", result });
+      const batchId = crypto.randomUUID();
+      const saved = await store.saveDrafts(
+        workspace.id,
+        result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: categoryId || null, source: result.source })),
+      );
+      update({ phase: "images", drafts: saved });
+      setIdea("");
+      await runPool(
+        saved,
+        2,
+        (d) => generateDraftImage(kind, store, d),
+        (r) =>
+          update({
+            drafts: run.drafts.map((x) => (x.id === r.draft.id ? r.draft : x)),
+            imageErrors: r.error ? { ...run.imageErrors, [r.draft.id]: r.error } : run.imageErrors,
+            imagesDone: run.imagesDone + 1,
+          }),
+      );
+      update({ phase: "done" });
+    } catch (e) {
+      if (!run.drafts.length) setAuto(null);
+      else update({ phase: "done" });
+      setError({ message: (e as Error).message, retryable: e instanceof GenerateError && e.retryable });
+    } finally {
+      setBusy("idle");
+    }
+  }
+
+  async function retryImage(d: PinDraft) {
+    if (!store || !auto) return;
+    setAuto({ ...auto, imageErrors: Object.fromEntries(Object.entries(auto.imageErrors).filter(([k]) => k !== d.id)) });
+    const pending = { ...d, image_status: "pending" as const };
+    setAuto((a) => a && { ...a, drafts: a.drafts.map((x) => (x.id === d.id ? pending : x)) });
+    const r = await generateDraftImage(kind, store, d);
+    setAuto((a) => a && { ...a, drafts: a.drafts.map((x) => (x.id === d.id ? r.draft : x)), imageErrors: r.error ? { ...a.imageErrors, [d.id]: r.error } : a.imageErrors });
   }
 
   async function save() {
@@ -97,16 +177,17 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} studio</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Enter a pin idea to get five distinct drafts. Edit them, then save the ones you want. Images are generated from saved drafts.
+          Type a title or idea and get five complete pins: title, description, tags, alt text and image, saved as drafts. Nothing
+          goes to Pinterest until you approve it in Review &amp; publish.
         </p>
         <form
           className="mt-4 flex flex-col gap-3 sm:flex-row"
           onSubmit={(e) => {
             e.preventDefault();
-            generate();
+            makeAll();
           }}
         >
-          <label className="sr-only" htmlFor="idea">Pin idea</label>
+          <label className="sr-only" htmlFor="idea">Pin title or idea</label>
           <input
             id="idea"
             className="flex-1 rounded-md border border-zinc-300 px-3 py-2"
@@ -127,19 +208,65 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             disabled={busy !== "idle" || idea.trim().length < 3}
             className="rounded-md bg-red-700 px-4 py-2 font-medium text-white disabled:opacity-50"
           >
-            {busy === "generating" ? "Generating 5 drafts…" : "Generate 5 drafts"}
+            {busy === "auto" ? "Making pins…" : "Make 5 complete pins"}
           </button>
         </form>
+        <button
+          type="button"
+          onClick={generate}
+          disabled={busy !== "idle" || idea.trim().length < 3}
+          className="mt-2 text-sm text-zinc-600 underline decoration-zinc-300 hover:text-zinc-900 disabled:opacity-50"
+        >
+          {busy === "generating" ? "Writing 5 drafts…" : "Or: write text only, so I can edit before saving"}
+        </button>
         {error && (
           <div className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
             <span>{error.message}</span>
             {error.retryable && (
-              <button className="underline" onClick={batch ? save : generate}>Retry</button>
+              <button className="underline" onClick={batch ? save : auto ? makeAll : generate}>Retry</button>
             )}
           </div>
         )}
         {notice && <p className="mt-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</p>}
       </section>
+
+      {auto && (
+        <section className="flex flex-col gap-4" aria-live="polite">
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-lg font-semibold">“{auto.idea}”</h2>
+            <span className="text-sm text-zinc-600">
+              {auto.phase === "writing" && "Writing 5 pins…"}
+              {auto.phase === "saving" && "Saving drafts…"}
+              {auto.phase === "images" && `Making images: ${auto.imagesDone} of ${auto.drafts.length} done…`}
+              {auto.phase === "done" &&
+                `Done. ${auto.drafts.filter((d) => d.image_status === "ready").length} of ${auto.drafts.length} pins have images, saved as drafts in ${WORKSPACE_LABELS[kind]}.`}
+            </span>
+            {auto.result && <SourceBadge source={auto.result.source} />}
+          </div>
+          {auto.result?.source === "demo" && (
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <strong>Demo output.</strong> Text comes from templates and images are placeholders until the AI keys are added on the server.
+            </p>
+          )}
+          {auto.drafts.length > 0 && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {auto.drafts.map((d) => (
+                <AutoPinCard key={d.id} store={store!} draft={d} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} />
+              ))}
+            </div>
+          )}
+          {auto.phase === "done" && (
+            <div className="flex flex-wrap gap-3">
+              <Link href={`/w/${kind}/publish`} className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white">
+                Review &amp; approve →
+              </Link>
+              <Link href={`/w/${kind}/drafts`} className="rounded-md px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
+                Edit in Saved drafts
+              </Link>
+            </div>
+          )}
+        </section>
+      )}
 
       {batch && (
         <section className="flex flex-col gap-4">

@@ -11,6 +11,8 @@ export const LIMITS = {
   pinterest: { limit: 10, windowMs: 60_000 },
   publish: { limit: 30, windowMs: 60_000 },
   account: { limit: 5, windowMs: 60_000 },
+  autopilot: { limit: 20, windowMs: 60_000 },
+  autopilotRun: { limit: 3, windowMs: 60_000 },
 } as const;
 export type LimitName = keyof typeof LIMITS;
 

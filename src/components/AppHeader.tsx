@@ -51,6 +51,7 @@ export function AppHeader() {
           {tab(`/w/${kind}`, "Studio", inWorkspace && section === "")}
           {tab(`/w/${kind}/drafts`, "Saved drafts", section === "drafts")}
           {tab(`/w/${kind}/publish`, "Review & publish", section === "publish")}
+          {tab(`/w/${kind}/autopilot`, "Autopilot", section === "autopilot")}
           {tab(`/w/${kind}/settings`, "Brand & categories", section === "settings")}
           {tab(`/w/${kind}/analytics`, "Analytics", section === "analytics")}
           {tab(`/w/${kind}/usage`, "Usage & cost", section === "usage")}

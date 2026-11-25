@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const ctx = await getRequestContext();
     if (ctx.mode !== "supabase") throw new HttpError(400, "In Demo mode, export from the browser instead.");
     const db = ctx.db;
-    const tables = ["workspaces", "brand_settings", "categories", "pin_drafts", "publish_jobs", "audit_events", "ai_usage", "pinterest_boards", "pinterest_pins", "analytics_snapshots", "analytics_insights"];
+    const tables = ["workspaces", "brand_settings", "categories", "pin_drafts", "publish_jobs", "audit_events", "ai_usage", "pinterest_boards", "pinterest_pins", "analytics_snapshots", "analytics_insights", "autopilot_settings", "autopilot_ideas"];
     const out: Record<string, unknown> = { exported_at: new Date().toISOString(), user: { id: ctx.user.id, email: ctx.user.email } };
     for (const t of tables) {
       const { data, error } = await db.from(t).select("*");

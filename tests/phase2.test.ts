@@ -85,6 +85,6 @@ describe("demo image provider", () => {
   });
   it("is chosen when no image provider is configured", () => {
     expect(getImageProvider({}).source).toBe("demo");
-    expect(() => getImageProvider({ IMAGE_AI_PROVIDER: "foo", IMAGE_AI_API_KEY: "k" })).toThrow(/not implemented/);
+    expect(() => getImageProvider({ IMAGE_AI_PROVIDER: "foo", IMAGE_AI_API_KEY: "k" })).toThrow(/not supported/);
   });
 });

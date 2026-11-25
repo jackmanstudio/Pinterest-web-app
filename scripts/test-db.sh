@@ -15,4 +15,7 @@ for f in supabase/migrations/*.sql; do
   echo "migrate: $f"
   psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f"
 done
-psql "$URL" -v ON_ERROR_STOP=1 -q -f supabase/tests/10_rls_test.sql
+for f in supabase/tests/[1-9]*.sql; do
+  echo "test: $f"
+  psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f"
+done

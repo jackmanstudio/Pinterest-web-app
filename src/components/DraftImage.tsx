@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { PinDraft, WorkspaceKind } from "@/lib/types";
 import { SourceBadge } from "./DraftEditor";
+import { generateDraftImage } from "@/lib/client/pinImages";
 
 interface Props {
   kind: WorkspaceKind;
@@ -33,23 +34,11 @@ export function DraftImage({ kind, store, draft, promptDirty, onUpdated }: Props
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/images", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, draftId: draft.id, prompt: store.mode === "demo" ? draft.image_prompt : undefined }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        setError(body.error ?? "Image generation failed");
-        // Server marks the draft failed in Supabase mode; reflect it.
-        if (store.mode === "supabase") onUpdated(await store.getDraft(draft.workspace_id, draft.id));
-        else onUpdated(await store.setImage(draft.workspace_id, draft.id, { image_status: "failed", image_path: draft.image_path, image_source: draft.image_source }));
-        return;
-      }
-      const updated = await store.setImage(draft.workspace_id, draft.id, { image_status: "ready", image_path: body.image_path, image_source: body.source });
-      onUpdated(updated);
-    } catch {
-      setError("Could not reach the server. Check your connection and retry.");
+      const r = await generateDraftImage(kind, store, draft);
+      setError(r.error);
+      onUpdated(r.draft);
+    } catch (e) {
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }

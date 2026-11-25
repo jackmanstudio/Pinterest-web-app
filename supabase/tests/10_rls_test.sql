@@ -153,4 +153,4 @@ insert into storage.objects (bucket_id, name) values ('pin-images', (select id::
 select pg_temp.check((select count(*) from storage.objects) = 1, 'storage writes limited to own workspace folder');
 
 reset role;
-\echo ALL DATABASE TESTS PASSED
+\echo RLS TESTS PASSED
