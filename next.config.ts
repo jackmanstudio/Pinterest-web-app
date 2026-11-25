@@ -20,7 +20,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  `connect-src 'self'${supabaseOrigin ? ` ${supabaseOrigin} ${supabaseOrigin.replace(/^https/, "wss")}` : ""}${dev ? " ws:" : ""}`,
+  // data:/blob: let the browser read images it already holds (downloads, resizing); they never leave the page.
+  `connect-src 'self' data: blob:${supabaseOrigin ? ` ${supabaseOrigin} ${supabaseOrigin.replace(/^https/, "wss")}` : ""}${dev ? " ws:" : ""}`,
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "frame-src 'none'",

@@ -9,7 +9,9 @@ import { DraftEditor, draftErrors } from "./DraftEditor";
 import { DraftImage } from "./DraftImage";
 import { useWorkspace } from "./useWorkspace";
 import { useTrendKeywords } from "@/lib/client/useTrendKeywords";
-import { downloadFile, downloadImage as saveImage } from "@/lib/client/download";
+import { downloadFile, downloadImage as saveImage, pinFileName } from "@/lib/client/download";
+import { resizeImage } from "@/lib/client/resize";
+import { EXPORT_SIZES, type ExportSizeId, type FitMode } from "@/lib/tools/resize";
 
 const pick = (d: PinDraft): DraftContent => ({
   angle: d.angle, concept: d.concept, title: d.title, description: d.description, tags: d.tags, alt_text: d.alt_text, image_prompt: d.image_prompt,
@@ -162,6 +164,16 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
     }
   }
 
+  async function downloadResized(d: PinDraft, size: ExportSizeId, mode: FitMode) {
+    try {
+      const url = await store!.imageUrl(d);
+      if (!url) throw new Error("No image yet");
+      downloadFile(pinFileName(`${d.title}-${size}`, "jpg"), await resizeImage(url, size, mode));
+    } catch (err) {
+      fail(d.id, err);
+    }
+  }
+
   const set = <K extends keyof LibraryFilter>(k: K, v: LibraryFilter[K]) => {
     setFilter({ ...filter, [k]: v });
     setShown(PAGE);
@@ -259,6 +271,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                       <button onClick={() => duplicate(d)} className={btn}>Duplicate</button>
                       <button onClick={() => showHistory(d)} className={btn}>{history?.id === d.id ? "Hide history" : "History"}</button>
                       {d.image_status === "ready" && <button onClick={() => downloadImage(d)} className={btn}>Download image</button>}
+                      {d.image_status === "ready" && <OtherSizes onPick={(size, mode) => downloadResized(d, size, mode)} />}
                       <button onClick={() => archive(d, !d.archived_at)} disabled={d.status === "scheduled"} className={btn}>{d.archived_at ? "Unarchive" : "Archive"}</button>
                       <button onClick={() => remove(d)} className="text-sm text-red-700 hover:underline">Delete</button>
                     </div>
@@ -296,5 +309,30 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
         </button>
       )}
     </div>
+  );
+}
+
+/** Download the pin image in another size: the whole pin on a blurred backdrop, or cropped to fill. */
+function OtherSizes({ onPick }: { onPick: (size: ExportSizeId, mode: FitMode) => void }) {
+  const [mode, setMode] = useState<FitMode>("fit");
+  return (
+    <details className="relative text-sm">
+      <summary className="cursor-pointer text-zinc-700 hover:underline">Other sizes</summary>
+      <div className="absolute z-10 mt-1 flex w-72 flex-col gap-1 rounded-md border border-zinc-200 bg-white p-2 shadow-lg">
+        <div className="flex gap-1 text-xs" role="group" aria-label="How to fit">
+          {(["fit", "fill"] as const).map((m) => (
+            <button key={m} onClick={() => setMode(m)} className={`rounded px-2 py-0.5 ${mode === m ? "bg-zinc-900 text-white" : "border border-zinc-300"}`}>
+              {m === "fit" ? "Show whole pin" : "Crop to fill"}
+            </button>
+          ))}
+        </div>
+        {EXPORT_SIZES.map((s) => (
+          <button key={s.id} onClick={() => onPick(s.id, mode)} className="rounded px-2 py-1 text-left text-xs hover:bg-zinc-100">
+            {s.label} <span className="text-zinc-500">· {s.width}×{s.height}</span>
+          </button>
+        ))}
+        <p className="px-2 text-[11px] text-zinc-500">Made in your browser; nothing is uploaded.</p>
+      </div>
+    </details>
   );
 }
