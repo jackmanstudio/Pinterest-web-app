@@ -1,4 +1,5 @@
 import type { TemplateStyle } from "@/lib/brand/template";
+import { LAYOUT_PALETTE, layoutForAngle, type Layout, type PaletteName } from "@/lib/brand/design";
 import type { WorkspaceKind } from "@/lib/types";
 
 /**
@@ -16,7 +17,20 @@ export interface ImagePromptInput {
   overlay?: TemplateStyle;
   /** The draft's angle (key or label); picks a distinct art direction per pin. */
   angle?: string;
+  /** Brand palette choice, so the photo's colours match the design. */
+  palette?: PaletteName;
+  /** Brand's preferred image style, e.g. "Editorial photography". */
+  imageStyle?: string;
 }
+
+/** Colour stories from the design guide; the photo is styled to match the pin's palette. */
+const COLOR_STORY: Record<Exclude<PaletteName, "auto" | "brand">, string> = {
+  ivory: "Colour story: cream, beige and warm ivory with soft natural wood or linen, gentle warm highlights.",
+  sage: "Colour story: sage green with soft neutrals (oatmeal, stone, off-white), fresh and calm.",
+  noir: "Colour story: black, white and champagne gold, high-end and moody with refined contrast.",
+  blush: "Colour story: dusty rose and muted blush with warm neutrals, soft and romantic.",
+  navy: "Colour story: deep navy with elegant cream and a touch of warm brass, timeless and crisp.",
+};
 
 /** One distinct look per angle, so a set of five never looks samey. */
 const ART_DIRECTION: Record<string, string> = {
@@ -44,12 +58,20 @@ const AESTHETIC: Record<WorkspaceKind, string> = {
     "Premium editorial photograph with a clean, modern Pinterest aesthetic: one clear subject, tasteful styling, refined and harmonious colour palette, aspirational and trustworthy.",
 };
 
-const SPACE: Record<TemplateStyle, string> = {
+/** Where the headline goes for each Designer-mix layout, so the subject stays clear of it. */
+const LAYOUT_SPACE: Record<Layout, string> = {
+  paper: "Place the main subject in the lower two thirds of the frame; the top third will be covered by a paper headline band, so keep only soft background there.",
+  framed: "Centre the main subject in the upper three quarters of the frame; the bottom quarter will be covered by a caption, so keep it simple.",
+  caption: "Keep the bottom third of the frame calm and simple (floor, table, soft shadow) because an elegant headline will sit there.",
+  editorial: "Keep the top third of the frame calm and simple (sky, wall or soft background) because a magazine-style headline will sit there.",
+  centered: "Keep the lower-middle of the frame soft and uncluttered (no faces there) because a centred headline will sit across it.",
+};
+
+const SPACE: Record<Exclude<TemplateStyle, Layout | "auto">, string> = {
   subtle: "Keep the bottom edge of the frame simple, because a small caption will sit there.",
   bold: "Keep the lower third of the frame calm and softly blurred (simple background, no important details) because a title band will be placed there.",
   minimal: "Keep the lower third of the frame darker and uncluttered because a white title will be placed there.",
   elegant: "Keep the upper third of the frame calm and uncluttered (sky, wall or soft background) because a title card will be placed there.",
-  editorial: "Keep the upper third of the frame calm and uncluttered because a magazine-style headline will be placed there.",
   none: "Use the full frame.",
 };
 
@@ -61,7 +83,11 @@ const clean = (s: string) =>
     .replace(/,?\s*(with\s+)?(bold\s+)?(number(ed)?\s+(badges|labels|panels)|text overlay space[^,.]*|minimal text[^,.]*)/gi, "")
     .trim();
 
-export function buildImagePrompt({ title, scene, kind, overlay = "subtle", angle }: ImagePromptInput): string {
+export function buildImagePrompt({ title, scene, kind, overlay = "auto", angle, palette = "auto", imageStyle }: ImagePromptInput): string {
+  const layout: Layout | null =
+    overlay === "auto" ? layoutForAngle(angle, title) : (["paper", "framed", "caption", "editorial", "centered"] as string[]).includes(overlay) ? (overlay as Layout) : null;
+  const space = layout ? LAYOUT_SPACE[layout] : SPACE[overlay as keyof typeof SPACE];
+  const story = palette === "auto" || palette === "brand" ? (layout ? COLOR_STORY[LAYOUT_PALETTE[layout]] : "") : COLOR_STORY[palette];
   // Never quote the title: image models copy quoted words into the picture as (misspelled) text.
   const t = title
     .replace(/["“”'‘’:!?]/g, " ")
@@ -76,11 +102,16 @@ export function buildImagePrompt({ title, scene, kind, overlay = "subtle", angle
     `Vertical 2:3 portrait photo for a Pinterest pin about ${t}. The photo must clearly show this subject.`,
     `Scene: ${sceneText}`,
     AESTHETIC[kind],
+    imageStyle ? `Preferred style for this brand: ${imageStyle.slice(0, 80)}.` : "",
     artDirection(angle, t),
-    "Make it distinctive and original, not a generic stock photo: one unexpected but tasteful detail, a considered colour story and a scroll-stopping focal point.",
-    "Composition: a single cohesive scene with one clear focal point, rule of thirds, generous negative space, depth with a softly blurred background.",
-    "Light and finish: soft natural light, gentle shadows, true-to-life skin and fabric textures, rich but natural colours, crisp focus on the subject, shot on a full-frame camera with a 50mm lens, magazine-quality retouching.",
-    SPACE[overlay],
-    "Again: no text, letters, words, numbers, captions, headlines, signs, logos, watermarks or signatures; collages, grids, split screens, borders or frames; extra or distorted fingers, hands or faces; clutter, harsh flash, oversaturated colours, cartoon or CGI look, cliché stock-photo poses.",
-  ].join("\n");
+    story,
+    "Quality bar: looks like the work of a premium creative agency, luxury editorial aesthetic, polished and intentional, instantly communicates the subject and stops the scroll within two seconds, still reads clearly as a small thumbnail on a phone.",
+    "Make it distinctive and original, not a generic stock photo: one unexpected but tasteful detail, a harmonious, restrained colour palette (no harsh or excessive colours) and a single strong focal point.",
+    "Composition: a single cohesive scene with one clear focal point, balanced layout with excellent spacing, rule of thirds, generous negative space, depth with a softly blurred background.",
+    "Light and finish: soft natural light, gentle shadows, true-to-life skin and fabric textures, rich but natural colours, tack-sharp focus on the subject, high resolution, shot on a full-frame camera with a 50mm lens, magazine-quality retouching.",
+    space,
+    "Again: no text, letters, words, numbers, captions, headlines, signs, logos, watermarks or signatures; collages, grids, split screens, borders or frames; extra or distorted fingers, hands or faces; clutter, harsh flash, oversaturated colours, heavy gradients, cartoon or CGI look, plastic or artificial-looking skin and objects, blur, awkward cropping, cliché stock-photo poses.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

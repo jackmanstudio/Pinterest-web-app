@@ -1,9 +1,12 @@
 import type { Store } from "@/lib/store";
 import type { PinDraft, WorkspaceKind } from "@/lib/types";
+import type { DesignReport } from "@/lib/brand/check";
 
 export interface ImageResult {
   draft: PinDraft;
   error: string | null;
+  /** The design self-check for the new image (not stored; shown right after generation). */
+  design?: DesignReport;
 }
 
 /** Asks the server to make one draft's image and records the result in the store. */
@@ -11,7 +14,8 @@ export async function generateDraftImage(kind: WorkspaceKind, store: Store, draf
   let res: Response;
   try {
     // Demo storage lives in the browser, so the server needs the prompt, title and pin design sent along.
-    const demo = store.mode === "demo" ? { prompt: draft.image_prompt, title: draft.title, angle: draft.angle, template: (await store.getBrand(draft.workspace_id)).pin_template } : {};
+    const brand = store.mode === "demo" ? await store.getBrand(draft.workspace_id) : null;
+    const demo = brand ? { prompt: draft.image_prompt, title: draft.title, angle: draft.angle, template: brand.pin_template, imageStyle: brand.image_style || undefined } : {};
     res = await fetch("/api/images", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -30,7 +34,7 @@ export async function generateDraftImage(kind: WorkspaceKind, store: Store, draf
     return { draft: failed, error: body.error ?? "Image generation failed" };
   }
   const updated = await store.setImage(draft.workspace_id, draft.id, { image_status: "ready", image_path: body.image_path, image_source: body.source });
-  return { draft: updated, error: null };
+  return { draft: updated, error: null, design: body.design };
 }
 
 /** Runs tasks with at most `limit` in flight, reporting each result as it lands. */

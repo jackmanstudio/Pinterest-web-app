@@ -1,7 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
-import { FONT_LABELS, STYLE_LABELS, TEMPLATE_FONTS, TEMPLATE_STYLES, overlaySvg, readTemplate, type PinTemplate } from "@/lib/brand/template";
+import { FONT_LABELS, STYLE_LABELS, TEMPLATE_FONTS, TEMPLATE_STYLES, layoutFor, overlaySvg, readTemplate, type PinTemplate } from "@/lib/brand/template";
+import { PALETTE_LABELS, PALETTES } from "@/lib/brand/design";
+
+/** Sample pins for the Designer-mix preview: one per creative angle. */
+const SAMPLES: { angle: string; title: string; bg: string }[] = [
+  { angle: "How-to / tutorial", title: "Layering a Trench Coat: A Simple 4-Step Guide", bg: "from-stone-300 via-stone-500 to-stone-700" },
+  { angle: "List / roundup", title: "7 Autumn Outfits Worth Saving", bg: "from-emerald-900 via-stone-500 to-stone-300" },
+  { angle: "Inspiration / mood", title: "Soft Neutrals for Slow Weekends", bg: "from-rose-200 via-rose-400 to-stone-700" },
+  { angle: "Problem → solution", title: "No More Boring Workwear: Easy Upgrades", bg: "from-stone-200 via-stone-600 to-zinc-900" },
+  { angle: "Seasonal / timely", title: "Cosy Winter Layers You Will Love", bg: "from-slate-400 via-slate-700 to-slate-900" },
+];
 import type { BrandSettings } from "@/lib/types";
 
 interface Props {
@@ -59,6 +69,7 @@ export function PinDesign({ store, workspaceId, brand, sampleTitle, onSaved }: P
   }
 
   const svg = overlaySvg({ width: 400, height: 600, title: sampleTitle, template: t, logoHref: logoUrl });
+  const mix = t.style === "auto";
   const sel = "rounded-md border border-zinc-300 px-2 py-1.5 text-sm";
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm md:col-span-2">
@@ -67,10 +78,26 @@ export function PinDesign({ store, workspaceId, brand, sampleTitle, onSaved }: P
         <p className="text-sm text-zinc-600">Every new pin image gets the title written on it in this style, with your colours, handle and logo.</p>
       </div>
       <div className="flex flex-col gap-6 sm:flex-row">
-        <div className="relative aspect-[2/3] w-full max-w-[260px] shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-stone-400 via-amber-700 to-stone-800" aria-label="Pin design preview">
-          <div className="absolute inset-0 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
-          <span className="absolute left-2 top-2 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700">Preview</span>
-        </div>
+        {mix ? (
+          <div className="grid w-full shrink-0 grid-cols-5 gap-2 sm:max-w-[520px]" aria-label="Designer mix preview: five layouts">
+            {SAMPLES.map((p) => (
+              <figure key={p.angle} className="flex flex-col gap-1">
+                <div className={`relative aspect-[2/3] overflow-hidden rounded-md bg-gradient-to-b ${p.bg}`}>
+                  <div
+                    className="absolute inset-0 [&>svg]:h-full [&>svg]:w-full"
+                    dangerouslySetInnerHTML={{ __html: overlaySvg({ width: 400, height: 600, title: p.title, template: t, logoHref: logoUrl, angle: p.angle }) }}
+                  />
+                </div>
+                <figcaption className="text-center text-[10px] capitalize text-zinc-500">{layoutFor(t, p.angle, p.title)}</figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <div className="relative aspect-[2/3] w-full max-w-[260px] shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-stone-400 via-amber-700 to-stone-800" aria-label="Pin design preview">
+            <div className="absolute inset-0 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+            <span className="absolute left-2 top-2 rounded bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-700">Preview</span>
+          </div>
+        )}
         <div className="grid flex-1 gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
             Style
@@ -81,8 +108,16 @@ export function PinDesign({ store, workspaceId, brand, sampleTitle, onSaved }: P
             </select>
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
-            Font
-            <select className={sel} value={t.font} onChange={(e) => setT({ ...t, font: e.target.value as PinTemplate["font"] })}>
+            Colour palette
+            <select className={sel} value={t.palette} onChange={(e) => setT({ ...t, palette: e.target.value as PinTemplate["palette"] })}>
+              {PALETTES.map((p) => (
+                <option key={p} value={p}>{PALETTE_LABELS[p]}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
+            Font{mix ? " (Designer mix pairs its own serif + sans)" : ""}
+            <select className={sel} value={t.font} disabled={mix} onChange={(e) => setT({ ...t, font: e.target.value as PinTemplate["font"] })}>
               {TEMPLATE_FONTS.map((f) => (
                 <option key={f} value={f}>{FONT_LABELS[f]}</option>
               ))}

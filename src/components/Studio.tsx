@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
 import { detectCategory } from "@/lib/categories/taxonomy";
+import type { DesignReport } from "@/lib/brand/check";
 import { LANGUAGES } from "@/lib/brand/languages";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { generateDraftImage, runPool } from "@/lib/client/pinImages";
@@ -37,6 +38,7 @@ interface AutoRun {
   drafts: PinDraft[];
   imageErrors: Record<string, string>;
   imagesDone: number;
+  designs: Record<string, DesignReport>;
 }
 
 interface Batch {
@@ -59,6 +61,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [saveCustom, setSaveCustom] = useState(true);
   const [language, setLanguage] = useState("");
   const [brand, setBrand] = useState<BrandSettings | null>(null);
+  const [count, setCount] = useState(5);
+  const [customCount, setCustomCount] = useState(false);
   const [busy, setBusy] = useState<"idle" | "generating" | "saving" | "auto">("idle");
   const [auto, setAuto] = useState<AutoRun | null>(null);
   const [link, setLink] = useState("");
@@ -117,7 +121,10 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     }
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new GenerateError(body.error ?? "Generation failed", Boolean(body.retryable));
-    return body as Batch["result"];
+    const result = body as Batch["result"];
+    // Exactly the number of pins asked for. The angles come in a fixed order, so
+    // every pin in the set gets a different creative angle and a different layout.
+    return { ...result, drafts: result.drafts.slice(0, count) };
   }
 
   async function generate() {
@@ -154,7 +161,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     setError(null);
     setNotice(null);
     setBatch(null);
-    let run: AutoRun = { phase: "writing", idea: theIdea, result: null, drafts: [], imageErrors: {}, imagesDone: 0 };
+    let run: AutoRun = { phase: "writing", idea: theIdea, result: null, drafts: [], imageErrors: {}, imagesDone: 0, designs: {} };
     const update = (patch: Partial<AutoRun>) => {
       run = { ...run, ...patch };
       setAuto(run);
@@ -180,6 +187,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             drafts: run.drafts.map((x) => (x.id === r.draft.id ? r.draft : x)),
             imageErrors: r.error ? { ...run.imageErrors, [r.draft.id]: r.error } : run.imageErrors,
             imagesDone: run.imagesDone + 1,
+            designs: r.design ? { ...run.designs, [r.draft.id]: r.design } : run.designs,
           }),
       );
       update({ phase: "done" });
@@ -198,7 +206,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     const pending = { ...d, image_status: "pending" as const };
     setAuto((a) => a && { ...a, drafts: a.drafts.map((x) => (x.id === d.id ? pending : x)) });
     const r = await generateDraftImage(kind, store, d);
-    setAuto((a) => a && { ...a, drafts: a.drafts.map((x) => (x.id === d.id ? r.draft : x)), imageErrors: r.error ? { ...a.imageErrors, [d.id]: r.error } : a.imageErrors });
+    setAuto((a) => a && { ...a, drafts: a.drafts.map((x) => (x.id === d.id ? r.draft : x)), imageErrors: r.error ? { ...a.imageErrors, [d.id]: r.error } : a.imageErrors, designs: r.design ? { ...a.designs, [d.id]: r.design } : a.designs });
   }
 
   async function save() {
@@ -237,7 +245,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h1 className="text-xl font-semibold">{WORKSPACE_LABELS[kind]} studio</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Type a title or idea and get five complete pins: title, description, tags, alt text and image, saved as drafts. Nothing
+          Type a title or idea and get up to five complete pins: title, description, tags, alt text and image, saved as drafts. Nothing
           goes to Pinterest until you approve it in Review &amp; publish.
         </p>
         <form
@@ -261,9 +269,46 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             disabled={busy !== "idle" || idea.trim().length < 3}
             className="rounded-md bg-red-700 px-4 py-2 font-medium text-white disabled:opacity-50"
           >
-            {busy === "auto" ? "Making pins…" : "Make 5 complete pins"}
+            {busy === "auto" ? "Making pins…" : `Make ${count} complete pin${count === 1 ? "" : "s"}`}
           </button>
         </form>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+          <span className="font-medium">How many pins</span>
+          <div className="flex rounded-full border border-zinc-200 bg-stone-50 p-0.5" role="radiogroup" aria-label="Number of pins">
+            {[2, 3, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={!customCount && count === n}
+                onClick={() => {
+                  setCustomCount(false);
+                  setCount(n);
+                }}
+                className={`rounded-full px-3.5 py-1 text-xs font-medium transition ${!customCount && count === n ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+              >
+                {n} pins
+              </button>
+            ))}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={customCount}
+              onClick={() => setCustomCount(true)}
+              className={`rounded-full px-3.5 py-1 text-xs font-medium transition ${customCount ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
+            >
+              Custom
+            </button>
+          </div>
+          {customCount && (
+            <select aria-label="Custom number of pins" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={count} onChange={(e) => setCount(Number(e.target.value))}>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>{n} pin{n === 1 ? "" : "s"}</option>
+              ))}
+            </select>
+          )}
+          <span className="text-xs text-zinc-500">Each pin gets its own angle, layout and colour story.</span>
+        </div>
         <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
           <span className="font-medium">Category</span>
           <div className="flex rounded-md bg-zinc-100 p-0.5" role="radiogroup" aria-label="Category mode">
@@ -332,7 +377,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           disabled={busy !== "idle" || idea.trim().length < 3}
           className="mt-2 text-sm text-zinc-600 underline decoration-zinc-300 hover:text-zinc-900 disabled:opacity-50"
         >
-          {busy === "generating" ? "Writing 5 drafts…" : "Or: write text only, so I can edit before saving"}
+          {busy === "generating" ? `Writing ${count} draft${count === 1 ? "" : "s"}…` : "Or: write text only, so I can edit before saving"}
         </button>
         <TrendIdeas kind={kind} store={store!} workspaceId={workspace.id} onPick={setIdea} />
         {error && (
@@ -351,7 +396,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold">“{auto.idea}”</h2>
             <span className="text-sm text-zinc-600">
-              {auto.phase === "writing" && "Writing 5 pins…"}
+              {auto.phase === "writing" && `Writing ${count} pin${count === 1 ? "" : "s"}…`}
               {auto.phase === "saving" && "Saving drafts…"}
               {auto.phase === "images" && `Making images: ${auto.imagesDone} of ${auto.drafts.length} done…`}
               {auto.phase === "done" &&
@@ -367,7 +412,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           {auto.drafts.length > 0 && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {auto.drafts.map((d) => (
-                <AutoPinCard key={d.id} store={store!} draft={d} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} />
+                <AutoPinCard key={d.id} store={store!} draft={d} design={auto.designs[d.id]} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} />
               ))}
             </div>
           )}

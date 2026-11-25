@@ -20,6 +20,7 @@ const Body = z.object({
   title: z.string().max(200).optional(),
   angle: z.string().max(80).optional(),
   template: z.unknown().optional(),
+  imageStyle: z.string().max(120).optional(),
 });
 
 export async function POST(request: Request) {
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     let prompt = parsed.data.prompt ?? "";
     let title = parsed.data.title ?? "";
     let angle = parsed.data.angle;
+    let imageStyle = parsed.data.imageStyle ?? "";
     let art: BrandArt;
 
     if (ctx.mode === "supabase") {
@@ -61,6 +63,8 @@ export async function POST(request: Request) {
       title = draft.title;
       angle = draft.angle;
       art = await brandArtFor(ctx.db, workspaceId!);
+      const { data: b } = await ctx.db.from("brand_settings").select("image_style").eq("workspace_id", workspaceId).maybeSingle();
+      imageStyle = (b?.image_style as string | undefined) ?? "";
       await ctx.db.from("pin_drafts").update({ image_status: "pending" }).eq("id", draftId).eq("workspace_id", workspaceId);
       markFailed = async () => {
         await ctx.db.from("pin_drafts").update({ image_status: "failed" }).eq("id", draftId).eq("workspace_id", workspaceId);
@@ -73,10 +77,16 @@ export async function POST(request: Request) {
     if (!prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
     await assertWithinBudget(ctx.ledger, provider.source === "ai");
-    const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle });
-    const raw = await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE));
-    // Title overlay, brand colours and logo are drawn on the server, then saved as one JPEG.
-    const image = await brandPinImage(raw, title, art, { demo: ctx.mode === "demo" });
+    const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
+    // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
+    let attempts = 1;
+    let image = await brandPinImage(await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)), title, art, { demo: ctx.mode === "demo", angle });
+    if (image.source === "ai" && image.design.retryPhoto) {
+      // The photo itself was weak (blurry or badly exposed): make one more and keep the better pin.
+      attempts = 2;
+      const second = await brandPinImage(await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)), title, art, { angle }).catch(() => null);
+      if (second && second.design.score > image.design.score) image = second;
+    }
 
     let imagePath: string;
     let imageUrl: string;
@@ -101,9 +111,9 @@ export async function POST(request: Request) {
 
     await ctx.ledger.record({
       workspace_id: workspaceId, workspace_kind: workspace, kind: "image", provider: image.provider, model: image.model, source: image.source,
-      input_tokens: 0, output_tokens: 0, images: 1, est_cost_usd: image.est_cost_usd, status: "ok", error: null,
+      input_tokens: 0, output_tokens: 0, images: attempts, est_cost_usd: image.est_cost_usd * attempts, status: "ok", error: null,
     });
-    return NextResponse.json({ source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl });
+    return NextResponse.json({ source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl, design: image.design });
   } catch (err) {
     if (!(err instanceof HttpError && (err.status === 404 || err.status === 409))) await markFailed().catch(() => {});
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });

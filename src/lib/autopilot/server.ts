@@ -249,7 +249,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       const ledger = new OwnerLedger(admin, ws.owner_id);
       const text = getTextProvider();
       const images = getImageProvider();
-      const brandRes = await admin.from("brand_settings").select("brand_name, voice, audience, website_url, focus_keywords, banned_words").eq("workspace_id", ws.workspace_id).maybeSingle();
+      const brandRes = await admin.from("brand_settings").select("brand_name, voice, audience, website_url, focus_keywords, banned_words, image_style, cta, language, region").eq("workspace_id", ws.workspace_id).maybeSingle();
       const brand = (brandRes.data as BrandSettings | null) ?? { ...EMPTY_BRAND };
 
       await assertWithinBudget(ledger, true);
@@ -276,8 +276,8 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
       for (const d of ins.data ?? []) {
         try {
           await assertWithinBudget(ledger, true);
-          const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.kind, overlay: art.template.style, angle: d.angle });
-          const img = await brandPinImage(await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE)), d.title, art);
+          const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.kind, overlay: art.template.style, angle: d.angle, palette: art.template.palette, imageStyle: brand.image_style });
+          const img = await brandPinImage(await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE)), d.title, art, { angle: d.angle });
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
           if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);

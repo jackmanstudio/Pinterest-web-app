@@ -5,17 +5,20 @@ import type { PinDraft } from "@/lib/types";
 import { SourceBadge } from "./DraftEditor";
 import { CopyButton, pinAsText } from "./CopyButton";
 import { downloadImage } from "@/lib/client/download";
+import type { DesignReport } from "@/lib/brand/check";
 
 interface Props {
   store: Store;
   draft: PinDraft;
   error?: string;
   disabled: boolean;
+  /** Design self-check for the image just made. */
+  design?: DesignReport;
   onRetry: () => void;
 }
 
 /** Read-only preview of a finished pin from the one-step flow. */
-export function AutoPinCard({ store, draft, error, disabled, onRetry }: Props) {
+export function AutoPinCard({ store, draft, error, disabled, onRetry, design }: Props) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,6 +56,24 @@ export function AutoPinCard({ store, draft, error, disabled, onRetry }: Props) {
           <SourceBadge source={draft.source} />
           {draft.image_source && draft.image_status === "ready" && <SourceBadge source={draft.image_source} what="image" />}
         </div>
+        {design && draft.image_source !== "demo" && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-zinc-600">
+              Design check: <span className={design.score >= 85 ? "font-semibold text-emerald-700" : design.score >= 65 ? "font-semibold text-zinc-800" : "font-semibold text-amber-700"}>{design.score}/100</span> · {design.layout}
+            </summary>
+            <ul className="mt-1 flex flex-col gap-0.5">
+              {design.checks.map((c) => (
+                <li key={c.id}>
+                  {c.status === "pass" ? "✓" : c.status === "manual" ? "👀" : c.status === "warn" ? "!" : "✗"} {c.question} <span className="text-zinc-500">{c.detail}</span>
+                </li>
+              ))}
+            </ul>
+            {design.score < 65 && (
+              <button onClick={onRetry} disabled={disabled} className="mt-1 underline disabled:opacity-50">Make a new image</button>
+            )}
+          </details>
+        )}
+        {design && draft.image_source === "demo" && <p className="text-xs text-zinc-500">Layout: {design.layout} (design check runs on real AI images)</p>}
         <div className="mt-1 flex flex-wrap gap-3 border-t border-zinc-100 pt-2">
           <CopyButton text={pinAsText(draft)} label="Copy text" />
           {shown && (

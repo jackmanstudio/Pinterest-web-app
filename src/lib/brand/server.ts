@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET, PIN_IMAGE_SIZE, type GeneratedImage } from "@/lib/ai/image/types";
 import { composePin } from "./compose";
 import { readTemplate, type PinTemplate } from "./template";
+import type { DesignReport } from "./check";
 
 export interface BrandArt {
   template: PinTemplate;
@@ -32,8 +33,13 @@ export async function brandArtFor(db: SupabaseClient, workspaceId: string): Prom
 }
 
 /** Turns a raw generated image into the final branded pin (JPEG at pin size). */
-export async function brandPinImage(img: GeneratedImage, title: string, art: BrandArt, opts: { demo?: boolean } = {}): Promise<GeneratedImage> {
+export async function brandPinImage(
+  img: GeneratedImage,
+  title: string,
+  art: BrandArt,
+  opts: { demo?: boolean; angle?: string } = {},
+): Promise<GeneratedImage & { design: DesignReport }> {
   const size = opts.demo ? { width: 600, height: 900 } : PIN_IMAGE_SIZE;
-  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 88 });
+  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 90, angle: opts.angle });
   return { ...img, ...out };
 }

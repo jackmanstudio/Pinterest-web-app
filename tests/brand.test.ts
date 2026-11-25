@@ -7,7 +7,7 @@ describe("brand template", () => {
   it("fills in defaults and rejects bad values", () => {
     expect(readTemplate(undefined)).toEqual(DEFAULT_TEMPLATE);
     const t = readTemplate({ style: "weird", primary_color: "red", handle: "@me" });
-    expect(t.style).toBe("subtle");
+    expect(t.style).toBe("auto");
     expect(t.primary_color).toBe(DEFAULT_TEMPLATE.primary_color);
     expect(t.handle).toBe("@me");
   });
