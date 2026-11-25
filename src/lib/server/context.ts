@@ -2,7 +2,8 @@ import "server-only";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getServerSupabase } from "@/lib/supabase/server";
-import { memoryLedger, SupabaseLedger, type UsageLedger } from "@/lib/usage/ledger";
+import { SupabaseLedger, type UsageLedger } from "@/lib/usage/ledger";
+import { CookieLedger } from "@/lib/usage/cookieLedger";
 import type { WorkspaceKind } from "@/lib/types";
 
 export type RequestContext =
@@ -17,7 +18,7 @@ export class HttpError extends Error {
 
 /** Resolves auth and storage mode for an API request. */
 export async function getRequestContext(): Promise<RequestContext> {
-  if (!isSupabaseConfigured) return { mode: "demo", ledger: memoryLedger() };
+  if (!isSupabaseConfigured) return { mode: "demo", ledger: new CookieLedger() };
   const db = await getServerSupabase();
   const { data } = await db.auth.getUser();
   if (!data.user) throw new HttpError(401, "Sign in required");

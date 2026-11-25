@@ -19,7 +19,7 @@ export interface UsageEntry {
 }
 
 export interface UsageLedger {
-  readonly mode: "supabase" | "memory";
+  readonly mode: "supabase" | "memory" | "browser";
   monthSpendUsd(): Promise<number>;
   record(entry: UsageEntry): Promise<void>;
   recent(limit: number): Promise<UsageEntry[]>;

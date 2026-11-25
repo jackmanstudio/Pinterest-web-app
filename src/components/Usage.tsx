@@ -4,7 +4,7 @@ import type { UsageEntry } from "@/lib/usage/ledger";
 import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
 
 interface UsageData {
-  ledger: "supabase" | "memory";
+  ledger: "supabase" | "memory" | "browser";
   budget_usd: number;
   spent_usd: number;
   recent: UsageEntry[];
@@ -45,9 +45,10 @@ export function Usage({ kind }: { kind: WorkspaceKind }) {
           Paid AI calls are blocked once the budget is reached. Set it with <code>AI_MONTHLY_BUDGET_USD</code> (default $10). Costs are estimates from list prices;
           check your provider dashboard for billing.
         </p>
-        {data.ledger === "memory" && (
+        {data.ledger !== "supabase" && (
           <p className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
-            Demo mode: usage is kept in server memory and resets when the server restarts.
+            Demo mode: AI calls (text, images, board picks, brand analysis) are counted for this browser only, the last 15 are listed, and the budget applies
+            per browser. A real monthly cap across all visitors needs Supabase.
           </p>
         )}
       </section>
