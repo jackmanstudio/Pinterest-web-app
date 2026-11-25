@@ -6,7 +6,7 @@ import { log } from "@/lib/server/log";
 import { rateLimited } from "@/lib/server/rateLimit";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 
-const Body = z.object({ confirm: z.literal("DELETE MY ACCOUNT") });
+const Body = z.object({ confirm: z.literal("DELETE MY ACCOUNT"), password: z.string().max(200).optional() });
 
 /**
  * Permanently deletes the user's account and all their data in this app
@@ -21,6 +21,13 @@ export async function POST(request: Request) {
   try {
     const ctx = await getRequestContext();
     if (ctx.mode !== "supabase") throw new HttpError(400, "In Demo mode, clear the browser data instead.");
+    // Password accounts must re-enter the password, so a borrowed session alone can't delete the account.
+    const providers: string[] = ctx.user.app_metadata?.providers ?? [ctx.user.app_metadata?.provider].filter((x): x is string => Boolean(x));
+    if (providers.includes("email")) {
+      if (!parsed.data.password) throw new HttpError(400, "Enter your password to delete your account.");
+      const check = await ctx.db.auth.signInWithPassword({ email: ctx.user.email!, password: parsed.data.password });
+      if (check.error) throw new HttpError(401, "That password is incorrect.");
+    }
     const admin = getAdminSupabase();
     const { data: ws } = await ctx.db.from("workspaces").select("id");
     for (const { id } of ws ?? []) {

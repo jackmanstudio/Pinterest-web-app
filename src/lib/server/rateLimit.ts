@@ -14,6 +14,12 @@ export const LIMITS = {
   autopilot: { limit: 20, windowMs: 60_000 },
   autopilotRun: { limit: 3, windowMs: 60_000 },
   urlCheck: { limit: 15, windowMs: 60_000 },
+  // Auth (spec 12): per IP, plus per email below, against brute force and email bombing.
+  authLogin: { limit: 10, windowMs: 10 * 60_000 },
+  authLoginEmail: { limit: 5, windowMs: 15 * 60_000 },
+  authSignup: { limit: 5, windowMs: 60 * 60_000 },
+  authEmail: { limit: 3, windowMs: 15 * 60_000 },
+  authPassword: { limit: 5, windowMs: 15 * 60_000 },
 } as const;
 export type LimitName = keyof typeof LIMITS;
 
@@ -42,6 +48,22 @@ export function callerKey(request: Request): string {
   const cookie = request.headers.get("cookie") ?? "";
   const session = /sb-[^=]+-auth-token(?:\.0)?=([^;]{12,40})/.exec(cookie)?.[1];
   return session ? `s:${session}` : `ip:${ip}`;
+}
+
+export function clientIp(request: Request): string {
+  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "local";
+}
+
+/** Like rateLimited, but for an explicit key (e.g. IP or a hashed email) instead of the session. */
+export function rateLimitedKey(name: LimitName, key: string): NextResponse | null {
+  const { limit, windowMs } = LIMITS[name];
+  const r = limiter().check(`${name}:${key}`, limit, windowMs);
+  if (r.ok) return null;
+  const mins = Math.ceil(r.retryAfterSec / 60);
+  return NextResponse.json(
+    { error: `Too many attempts. Please wait ${mins > 1 ? `${mins} minutes` : "a minute"} and try again.` },
+    { status: 429, headers: { "Retry-After": String(r.retryAfterSec) } },
+  );
 }
 
 /** Returns a 429 response when the caller is over the limit, otherwise null. */

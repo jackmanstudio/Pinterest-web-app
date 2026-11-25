@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getBrowserSupabase } from "@/lib/supabase/client";
+import { clearRememberCookie, getBrowserSupabase } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { WORKSPACE_KINDS, WORKSPACE_LABELS, isWorkspaceKind } from "@/lib/types";
 import { StatusBar } from "./StatusBar";
@@ -9,14 +9,16 @@ import { StatusBar } from "./StatusBar";
 export function AppHeader() {
   const path = usePathname();
   const router = useRouter();
-  if (path.startsWith("/login")) return null;
+  if (/^\/(login|signup|forgot-password|reset-password)/.test(path)) return null;
   const seg = path.split("/");
   const kind = seg[1] === "w" && isWorkspaceKind(seg[2] ?? "") ? seg[2] : "fashion";
   const inWorkspace = seg[1] === "w";
   const section = seg[3] ?? "";
 
   const signOut = async () => {
-    await getBrowserSupabase().auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    await getBrowserSupabase().auth.signOut({ scope: "local" }).catch(() => {});
+    clearRememberCookie();
     router.replace("/login");
     router.refresh();
   };
@@ -65,7 +67,7 @@ export function AppHeader() {
             All accounts
           </Link>
           <Link href="/account" className={`text-sm ${path === "/account" ? "font-semibold text-zinc-900" : "text-zinc-600 hover:text-zinc-900"}`}>
-            Account &amp; data
+            Account
           </Link>
           {isSupabaseConfigured && (
             <button onClick={signOut} className="text-sm text-zinc-600 hover:text-zinc-900">

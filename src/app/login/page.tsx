@@ -1,76 +1,75 @@
 "use client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { getBrowserSupabase } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { useEffect, useState } from "react";
+import { Alert, AuthShell, Field, GoogleButton, PasswordField, SubmitButton, postAuth } from "@/components/auth/AuthUi";
+import { safeNext } from "@/lib/auth/validation";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [next, setNext] = useState("/w/fashion");
 
-  if (!isSupabaseConfigured) {
-    return (
-      <main className="mx-auto mt-24 max-w-md rounded-xl border border-amber-300 bg-amber-50 p-6 text-amber-900">
-        <h1 className="text-lg font-semibold">Demo mode: sign-in is off</h1>
-        <p className="mt-2 text-sm">
-          Supabase isn&apos;t configured, so there are no accounts. Data is kept only in this browser. Set
-          <code className="mx-1">NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to enable sign-in.
-        </p>
-        <Link href="/w/fashion" className="mt-4 inline-block text-sm font-medium underline">Continue in Demo mode</Link>
-      </main>
-    );
-  }
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reading the URL once after hydration
+    setNext(safeNext(q.get("next")));
+    if (q.get("error") === "link") setError("That link has expired or was already used. Sign in, or request a new link.");
+    if (q.get("reset") === "1") setInfo("Your password was changed. Sign in with the new password.");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMsg(null);
-    const auth = getBrowserSupabase().auth;
-    const { data, error } =
-      mode === "signin"
-        ? await auth.signInWithPassword({ email, password })
-        : await auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
-    setBusy(false);
-    if (error) return setMsg({ text: error.message, ok: false });
-    if (mode === "signup" && !data.session) return setMsg({ text: "Check your email to confirm your account, then sign in.", ok: true });
-    router.replace("/w/fashion");
-    router.refresh();
+    setError(null);
+    setInfo(null);
+    setFields({});
+    try {
+      await postAuth("/api/auth/login", { email, password, remember });
+      // A full navigation so every page loads with the new session cookies.
+      window.location.assign(next);
+    } catch (err) {
+      const e2 = err as Error & { fields?: Record<string, string> };
+      setError(e2.message);
+      setFields(e2.fields ?? {});
+      setBusy(false);
+    }
   }
 
   return (
-    <main className="mx-auto mt-24 w-full max-w-sm rounded-xl border border-zinc-200 bg-white p-6 shadow-sm">
-      <h1 className="text-xl font-semibold text-red-700">Pinterest AI Studio</h1>
-      <p className="mt-1 text-sm text-zinc-600">{mode === "signin" ? "Sign in to your studio" : "Create your studio account"}</p>
-      <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
-          <input type="email" required autoComplete="email" className="rounded-md border border-zinc-300 px-3 py-2" value={email} onChange={(e) => setEmail(e.target.value)} />
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to continue to your studio."
+      footer={
+        <>
+          New to Pinterest AI Studio?{" "}
+          <Link href="/signup" className="font-medium text-[#2a1416] underline underline-offset-2">Create an account</Link>
+        </>
+      }
+    >
+      <GoogleButton next={next} />
+      <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
+        {info && <Alert tone="success">{info}</Alert>}
+        {error && <Alert tone="error">{error}</Alert>}
+        <Field label="Email address" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} error={fields.email} placeholder="you@example.com" />
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={setPassword}
+          error={fields.password}
+          right={<Link href="/forgot-password" className="text-xs font-medium text-[#b3262e] hover:underline">Forgot password?</Link>}
+        />
+        <label className="flex items-center gap-2 text-sm text-zinc-700">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-4 w-4 rounded border-zinc-300 accent-[#2a1416]" />
+          Remember me on this device
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
-          <input
-            type="password"
-            required
-            minLength={8}
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            className="rounded-md border border-zinc-300 px-3 py-2"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <button disabled={busy} className="rounded-md bg-red-700 py-2 font-medium text-white disabled:opacity-50">
-          {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
-        </button>
+        <SubmitButton busy={busy}>{busy ? "Signing in…" : "Sign in"}</SubmitButton>
       </form>
-      {msg && <p className={`mt-3 text-sm ${msg.ok ? "text-emerald-700" : "text-red-700"}`} role="status">{msg.text}</p>}
-      <button className="mt-4 text-sm text-zinc-600 underline" onClick={() => setMode(mode === "signin" ? "signup" : "signin")}>
-        {mode === "signin" ? "Need an account? Sign up" : "Have an account? Sign in"}
-      </button>
-    </main>
+    </AuthShell>
   );
 }

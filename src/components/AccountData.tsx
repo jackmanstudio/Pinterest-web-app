@@ -23,6 +23,7 @@ function demoKeys(): string[] {
 export function AccountData() {
   const router = useRouter();
   const [confirm, setConfirm] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -67,7 +68,7 @@ export function AccountData() {
       const res = await fetch("/api/account/delete", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ confirm }),
+        body: JSON.stringify({ confirm, password: password || undefined }),
       });
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? `Delete failed (${res.status})`);
       router.replace("/login");
@@ -81,7 +82,7 @@ export function AccountData() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Account &amp; data</h1>
+        <h2 className="text-xl font-semibold">Your data</h2>
         <p className="mt-1 text-sm text-zinc-600">
           {live
             ? "Your data is stored in Supabase with row-level security. Fashion and Macro stay separate in the export too."
@@ -120,6 +121,18 @@ export function AccountData() {
             aria-label="Confirmation text"
           />
         </label>
+        {live && (
+          <label className="mt-3 block text-sm">
+            Your password (leave empty if you only sign in with Google)
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="mt-1 block w-full max-w-sm rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            />
+          </label>
+        )}
         <button
           onClick={remove}
           disabled={busy || confirm !== CONFIRM}

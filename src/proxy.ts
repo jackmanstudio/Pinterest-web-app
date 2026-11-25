@@ -1,19 +1,24 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
+import { readRemember, rememberOptions } from "@/lib/supabase/remember";
+
+/** Pages and routes that work without an account. Everything else needs sign-in. */
+const PUBLIC = [/^\/login/, /^\/signup/, /^\/forgot-password/, /^\/reset-password/, /^\/terms/, /^\/privacy/, /^\/auth\//, /^\/api\/auth\/(login|signup|forgot)$/, /^\/api\/cron\//];
 
 /** Refreshes the Supabase session and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
   if (!isSupabaseConfigured) return NextResponse.next();
 
   let response = NextResponse.next({ request });
+  const remember = readRemember((n) => request.cookies.get(n)?.value);
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (toSet) => {
         for (const { name, value } of toSet) request.cookies.set(name, value);
         response = NextResponse.next({ request });
-        for (const { name, value, options } of toSet) response.cookies.set(name, value, options);
+        for (const { name, value, options } of toSet) response.cookies.set(name, value, rememberOptions(options, remember));
       },
     },
   });
@@ -21,13 +26,23 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
   // /api/cron authenticates with CRON_SECRET instead of a user session.
-  const isPublic = path.startsWith("/login") || path.startsWith("/auth") || path.startsWith("/api/cron/");
+  const isPublic = PUBLIC.some((r) => r.test(path));
   if (!data.user && !isPublic) {
     if (path.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in required" }, { status: 401 });
     }
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    // Come back to the page they asked for after signing in.
+    if (path !== "/") url.searchParams.set("next", path + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+  // Signed-in users don't need the sign-in pages.
+  if (data.user && /^\/(login|signup|forgot-password)/.test(path)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/w/fashion";
+    url.search = "";
     return NextResponse.redirect(url);
   }
   return response;
