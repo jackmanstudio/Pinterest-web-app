@@ -14,6 +14,7 @@ import { AutoPinCard } from "./AutoPinCard";
 import { TrendIdeas } from "./TrendIdeas";
 import { downloadImage } from "@/lib/client/download";
 import { pageContext, type PageInfo } from "@/lib/tools/pageExtract";
+import { PIN_STYLES, PIN_STYLE_KEYS, type PinStyle } from "@/lib/drafts/angles";
 
 /** "" → null (no link); a valid http(s) URL → itself; anything else → false. */
 function normalizeLink(raw: string): string | null | false {
@@ -73,6 +74,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [batch, setBatch] = useState<Batch | null>(null);
   // "From a link": read a blog post or product page and turn it into pins.
   const [source, setSource] = useState<"idea" | "link">("idea");
+  const [style, setStyle] = useState<PinStyle>("mixed");
   const [pageUrl, setPageUrl] = useState("");
   const [page, setPage] = useState<PageInfo | null>(null);
   const [reading, setReading] = useState(false);
@@ -144,7 +146,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined }),
+        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined, style }),
       });
     } catch {
       throw new GenerateError("Could not reach the server. Check your connection and retry.", true);
@@ -413,6 +415,15 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             </select>
           )}
           <span className="text-xs text-zinc-500">Each pin gets its own angle, layout and colour story.</span>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-zinc-700">
+          <label htmlFor="pin-style" className="font-medium">Pin type</label>
+          <select id="pin-style" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={style} onChange={(e) => setStyle(e.target.value as PinStyle)}>
+            {PIN_STYLE_KEYS.map((k) => (
+              <option key={k} value={k}>{PIN_STYLES[k].label}</option>
+            ))}
+          </select>
+          <span className="text-xs text-zinc-500">{PIN_STYLES[style].hint}</span>
         </div>
         <div className="mt-3 flex flex-col gap-2 text-sm text-zinc-700 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
           <span className="font-medium">Category</span>

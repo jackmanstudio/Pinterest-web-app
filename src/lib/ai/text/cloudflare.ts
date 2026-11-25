@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PIN_ANGLES } from "@/lib/drafts/angles";
+import { PIN_ANGLES, anglesFor } from "@/lib/drafts/angles";
 import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
 import { BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
@@ -18,7 +18,7 @@ interface Options {
 const clip = (s: unknown, n: number) => String(s ?? "").trim().slice(0, n);
 
 /** Models sometimes run a little over Pinterest's limits; trim instead of failing the whole set. */
-export function normalizeDrafts(raw: unknown): unknown {
+export function normalizeDrafts(raw: unknown, angles: readonly { label: string }[] = PIN_ANGLES): unknown {
   const drafts = (raw as { drafts?: unknown[] } | null)?.drafts;
   if (!Array.isArray(drafts)) return raw;
   return {
@@ -29,7 +29,7 @@ export function normalizeDrafts(raw: unknown): unknown {
         .filter(Boolean)
         .slice(0, LIMITS.tags);
       return {
-        angle: PIN_ANGLES[i]?.label ?? clip(x.angle, 60),
+        angle: angles[i]?.label ?? clip(x.angle, 60),
         concept: clip(x.concept, 400),
         title: clip(x.title, LIMITS.title),
         description: clip(x.description, LIMITS.description),
@@ -101,7 +101,7 @@ export class CloudflareTextProvider implements TextProvider {
 
   async generateDrafts(req: GenerateRequest): Promise<GenerateResponse> {
     const { out, usage } = await this.run(DRAFTS_SYSTEM, draftsUserPrompt(req), DraftSetSchema, 4000);
-    const parsed = DraftSetSchema.safeParse(normalizeDrafts(out));
+    const parsed = DraftSetSchema.safeParse(normalizeDrafts(out, anglesFor(req.style)));
     if (!parsed.success) throw new ProviderError("The AI returned incomplete drafts. Please retry.", 502, true);
     return { source: "ai", provider: this.name, model: this.model, drafts: parsed.data.drafts, usage };
   }

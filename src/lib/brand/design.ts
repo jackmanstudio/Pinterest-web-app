@@ -1,3 +1,4 @@
+import { anglePosition } from "@/lib/drafts/angles";
 /**
  * Premium pin design system: palettes, headline/kicker split, layout choice
  * per pin, and the five "Designer mix" layouts. Pure code (no Node APIs), so
@@ -98,6 +99,9 @@ const ANGLE_LAYOUT: [RegExp, Layout][] = [
 
 /** One layout per creative angle, so a batch of five never looks identical. */
 export function layoutForAngle(angle: string | undefined, title = ""): Layout {
+  // Pin sets (roundup, comparison…): the n-th angle of a set gets the n-th layout.
+  const pos = anglePosition(angle);
+  if (pos !== null) return (["paper", "framed", "caption", "editorial", "centered"] as const)[pos];
   for (const [re, layout] of ANGLE_LAYOUT) if (re.test(angle ?? "")) return layout;
   let h = 0;
   for (const c of title) h = (h * 31 + c.charCodeAt(0)) >>> 0;

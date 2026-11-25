@@ -1,3 +1,4 @@
+import { PIN_STYLE_KEYS, type PinStyle } from "./angles";
 import { z } from "zod";
 import { WORKSPACE_KINDS } from "@/lib/types";
 
@@ -38,6 +39,7 @@ export const GenerateRequestSchema = z.object({
   language: z.string().max(40).optional(),
   brand: BrandSchema,
   context: z.string().max(2000).optional(),
+  style: z.enum(PIN_STYLE_KEYS as [PinStyle, ...PinStyle[]]).optional(),
 });
 
 /** Turn "a, b,  c" into ["a","b","c"] (trimmed, deduped, no empties). */

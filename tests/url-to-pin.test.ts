@@ -99,3 +99,14 @@ describe("safe fetching", () => {
     expect(new TextDecoder().decode(r.bytes)).toMatch(/title/);
   });
 });
+
+describe("brand from a website", () => {
+  it("finds theme colour and logo candidates", () => {
+    const html = `<html><head><meta name="theme-color" content="#C0A"><link rel="icon" href="/favicon.ico"><link rel="icon" sizes="192x192" href="/icon-192.png"><link rel="apple-touch-icon" href="/apple.png"><script type="application/ld+json">{"@type":"Organization","logo":{"@type":"ImageObject","url":"https://x.example/logo.png"}}</script></head><body></body></html>`;
+    const p = extractPage(html, "https://x.example/");
+    expect(p.themeColor).toBe("#cc00aa");
+    expect(p.logos[0]).toBe("https://x.example/logo.png");
+    expect(p.logos).toContain("https://x.example/icon-192.png");
+    expect(p.logos.join(" ")).not.toMatch(/favicon\.ico/);
+  });
+});

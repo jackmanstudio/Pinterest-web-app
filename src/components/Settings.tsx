@@ -5,6 +5,7 @@ import type { BrandSettings, Category, WorkspaceKind } from "@/lib/types";
 import { WORKSPACE_LABELS } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
 import { PinDesign } from "./PinDesign";
+import { readTemplate } from "@/lib/brand/template";
 import { defaultCategories } from "@/lib/categories/taxonomy";
 
 import { LANGUAGES } from "@/lib/brand/languages";
@@ -20,6 +21,8 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   const [newParent, setNewParent] = useState("");
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [displayName, setDisplayName] = useState("");
+  const [filling, setFilling] = useState(false);
+  const [designKey, setDesignKey] = useState(0);
 
   useEffect(() => {
     if (!store || !workspace) return;
@@ -48,6 +51,48 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       )}
     </label>
   );
+
+  /** Brand analysis from the website: suggestions only, saved when you click Save. */
+  async function fillFromSite() {
+    setFilling(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/tools/brand-from-site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: brand!.website_url }) });
+      const s = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(s.error ?? "Couldn't read your website.");
+      const t = readTemplate(brand!.pin_template);
+      let logo = t.logo;
+      if (s.logo && !t.logo) {
+        const blob = await (await fetch(s.logo)).blob();
+        logo = await store!.uploadLogo(workspace!.id, new File([blob], "logo.png", { type: "image/png" }));
+      }
+      const filled: string[] = [];
+      const next: BrandSettings = { ...brand!, website_url: s.website_url ?? brand!.website_url };
+      if (!next.brand_name && s.brand_name) {
+        next.brand_name = s.brand_name;
+        filled.push("brand name");
+      }
+      if (!next.audience && s.description) {
+        next.audience = `People interested in: ${s.description}`.slice(0, 500);
+        filled.push("audience");
+      }
+      if (s.keywords?.length) {
+        const merged = parseList([kw, ...s.keywords].filter(Boolean).join(", ")).slice(0, 15);
+        setKw(merged.join(", "));
+        filled.push("keywords");
+      }
+      next.pin_template = { ...t, ...(s.color && t.primary_color === "#b91c1c" ? { primary_color: s.color } : {}), logo };
+      if (s.color) filled.push("brand colour");
+      if (logo && logo !== t.logo) filled.push("logo");
+      setBrand(next);
+      setDesignKey((k) => k + 1);
+      setMsg({ text: filled.length ? `Filled from your site: ${filled.join(", ")}. Check them, then Save.` : "Nothing new found on your site; your settings are unchanged.", ok: true });
+    } catch (e) {
+      setMsg({ text: (e as Error).message, ok: false });
+    } finally {
+      setFilling(false);
+    }
+  }
 
   async function saveBrand() {
     try {
@@ -106,6 +151,9 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         {field("voice", "Brand voice", true)}
         {field("audience", "Target audience", true)}
         {field("website_url", "Website URL")}
+        <button type="button" onClick={fillFromSite} disabled={filling || !brand.website_url.trim()} className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">
+          {filling ? "Reading your site…" : "Fill brand from my website"}
+        </button>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
           Focus keywords (comma separated)
           <input className={input} value={kw} onChange={(e) => setKw(e.target.value)} />
@@ -190,6 +238,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       </section>
 
       <PinDesign
+        key={designKey}
         store={store}
         workspaceId={workspace.id}
         brand={brand}

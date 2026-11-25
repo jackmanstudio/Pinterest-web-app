@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PIN_ANGLES } from "@/lib/drafts/angles";
+import { anglesFor } from "@/lib/drafts/angles";
 import { LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest } from "@/lib/types";
 import type { InsightsInput } from "./types";
@@ -39,7 +39,7 @@ Actions must be concrete next steps for pin content (topics, formats, timing) gr
 
 
 export function draftsUserPrompt(req: GenerateRequest): string {
-  const angles = PIN_ANGLES.map((a, i) => `${i + 1}. ${a.label}: ${a.brief}`).join("\n");
+  const angles = anglesFor(req.style).map((a, i) => `${i + 1}. ${a.label}: ${a.brief}`).join("\n");
   const b = req.brand;
   const brand = [
     b.brand_name && `Brand: ${b.brand_name}`,

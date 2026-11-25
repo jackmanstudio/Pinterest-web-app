@@ -1,3 +1,4 @@
+import type { PinStyle } from "@/lib/drafts/angles";
 export const WORKSPACE_KINDS = ["fashion", "macro"] as const;
 export type WorkspaceKind = (typeof WORKSPACE_KINDS)[number];
 
@@ -123,6 +124,8 @@ export interface GenerateRequest {
   brand: BrandSettings;
   /** Facts read from a source page (URL to pin). The AI must stay true to them. */
   context?: string;
+  /** Pin set: mixed angles (default), roundup, comparison, gift guide, curiosity. */
+  style?: PinStyle;
 }
 
 export interface GenerateResponse {

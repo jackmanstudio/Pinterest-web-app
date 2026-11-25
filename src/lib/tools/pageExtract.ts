@@ -25,6 +25,10 @@ export interface PageInfo {
   brand: string | null;
   keywords: string[];
   language: string | null;
+  /** Brand colour from <meta name="theme-color">, if the site sets one. */
+  themeColor: string | null;
+  /** Logo candidates, best first (Organization logo, apple-touch-icon, large icons). */
+  logos: string[];
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", rsquo: "’", lsquo: "‘", rdquo: "”", ldquo: "“", ndash: "–", mdash: "—", hellip: "…" };
@@ -159,6 +163,16 @@ export function extractPage(html: string, pageUrl: string): PageInfo {
   const kw = [...(product?.keywords ?? []), ...(article?.keywords ?? []), ...(meta.get("keywords")?.split(",") ?? [])].map((k) => k.trim()).filter((k) => k && k.length < 40);
   const lang = /<html\b[^>]*\slang\s*=\s*["']?([a-z-]+)/i.exec(html)?.[1] ?? null;
   const ogType = meta.get("og:type") ?? "";
+  const theme = meta.get("theme-color") ?? meta.get("msapplication-tilecolor") ?? "";
+  const logos: string[] = [];
+  const orgLogo = /"logo"\s*:\s*(?:\{[^}]*?"url"\s*:\s*)?"([^"]+)"/i.exec(html)?.[1];
+  if (orgLogo) logos.push(orgLogo);
+  if (meta.get("og:logo")) logos.push(meta.get("og:logo")!);
+  const icons = [...html.matchAll(/<link\b[^>]*rel\s*=\s*["'][^"']*(apple-touch-icon|icon)[^"']*["'][^>]*>/gi)]
+    .map((m) => ({ href: attr(m[0], "href"), size: parseInt(attr(m[0], "sizes") ?? "0") || (/apple/i.test(m[1]) ? 180 : 0) }))
+    .filter((x) => x.href && !/\.ico(\?|$)/i.test(x.href))
+    .sort((a, b) => b.size - a.size);
+  logos.push(...icons.map((i) => i.href!));
   return {
     url: pageUrl,
     canonical,
@@ -173,6 +187,8 @@ export function extractPage(html: string, pageUrl: string): PageInfo {
     brand: product?.brand ?? null,
     keywords: Array.from(new Set(kw)).slice(0, 10),
     language: lang,
+    themeColor: /^#[0-9a-f]{6}$/i.test(theme) ? theme.toLowerCase() : /^#[0-9a-f]{3}$/i.test(theme) ? `#${[...theme.slice(1)].map((c) => c + c).join("")}`.toLowerCase() : null,
+    logos: Array.from(new Set(logos.map((l) => absolute(l, pageUrl)).filter((l): l is string => Boolean(l)))).slice(0, 5),
   };
 }
 

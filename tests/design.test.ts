@@ -81,3 +81,22 @@ describe("premium pin design", () => {
     expect(buildImagePrompt({ title: "x", scene: "y", kind: "macro", angle: "Seasonal", palette: "sage" })).toMatch(/sage green/i);
   });
 });
+
+describe("pin sets", async () => {
+  const { anglesFor, PIN_STYLE_KEYS } = await import("@/lib/drafts/angles");
+  const { layoutForAngle } = await import("@/lib/brand/design");
+  const { DemoTextProvider } = await import("@/lib/ai/text/demo");
+  it("every set has five angles with five different layouts", () => {
+    for (const s of PIN_STYLE_KEYS) {
+      const a = anglesFor(s);
+      expect(a).toHaveLength(5);
+      expect(new Set(a.map((x) => layoutForAngle(x.label))).size).toBe(5);
+    }
+  });
+  it("demo text follows the chosen set", async () => {
+    const { EMPTY_BRAND } = await import("@/lib/types");
+    const r = await new DemoTextProvider().generateDrafts({ workspace: "fashion", idea: "linen vs cotton shirts", brand: EMPTY_BRAND, style: "comparison" });
+    expect(r.drafts[0].angle).toBe("Comparison: A vs B");
+    expect(r.drafts[0].title).toMatch(/Which One Wins/);
+  });
+});

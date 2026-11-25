@@ -1,4 +1,4 @@
-import { PIN_ANGLES, type PinAngleKey } from "@/lib/drafts/angles";
+import { PIN_ANGLES, anglesFor, type PinAngleKey } from "@/lib/drafts/angles";
 import { LIMITS } from "@/lib/drafts/validation";
 import type { DraftContent, GenerateRequest, GenerateResponse } from "@/lib/types";
 import type { TextProvider } from "./types";
@@ -16,7 +16,7 @@ export class DemoTextProvider implements TextProvider {
       source: "demo",
       provider: this.name,
       model: null,
-      drafts: PIN_ANGLES.map((a) => demoDraft(a.key, a.label, req)),
+      drafts: !req.style || req.style === "mixed" ? PIN_ANGLES.map((a) => demoDraft(a.key, a.label, req)) : anglesFor(req.style).map((a) => styleDraft(a, req)),
     };
   }
 }
@@ -98,4 +98,23 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
 function currentSeason(d = new Date()): string {
   const m = d.getMonth();
   return m < 2 || m === 11 ? "winter" : m < 5 ? "spring" : m < 8 ? "summer" : "autumn";
+}
+
+/** Demo text for the pin sets (roundup, comparison, gift guide, curiosity). */
+function styleDraft(a: { key: string; label: string; brief: string; demo?: string }, req: GenerateRequest): DraftContent {
+  const idea = req.idea.trim();
+  const Idea = titleCase(clip(idea.split(/\s+/).slice(0, 6).join(" "), 40));
+  const brand = req.brand.brand_name || "our studio";
+  const title = (a.demo ?? `${a.label}: {Idea}`).replace("{Idea}", Idea);
+  const shots = ["styled flat lay of several items side by side on linen", "two options arranged side by side on a clean table", "gift-wrapped items with ribbon and a handwritten tag", "close-up detail with soft window light", "lifestyle scene with a person choosing between items"];
+  const shot = shots[(a.key.length + idea.length) % shots.length];
+  return {
+    angle: a.label,
+    concept: `${a.label}: ${a.brief}`,
+    title: clip(title, LIMITS.title),
+    description: clip(`${a.brief.replace(/\.$/, "")} for ${idea}. Save this pin so you have it when you need it. More ideas from ${brand}.`, LIMITS.description),
+    alt_text: clip(`Photo of ${idea}: ${shot}.`, LIMITS.alt_text),
+    image_prompt: `Editorial photo of ${idea}: ${shot}, restrained palette, soft natural light.`,
+    tags: [...new Set([...idea.toLowerCase().split(/\s+/).filter((w) => w.length > 3).slice(0, 3), a.key.split("_")[0], req.workspace])].slice(0, LIMITS.tags),
+  };
 }
