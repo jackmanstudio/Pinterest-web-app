@@ -6,7 +6,7 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 
 | Integration | Status |
 | --- | --- |
-| Supabase auth + database | **Built, not yet tested against a live project.** Without env vars the app runs in Demo mode (browser-only storage, clearly labelled). |
+| Supabase auth + database | **Live Supabase project connected (26 Nov 2026), migrations 0001–0014 applied.** Without env vars the app runs in Demo mode (browser-only storage, clearly labelled). |
 | Text AI | **Two adapters built.** Free: Cloudflare Workers AI (Llama 3.3 70B, JSON mode) using the same Cloudflare credentials as images. Best quality: Claude (`TEXT_AI_API_KEY`). Without either, drafts come from templates and are labelled **DEMO** everywhere. Neither tested from this build environment with live keys. |
 | Image AI | **Three adapters built, not yet tested with live keys.** Recommended paid: fal.ai FLUX.3 Klein (~$0.011/pin; premium Nano Banana 2 or FLUX.3 via `IMAGE_AI_MODEL`). Free: Cloudflare Workers AI FLUX.2 klein 4B (~60/day). Alternative: OpenAI GPT Image. Without credentials, images are labelled DEMO placeholders. |
 | Pin design | **Built and tested.** Title overlay, brand colours, font, handle and logo drawn on the server (resvg + sharp, bundled OFL fonts). |
