@@ -1,9 +1,10 @@
 "use client";
+import { useState } from "react";
 import { LIMITS, parseList } from "@/lib/drafts/validation";
 import type { QualityContext } from "@/lib/drafts/quality";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
 import { CopyButton, pinAsText } from "./CopyButton";
-import { QualityPanel } from "./QualityPanel";
+import { QualityPanel, QualityScoreCard } from "./QualityPanel";
 
 const IMAGE_LABEL: Record<ImageStatus, string> = {
   not_generated: "No image yet",
@@ -54,9 +55,11 @@ interface Props {
   layout?: "form" | "card";
   /** Small line under the image in card layout (status, category, date). */
   meta?: React.ReactNode;
+  /** Card layout: who posts it and where, shown like a pin's account row. */
+  owner?: { name: string; board?: string | null };
 }
 
-export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality, layout = "form", meta }: Props) {
+export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality, layout = "form", meta, owner }: Props) {
   const set = <K extends keyof DraftContent>(k: K, v: DraftContent[K]) => onChange({ ...draft, [k]: v });
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
@@ -138,29 +141,19 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
     </>
   );
 
-  if (layout === "card") {
-    return (
-      <article className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300">
-        {media && <div className="p-2.5 pb-0">{media}</div>}
-        <div className="flex flex-col gap-3 p-4">
-          {meta}
-          {header}
-          {main}
-          <details className="group rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <summary className="cursor-pointer list-none text-[13px] font-semibold text-zinc-700 marker:hidden">
-              <span className="inline-block transition group-open:rotate-90" aria-hidden>›</span> More details
-              <span className="font-normal text-zinc-500"> · concept, alt text, image prompt</span>
-            </summary>
-            <div className="mt-3 flex flex-col gap-3">
-              {concept}
-              {extra}
-            </div>
-          </details>
-          {tail}
-        </div>
-      </article>
-    );
-  }
+  const cardTail = (
+    <>
+      {errors.length > 0 && (
+        <ul className="rounded-md bg-red-50 p-2 text-xs text-red-700" role="alert">
+          {errors.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      )}
+      {footer}
+    </>
+  );
+  if (layout === "card") return <CardView {...{ index, draft, source, media, meta, quality, owner, concept, main, extra, tail: cardTail }} />;
 
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -170,6 +163,93 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       {extra}
       {media}
       {tail}
+    </article>
+  );
+}
+
+function domainOf(link?: string | null): string | null {
+  if (!link) return null;
+  try {
+    return new URL(link).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+/** Pin library card, laid out like a pin: image, title, description, link, account row, tags, then the score card. */
+function CardView({ index, draft, source, media, meta, quality, owner, concept, main, extra, tail }: {
+  index: number;
+  draft: DraftContent;
+  source: ContentSource;
+  media?: React.ReactNode;
+  meta?: React.ReactNode;
+  quality?: QualityContext;
+  owner?: { name: string; board?: string | null };
+  concept: React.ReactNode;
+  main: React.ReactNode;
+  extra: React.ReactNode;
+  tail: React.ReactNode;
+}) {
+  const [editing, setEditing] = useState(false);
+  const domain = domainOf(quality?.link);
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/[0.05] transition duration-200 hover:border-white/20 hover:bg-white/[0.07]">
+      {media && <div className="p-2.5 pb-0">{media}</div>}
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        {/* Pin text, in the order a pin shows it */}
+        <div className="flex flex-col gap-2">
+          {domain && (
+            <a href={quality?.link ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12] hover:text-white">
+              <span aria-hidden>↗</span> {domain}
+            </a>
+          )}
+          <h3 className="text-[19px] font-bold leading-snug tracking-tight text-white">{draft.title || "Untitled pin"}</h3>
+          {!editing && <p className="line-clamp-3 text-[14px] leading-relaxed text-white/70">{draft.description}</p>}
+          {owner && (
+            <div className="mt-1 flex items-center gap-2.5">
+              <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#e60023] to-[#ff7a45] text-[13px] font-bold text-white">{owner.name.charAt(0).toUpperCase()}</span>
+              <span className="min-w-0 leading-tight">
+                <span className="block truncate text-[13px] font-semibold text-white">{owner.name}</span>
+                {owner.board && <span className="block truncate text-[12px] text-white/50">Board: {owner.board}</span>}
+              </span>
+            </div>
+          )}
+          {!editing && draft.tags.length > 0 && (
+            <ul className="mt-1 flex flex-wrap gap-1.5" aria-label="Tags">
+              {draft.tags.map((t) => (
+                <li key={t} className="rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[11.5px] font-medium text-white/70 ring-1 ring-white/10">#{t.replace(/\s+/g, "")}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <QualityScoreCard draft={draft} ctx={quality} />
+
+        {meta}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/40">Pin {index + 1} · {draft.angle || "Custom"}</span>
+          <span className="ml-auto"><SourceBadge source={source} /></span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(!editing)}
+            aria-expanded={editing}
+            className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/[0.14]"
+          >
+            {editing ? "Close editor" : "Edit text"}
+          </button>
+          <CopyButton text={pinAsText({ ...draft, link: quality?.link })} label="Copy pin" className="!rounded-lg !px-3 !py-1.5 !text-[13px] !font-semibold !text-white/80 !no-underline ring-1 ring-white/10 hover:!bg-white/[0.1]" />
+        </div>
+        {editing && (
+          <div className="flex flex-col gap-3 rounded-xl bg-black/20 p-3 ring-1 ring-white/10">
+            {main}
+            {concept}
+            {extra}
+          </div>
+        )}
+        <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-3">{tail}</div>
+      </div>
     </article>
   );
 }
