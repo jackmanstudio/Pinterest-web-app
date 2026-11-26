@@ -267,12 +267,12 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), idea: d.idea, link: d.link }}
                 onChange={(nd) => setEdits((all) => ({ ...all, [d.id]: nd }))}
                 layout="card"
+                owner={{ name: brand?.brand_name || workspace.name || "Your account", board: catName(d.category_id) || null }}
                 meta={
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
                       <span className={`rounded-full px-2 py-0.5 ${STATUS_PILL[d.status]}`}>{STATUS_LABELS[d.status]}</span>
                       {d.archived_at && <span className="rounded-full bg-white/10 px-2 py-0.5 text-white/70">Archived</span>}
-                      {catName(d.category_id) && <span className="max-w-full truncate rounded-full bg-white/[0.07] px-2 py-0.5 text-white/70 ring-1 ring-white/10">{catName(d.category_id)}</span>}
                       <span className="ml-auto font-medium text-white/45">{new Date(d.created_at).toLocaleDateString()}</span>
                     </div>
                     <p className="truncate text-xs text-white/50" title={`Idea: ${d.idea} · Job ${d.batch_id.slice(0, 8)}`}>Idea: “{d.idea}”</p>
