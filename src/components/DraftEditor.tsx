@@ -4,7 +4,7 @@ import { LIMITS, parseList } from "@/lib/drafts/validation";
 import type { QualityContext } from "@/lib/drafts/quality";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
 import { CopyButton, pinAsText } from "./CopyButton";
-import { QualityPanel, QualityScoreCard } from "./QualityPanel";
+import { QualityPanel, QualityScoreCard, type ScoreFix } from "./QualityPanel";
 
 const IMAGE_LABEL: Record<ImageStatus, string> = {
   not_generated: "No image yet",
@@ -57,9 +57,11 @@ interface Props {
   meta?: React.ReactNode;
   /** Card layout: who posts it and where, shown like a pin's account row. */
   owner?: { name: string; board?: string | null };
+  /** Card layout: one-click fix under the score card's notes. */
+  fix?: ScoreFix;
 }
 
-export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality, layout = "form", meta, owner }: Props) {
+export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality, layout = "form", meta, owner, fix }: Props) {
   const set = <K extends keyof DraftContent>(k: K, v: DraftContent[K]) => onChange({ ...draft, [k]: v });
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
@@ -153,7 +155,7 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       {footer}
     </>
   );
-  if (layout === "card") return <CardView {...{ index, draft, source, media, meta, quality, owner, concept, main, extra, tail: cardTail }} />;
+  if (layout === "card") return <CardView {...{ index, draft, source, media, meta, quality, owner, fix, concept, main, extra, tail: cardTail }} />;
 
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -177,7 +179,8 @@ function domainOf(link?: string | null): string | null {
 }
 
 /** Pin library card, laid out like a pin: image, title, description, link, account row, tags, then the score card. */
-function CardView({ index, draft, source, media, meta, quality, owner, concept, main, extra, tail }: {
+function CardView({ index, draft, source, media, meta, quality, owner, fix, concept, main, extra, tail }: {
+  fix?: ScoreFix;
   index: number;
   draft: DraftContent;
   source: ContentSource;
@@ -236,7 +239,7 @@ function CardView({ index, draft, source, media, meta, quality, owner, concept, 
           )}
         </dl>
 
-        <QualityScoreCard draft={draft} ctx={quality} />
+        <QualityScoreCard draft={draft} ctx={quality} fix={fix} />
 
         {meta}
         <div className="flex flex-wrap items-center gap-2">
