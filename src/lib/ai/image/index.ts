@@ -14,37 +14,63 @@ function costOverride(env: Env): number | undefined {
 }
 
 /**
- * Picks the image provider from server env:
- * - "fal" (recommended paid: good quality, ~$0.011/image): FAL_KEY
- * - "cloudflare" (free tier, ~60 images/day): CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN
- * - "openai" (paid alternative): IMAGE_AI_API_KEY or OPENAI_API_KEY
- * With no IMAGE_AI_PROVIDER, the first with credentials wins in that order
- * (a paid key you added is assumed to be the one you want). With none, the
- * labelled demo placeholder is used.
+ * One entry per image API. To switch to a new (paid) API later:
+ *   1. add a file next to this one that implements ImageProvider (see fal.ts),
+ *   2. add an entry here with the env vars it needs,
+ *   3. set IMAGE_AI_PROVIDER=<its name> (and its key) in Vercel and redeploy.
+ * Nothing else in the app changes: every image (Studio, Autopilot, one-step
+ * pins) goes through getImageProvider(), and usage/cost is logged per provider.
+ */
+interface ProviderEntry {
+  /** True when the env has what this provider needs. */
+  ready(env: Env): boolean;
+  create(env: Env): ImageProvider;
+}
+
+const PROVIDERS: Record<string, ProviderEntry> = {
+  // Recommended paid: good quality, ~$0.011/image.
+  fal: {
+    ready: (env) => Boolean(env.FAL_KEY),
+    create: (env) => new FalImageProvider({ apiKey: env.FAL_KEY!, model: env.IMAGE_AI_MODEL || undefined, costPerImage: costOverride(env) }),
+  },
+  // Free tier, ~60 images/day.
+  cloudflare: {
+    ready: (env) => Boolean(env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN),
+    create: (env) =>
+      new CloudflareImageProvider({ accountId: env.CLOUDFLARE_ACCOUNT_ID!, apiToken: env.CLOUDFLARE_API_TOKEN!, model: env.IMAGE_AI_MODEL || undefined, costPerImage: costOverride(env) }),
+  },
+  // Paid alternative.
+  openai: {
+    ready: (env) => Boolean(env.IMAGE_AI_API_KEY || env.OPENAI_API_KEY),
+    create: (env) => {
+      const q = (env.IMAGE_AI_QUALITY || "medium").toLowerCase();
+      return new OpenAIImageProvider({
+        apiKey: (env.IMAGE_AI_API_KEY || env.OPENAI_API_KEY)!,
+        model: env.IMAGE_AI_MODEL || undefined,
+        quality: (["low", "medium", "high"].includes(q) ? q : "medium") as ImageQuality,
+        costPerImage: costOverride(env),
+      });
+    },
+  },
+  demo: { ready: () => true, create: () => new DemoImageProvider() },
+};
+
+/** Image APIs this build can use (for IMAGE_AI_PROVIDER). */
+export const IMAGE_PROVIDER_NAMES = Object.keys(PROVIDERS);
+
+/**
+ * Picks the image provider from server env. IMAGE_AI_PROVIDER chooses one by
+ * name. Without it, the first with credentials wins in the order above (a paid
+ * key you added is assumed to be the one you want). A chosen provider without
+ * its credentials, or no credentials at all, gives the labelled demo placeholder.
  */
 export function getImageProvider(env: Env = process.env): ImageProvider {
-  const cf = env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN;
-  const openaiKey = env.IMAGE_AI_API_KEY || env.OPENAI_API_KEY;
-  const provider = (env.IMAGE_AI_PROVIDER || (env.FAL_KEY ? "fal" : cf ? "cloudflare" : openaiKey ? "openai" : "demo")).toLowerCase();
-
-  if (provider === "demo") return new DemoImageProvider();
-  if (provider === "fal") {
-    if (!env.FAL_KEY) return new DemoImageProvider();
-    return new FalImageProvider({ apiKey: env.FAL_KEY, model: env.IMAGE_AI_MODEL || undefined, costPerImage: costOverride(env) });
+  const chosen = (env.IMAGE_AI_PROVIDER || "").trim().toLowerCase();
+  if (chosen) {
+    const entry = PROVIDERS[chosen];
+    if (!entry) throw new Error(`IMAGE_AI_PROVIDER "${chosen}" is not supported. Use ${IMAGE_PROVIDER_NAMES.map((n) => `"${n}"`).join(", ")}.`);
+    return entry.ready(env) ? entry.create(env) : new DemoImageProvider();
   }
-  if (provider === "cloudflare") {
-    if (!cf) return new DemoImageProvider();
-    return new CloudflareImageProvider({ accountId: env.CLOUDFLARE_ACCOUNT_ID!, apiToken: env.CLOUDFLARE_API_TOKEN!, model: env.IMAGE_AI_MODEL || undefined, costPerImage: costOverride(env) });
-  }
-  if (provider === "openai") {
-    if (!openaiKey) return new DemoImageProvider();
-    const q = (env.IMAGE_AI_QUALITY || "medium").toLowerCase();
-    return new OpenAIImageProvider({
-      apiKey: openaiKey,
-      model: env.IMAGE_AI_MODEL || undefined,
-      quality: (["low", "medium", "high"].includes(q) ? q : "medium") as ImageQuality,
-      costPerImage: costOverride(env),
-    });
-  }
-  throw new Error(`IMAGE_AI_PROVIDER "${provider}" is not supported. Use "fal", "cloudflare", "openai" or "demo".`);
+  const name = IMAGE_PROVIDER_NAMES.find((n) => PROVIDERS[n].ready(env))!;
+  return PROVIDERS[name].create(env);
 }

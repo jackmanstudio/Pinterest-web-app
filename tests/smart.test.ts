@@ -30,7 +30,7 @@ describe("best posting time", () => {
 });
 
 describe("autopilot timing", () => {
-  const ws: AutopilotWorkspace = { workspace_id: "w", owner_id: "u", kind: "fashion", board_id: "b", board_name: null, pins_per_day: 3, link: null, timezone: "UTC", best_time: true, remix_winners: false, auto_trends: false, trend_interest: null };
+  const ws: AutopilotWorkspace = { workspace_id: "w", owner_id: "u", kind: "fashion", niche: "fashion", board_id: "b", board_name: null, pins_per_day: 3, link: null, timezone: "UTC", best_time: true, remix_winners: false, auto_trends: false, trend_interest: null };
   const deps = (now: Date, hours: number[]): AutopilotDeps & { published: string[] } => {
     const published: string[] = [];
     return {

@@ -5,7 +5,8 @@ import { useEffect, useState } from "react";
 import { PasswordField, postAuth } from "@/components/auth/AuthUi";
 import { passwordProblems } from "@/lib/auth/validation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { WORKSPACE_KINDS, WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import type { WorkspaceKind } from "@/lib/types";
+import { getStore } from "@/lib/store";
 
 interface Profile {
   email: string;
@@ -20,6 +21,7 @@ interface Profile {
 }
 interface Conn {
   kind: WorkspaceKind;
+  name: string;
   username: string | null;
   status: string | null;
   ready: boolean;
@@ -50,14 +52,20 @@ export function AccountSettings() {
         })
         .catch((e: Error) => !cancelled && setLoadErr(e.message));
     }
-    Promise.all(
-      WORKSPACE_KINDS.map((k) =>
-        fetch(`/api/pinterest/status?workspace=${k}`)
-          .then((r) => r.json())
-          .then((s) => ({ kind: k, username: s.connection?.username ?? null, status: s.connection?.status ?? null, ready: Boolean(s.config?.ready) }))
-          .catch(() => ({ kind: k, username: null, status: null, ready: false })),
-      ),
-    ).then((c) => !cancelled && setConns(c));
+    getStore()
+      .listWorkspaces()
+      .catch(() => [])
+      .then((list) =>
+        Promise.all(
+          list.map(({ kind: k, name }) =>
+            fetch(`/api/pinterest/status?workspace=${k}`)
+              .then((r) => r.json())
+              .then((s) => ({ kind: k, name, username: s.connection?.username ?? null, status: s.connection?.status ?? null, ready: Boolean(s.config?.ready) }))
+              .catch(() => ({ kind: k, name, username: null, status: null, ready: false })),
+          ),
+        ),
+      )
+      .then((c) => !cancelled && setConns(c));
     return () => {
       cancelled = true;
     };
@@ -94,11 +102,11 @@ export function AccountSettings() {
 
       <section className={card}>
         <h2 className="font-semibold">Pinterest connections</h2>
-        <p className="mt-1 text-sm text-zinc-600">Each account (Fashion, Macro) connects its own Pinterest profile. Disconnecting deletes the stored tokens.</p>
+        <p className="mt-1 text-sm text-zinc-600">Each of your accounts connects its own Pinterest profile, and you can add as many accounts as you like on <Link href="/overview?add=1" className="underline">All accounts</Link>. Disconnecting deletes the stored tokens.</p>
         <ul className="mt-3 divide-y divide-zinc-100">
           {conns.map((c) => (
             <li key={c.kind} className="flex flex-wrap items-center gap-3 py-2 text-sm">
-              <span className="w-20 font-medium">{WORKSPACE_LABELS[c.kind]}</span>
+              <span className="w-32 truncate font-medium">{c.name}</span>
               <span className={`rounded-full px-2 py-0.5 text-xs ${c.status === "active" ? "bg-emerald-100 text-emerald-800" : c.status ? "bg-amber-100 text-amber-900" : "bg-zinc-100 text-zinc-700"}`}>
                 {c.status === "active" ? `Connected · @${c.username}` : c.status ? `Needs reconnect · @${c.username}` : c.ready ? "Not connected" : "Pinterest not configured"}
               </span>

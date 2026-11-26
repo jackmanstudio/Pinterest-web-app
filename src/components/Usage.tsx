@@ -2,7 +2,7 @@
 import { PageTitle } from "./PageTitle";
 import { useEffect, useState } from "react";
 import type { UsageEntry } from "@/lib/usage/ledger";
-import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import { labelFromSlug, type WorkspaceKind } from "@/lib/types";
 
 interface UsageData {
   ledger: "supabase" | "memory" | "browser";
@@ -56,7 +56,7 @@ export function Usage({ kind }: { kind: WorkspaceKind }) {
       </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} · recent AI calls</h2>
+        <h2 className="text-lg font-semibold">{labelFromSlug(kind)} · recent AI calls</h2>
         {rows.length === 0 ? (
           <p className="mt-2 text-sm text-zinc-600">No AI calls in this workspace yet.</p>
         ) : (

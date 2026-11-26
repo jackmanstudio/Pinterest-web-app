@@ -4,10 +4,12 @@ import type { Snapshot, TrendKeyword } from "@/lib/analytics/types";
 import { freshness } from "@/lib/analytics/parse";
 import { seasonalIdeas } from "@/lib/ideas/seasonal";
 import type { Store } from "@/lib/store";
-import type { WorkspaceKind } from "@/lib/types";
+import { nicheFromSlug, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 
 interface Props {
   kind: WorkspaceKind;
+  /** The account's niche template; guessed from the slug when missing. */
+  niche?: WorkspaceNiche;
   store: Store;
   workspaceId: string;
   onPick: (idea: string) => void;
@@ -16,7 +18,7 @@ interface Props {
 const pct = (t: TrendKeyword) => t.pct_growth_wow ?? t.pct_growth_mom ?? t.pct_growth_yoy;
 
 /** Topic suggestions: live Pinterest Trends when available, otherwise clearly labelled seasonal ideas. */
-export function TrendIdeas({ kind, store, workspaceId, onPick }: Props) {
+export function TrendIdeas({ kind, niche, store, workspaceId, onPick }: Props) {
   const [trends, setTrends] = useState<Snapshot<TrendKeyword[]> | null>(null);
   const [canFetch, setCanFetch] = useState(false);
   const [seasonal, setSeasonal] = useState<string[]>([]);
@@ -25,11 +27,11 @@ export function TrendIdeas({ kind, store, workspaceId, onPick }: Props) {
 
   const load = useCallback(async () => {
     const [brand, res] = await Promise.all([store.getBrand(workspaceId).catch(() => null), fetch(`/api/analytics?workspace=${kind}`).catch(() => null)]);
-    setSeasonal(seasonalIdeas(kind, new Date(), brand?.focus_keywords ?? []));
+    setSeasonal(seasonalIdeas(niche ?? nicheFromSlug(kind), new Date(), brand?.focus_keywords ?? []));
     const body = res?.ok ? await res.json() : null;
     setTrends((body?.snapshots?.trends as Snapshot<TrendKeyword[]> | undefined) ?? null);
     setCanFetch(Boolean(body && body.mode === "supabase" && body.pinterestConfigured));
-  }, [kind, store, workspaceId]);
+  }, [kind, niche, store, workspaceId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial fetch
@@ -43,7 +45,7 @@ export function TrendIdeas({ kind, store, workspaceId, onPick }: Props) {
       const res = await fetch("/api/analytics/trends", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, type: "growing", ...(kind === "fashion" ? { interest: "womens_fashion" } : {}) }),
+        body: JSON.stringify({ workspace: kind, type: "growing", ...((niche ?? nicheFromSlug(kind)) === "fashion" ? { interest: "womens_fashion" } : {}) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Could not fetch trends");

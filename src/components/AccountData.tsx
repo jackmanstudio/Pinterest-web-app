@@ -85,7 +85,7 @@ export function AccountData() {
         <h2 className="text-xl font-semibold">Your data</h2>
         <p className="mt-1 text-sm text-zinc-600">
           {live
-            ? "Your data is stored in Supabase with row-level security. Fashion and Macro stay separate in the export too."
+            ? "Your data is stored in Supabase with row-level security. Each account stays separate in the export too."
             : "Demo mode: your pins and settings are saved only in this browser's local storage. To write pins and make images, your idea and brand settings are sent to the server and its AI provider; they are not stored there."}
         </p>
       </div>
@@ -93,7 +93,7 @@ export function AccountData() {
       <section className="rounded-lg border border-zinc-200 bg-white p-5">
         <h2 className="font-semibold">Export your data</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Downloads a JSON file with both workspaces: brand settings, categories, drafts, publish history, analytics snapshots,
+          Downloads a JSON file with all your accounts: brand settings, categories, drafts, publish history, analytics snapshots,
           AI usage and the audit log. Pinterest access tokens are never exported.
         </p>
         <button
@@ -109,7 +109,7 @@ export function AccountData() {
         <h2 className="font-semibold text-red-800">{live ? "Delete account" : "Clear demo data"}</h2>
         <p className="mt-1 text-sm text-zinc-600">
           {live
-            ? "Permanently deletes your account, both workspaces, all drafts, images and the stored Pinterest connection. Pins already published on Pinterest are not touched. This cannot be undone, so export first."
+            ? "Permanently deletes your account, all its Pinterest accounts, all drafts, images and the stored Pinterest connection. Pins already published on Pinterest are not touched. This cannot be undone, so export first."
             : "Removes all demo workspaces, drafts and images from this browser."}
         </p>
         <label className="mt-3 block text-sm">

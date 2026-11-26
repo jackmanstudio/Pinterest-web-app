@@ -1,4 +1,4 @@
-import type { Category, WorkspaceKind } from "@/lib/types";
+import type { Category, WorkspaceNiche } from "@/lib/types";
 
 /**
  * The 40-category taxonomy from the product spec (section 6).
@@ -48,7 +48,7 @@ export const TAXONOMY_40 = [
   "Self-Care & Daily Wellness",
 ] as const;
 
-export function defaultCategories(kind: WorkspaceKind): string[] {
+export function defaultCategories(kind: WorkspaceNiche): string[] {
   return kind === "macro" ? [...TAXONOMY_40] : TAXONOMY_40.slice(0, 10);
 }
 

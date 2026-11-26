@@ -11,19 +11,22 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const jar = await cookies();
   const raw = jar.get(STATE_COOKIE)?.value;
-  const back = (kind: string, q: string) => {
-    const res = NextResponse.redirect(new URL(`/w/${isWorkspaceKind(kind) ? kind : "fashion"}/pinterest?${q}`, url.origin));
+  // Without a known account, land on the accounts list (any account may have been deleted).
+  const back = (kind: string | null, q: string) => {
+    const res = NextResponse.redirect(new URL(kind && isWorkspaceKind(kind) ? `/w/${kind}/pinterest?${q}` : `/overview?${q}`, url.origin));
     res.cookies.set(STATE_COOKIE, "", { path: "/api/pinterest", maxAge: 0 });
     return res;
   };
 
+  let kind: string | null = null;
   try {
     const ctx = await getRequestContext();
     if (ctx.mode !== "supabase") throw new HttpError(503, "Supabase required");
     const secret = process.env.TOKEN_ENCRYPTION_KEY ?? "";
     const st = verifyState(raw, url.searchParams.get("state"), ctx.user.id, secret);
-    if (!st || !isWorkspaceKind(st.workspace)) return back("fashion", "error=" + encodeURIComponent("Connection expired or invalid. Please try again."));
+    if (!st || !isWorkspaceKind(st.workspace)) return back(null, "error=" + encodeURIComponent("Connection expired or invalid. Please try again."));
 
+    kind = st.workspace;
     if (url.searchParams.get("error")) {
       return back(st.workspace, "error=" + encodeURIComponent("Pinterest access was not granted."));
     }
@@ -38,6 +41,6 @@ export async function GET(request: Request) {
   } catch (err) {
     const msg = err instanceof HttpError ? err.message : describePinterestError(err);
     console.error("pinterest callback failed", err instanceof Error ? err.message : err);
-    return back("fashion", "error=" + encodeURIComponent(msg));
+    return back(kind, "error=" + encodeURIComponent(msg));
   }
 }

@@ -9,10 +9,10 @@ import { ProviderError } from "@/lib/ai/text/types";
 import type { BrandAnalysis } from "@/lib/ai/text/prompt";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { estimateTextCost } from "@/lib/usage/pricing";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { FetchBlocked, safeFetch } from "@/lib/tools/safeFetch";
 
-const Body = z.object({ url: z.string().trim().min(4).max(2048), workspace: z.enum(WORKSPACE_KINDS).optional() });
+const Body = z.object({ url: z.string().trim().min(4).max(2048), workspace: WorkspaceSlug.optional() });
 
 /** Logo as a small PNG data URL (fits the pin template's size limit), or null. */
 async function logoDataUrl(urls: string[]): Promise<string | null> {

@@ -5,16 +5,17 @@ import { getImageProvider } from "@/lib/ai/image";
 import { IMAGE_BUCKET, PIN_IMAGE_SIZE } from "@/lib/ai/image/types";
 import { withRetry } from "@/lib/ai/retry";
 import { ProviderError } from "@/lib/ai/text/types";
-import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
+import { getRequestContext, HttpError, workspaceFor } from "@/lib/server/context";
+import type { WorkspaceNiche } from "@/lib/types";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
 import { readTemplate } from "@/lib/brand/template";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { PhotoError, pagePhoto as fetchPagePhoto } from "@/lib/tools/pagePhoto";
 
 const Body = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   draftId: z.string().min(1).max(64),
   // Only used in Demo storage mode, where the server can't read the draft or brand.
   prompt: z.string().max(2000).optional(),
@@ -45,9 +46,10 @@ export async function POST(request: Request) {
 
   const provider = getImageProvider();
   let workspaceId: string | null = null;
+  let niche: WorkspaceNiche = "macro";
   let markFailed = async () => {};
   try {
-    workspaceId = await workspaceIdFor(ctx, workspace);
+    ({ id: workspaceId, niche } = await workspaceFor(ctx, workspace));
     let prompt = parsed.data.prompt ?? "";
     let title = parsed.data.title ?? "";
     let angle = parsed.data.angle;
@@ -82,7 +84,7 @@ export async function POST(request: Request) {
     let source = parsed.data.sourceImage;
     if (!source && !prompt.trim()) throw new HttpError(400, "Add an image prompt first");
 
-    const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: workspace, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
+    const fullPrompt = buildImagePrompt({ title, scene: prompt, kind: niche, overlay: art.template.style, angle, palette: art.template.palette, imageStyle });
     // A page photo first (retried inside); if the site still refuses it, make an AI image instead of leaving the pin empty.
     let notice: string | null = null;
     let pagePhotoRaw: Awaited<ReturnType<typeof fetchPagePhoto>> | null = null;

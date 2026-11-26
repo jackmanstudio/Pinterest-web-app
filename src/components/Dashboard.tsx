@@ -4,7 +4,7 @@ import Link from "./NavLink";
 import { useRouter } from "next/navigation";
 import { getDemoUser } from "@/lib/auth/demo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { WORKSPACE_KINDS, WORKSPACE_LABELS, type PinDraft, type WorkspaceKind } from "@/lib/types";
+import { DEFAULT_WORKSPACES, type PinDraft, type WorkspaceKind } from "@/lib/types";
 
 interface Pin { draft: PinDraft; kind: WorkspaceKind }
 interface WsInfo { kind: WorkspaceKind; name: string; brand: boolean; connected: boolean | null }
@@ -88,16 +88,24 @@ export function Dashboard() {
       try {
         const all: Pin[] = [];
         const ws: WsInfo[] = [];
-        for (const kind of WORKSPACE_KINDS) {
-          const w = await store.getWorkspace(kind);
-          const [drafts, brand] = await Promise.all([store.listDrafts(w.id), store.getBrand(w.id)]);
-          let connected: boolean | null = null;
-          if (store.mode === "supabase") {
-            const s = await fetch(`/api/pinterest/status?workspace=${kind}`).then((r) => r.json()).catch(() => ({}));
-            connected = s.connection?.status === "active";
-          }
-          for (const d of drafts) if (!d.archived_at) all.push({ draft: d, kind });
-          ws.push({ kind, name: w.name, brand: Boolean(brand.brand_name?.trim() || brand.website_url?.trim()), connected });
+        const list = await store.listWorkspaces();
+        if (!cancelled && list[0]) setTarget((t) => (list.some((w) => w.kind === t) ? t : list[0].kind));
+        // Any number of accounts: load them in parallel, keeping the user's order.
+        const loaded = await Promise.all(
+          list.map(async (w) => {
+            const kind = w.kind;
+            const [drafts, brand] = await Promise.all([store.listDrafts(w.id), store.getBrand(w.id)]);
+            let connected: boolean | null = null;
+            if (store.mode === "supabase") {
+              const s = await fetch(`/api/pinterest/status?workspace=${kind}`).then((r) => r.json()).catch(() => ({}));
+              connected = s.connection?.status === "active";
+            }
+            return { drafts, info: { kind, name: w.name, brand: Boolean(brand.brand_name?.trim() || brand.website_url?.trim()), connected } };
+          }),
+        );
+        for (const { drafts, info } of loaded) {
+          for (const d of drafts) if (!d.archived_at) all.push({ draft: d, kind: info.kind });
+          ws.push(info);
         }
         all.sort((a, b) => b.draft.created_at.localeCompare(a.draft.created_at));
         if (cancelled) return;
@@ -119,6 +127,10 @@ export function Dashboard() {
   const days = useMemo(() => (today ? lastDays(DAYS, today) : []), [today]);
   const made = useMemo(() => series(view, (d) => d.created_at, days), [view, days]);
   const ws = filter === "all" ? target : filter;
+  const accounts = spaces.length ? spaces.map((w) => ({ kind: w.kind, name: w.name })) : DEFAULT_WORKSPACES;
+  const nameOf = (k: WorkspaceKind) => accounts.find((a) => a.kind === k)?.name ?? k;
+  /** More accounts than fit as buttons: show a dropdown instead. */
+  const many = accounts.length > 3;
 
   function create(e: React.FormEvent) {
     e.preventDefault();
@@ -150,8 +162,16 @@ export function Dashboard() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="au-glass inline-block min-w-[11rem] rounded-full px-3 py-1 text-center font-medium text-white/75">{dateLabel || "\u00a0"}</span>
           {!isSupabaseConfigured && <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 font-semibold text-amber-200">Demo mode · this browser</span>}
-          <div className="au-glass ml-auto flex gap-0.5 rounded-full p-0.5" role="radiogroup" aria-label="Show workspace">
-            {(["all", ...WORKSPACE_KINDS] as Filter[]).map((f) => (
+          {many ? (
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Show account" className="au-glass ml-auto max-w-[12rem] truncate rounded-full !border-0 px-3 py-1.5 text-[13px] font-semibold text-white outline-none">
+              <option value="all" className="bg-[#1a1426]">All accounts</option>
+              {accounts.map((a) => (
+                <option key={a.kind} value={a.kind} className="bg-[#1a1426]">{a.name}</option>
+              ))}
+            </select>
+          ) : (
+          <div className="au-glass ml-auto flex gap-0.5 rounded-full p-0.5" role="radiogroup" aria-label="Show account">
+            {(["all", ...accounts.map((a) => a.kind)] as Filter[]).map((f) => (
               <button
                 key={f}
                 role="radio"
@@ -159,10 +179,11 @@ export function Dashboard() {
                 onClick={() => setFilter(f)}
                 className={`rounded-full px-3 py-1 text-[13px] font-semibold transition-colors ${filter === f ? "bg-[#fff] text-[#0b0912]" : "text-white/60 hover:text-white"}`}
               >
-                {f === "all" ? "All" : WORKSPACE_LABELS[f]}
+                {f === "all" ? "All" : nameOf(f)}
               </button>
             ))}
           </div>
+          )}
         </div>
         <p className="mt-6 h-6 text-base font-semibold text-white/80">
           {hello}
@@ -175,8 +196,15 @@ export function Dashboard() {
         </h1>
         <p className="mt-3 max-w-lg text-[15px] text-white/60">One idea in, finished pins out: title, description, tags and a designed image.</p>
         <form onSubmit={create} className={`${glass} mt-6 flex flex-col gap-2 p-2 shadow-[0_20px_60px_-20px_rgba(230,0,35,0.5)] sm:flex-row sm:items-center`}>
-          <div className="flex shrink-0 gap-1 rounded-xl bg-black/25 p-1" role="radiogroup" aria-label="Workspace for new pins">
-            {WORKSPACE_KINDS.map((k) => (
+          {many ? (
+            <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Account for new pins" className="max-w-full shrink-0 truncate rounded-xl !border-0 bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3.5 py-2 text-[13px] font-semibold text-white outline-none sm:max-w-[12rem]">
+              {accounts.map((a) => (
+                <option key={a.kind} value={a.kind} className="bg-[#1a1426]">{a.name}</option>
+              ))}
+            </select>
+          ) : (
+          <div className="flex shrink-0 gap-1 rounded-xl bg-black/25 p-1" role="radiogroup" aria-label="Account for new pins">
+            {accounts.map(({ kind: k }) => (
               <button
                 key={k}
                 type="button"
@@ -185,10 +213,11 @@ export function Dashboard() {
                 onClick={() => setTarget(k)}
                 className={`flex-1 rounded-lg px-3.5 py-1.5 text-[13px] font-semibold transition-all ${target === k ? "bg-gradient-to-r from-[#e60023] to-[#ff7a45] text-white shadow-[0_6px_18px_-6px_rgba(255,90,60,0.8)]" : "text-white/60 hover:text-white"}`}
               >
-                {WORKSPACE_LABELS[k]}
+                {nameOf(k)}
               </button>
             ))}
           </div>
+          )}
           <input
             ref={cmd}
             value={idea}
@@ -281,14 +310,14 @@ export function Dashboard() {
 
       {/* Workspaces */}
       <div className="grid gap-3 sm:grid-cols-2">
-        {spaces.map((w) => {
+        {spaces.map((w, i) => {
           const mine = (pins ?? []).filter((p) => p.kind === w.kind);
           const next = !w.brand ? { href: `/w/${w.kind}/settings`, label: "Set up brand" } : w.connected !== true ? { href: `/w/${w.kind}/pinterest`, label: "Connect Pinterest" } : { href: `/w/${w.kind}`, label: "Make pins" };
           return (
             <section key={w.kind} className={`${glass} relative overflow-hidden p-5`}>
-              <div aria-hidden className={`pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full blur-3xl ${w.kind === "fashion" ? "bg-rose-500/30" : "bg-violet-500/30"}`} />
+              <div aria-hidden className={`pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full blur-3xl ${i % 2 === 0 ? "bg-rose-500/30" : "bg-violet-500/30"}`} />
               <div className="relative flex items-center gap-3">
-                <span className={`grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white ${w.kind === "fashion" ? "bg-gradient-to-br from-[#e60023] to-[#ff7a45]" : "bg-gradient-to-br from-violet-500 to-indigo-600"}`}>{w.name.charAt(0)}</span>
+                <span className={`grid h-10 w-10 place-items-center rounded-xl text-sm font-bold text-white ${i % 2 === 0 ? "bg-gradient-to-br from-[#e60023] to-[#ff7a45]" : "bg-gradient-to-br from-violet-500 to-indigo-600"}`}>{w.name.charAt(0).toUpperCase()}</span>
                 <div>
                   <h2 className="text-base font-semibold leading-tight">{w.name}</h2>
                   <p className="text-xs text-white/50">{mine.length} pins · {mine.filter((p) => p.draft.status === "in_review").length} review · {mine.filter((p) => p.draft.status === "published").length} live</p>
@@ -301,6 +330,13 @@ export function Dashboard() {
             </section>
           );
         })}
+        {spaces.length > 0 && (
+          <Link href="/overview?add=1" className={`${glass} flex min-h-[8.5rem] flex-col items-center justify-center gap-1.5 border border-dashed border-white/20 p-5 text-center text-white/70 transition hover:bg-white/[0.08] hover:text-white`}>
+            <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.08] text-xl font-bold" aria-hidden>+</span>
+            <span className="text-sm font-semibold">Add a Pinterest account</span>
+            <span className="text-xs text-white/50">No limit on accounts</span>
+          </Link>
+        )}
       </div>
     </div>
   );

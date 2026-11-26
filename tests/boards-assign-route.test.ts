@@ -4,6 +4,7 @@ const ledger = { mode: "memory", monthSpendUsd: async () => 0, record: async () 
 vi.mock("@/lib/server/context", () => ({
   getRequestContext: async () => ({ mode: "demo", ledger }),
   workspaceIdFor: async () => "demo-fashion",
+  workspaceFor: async () => ({ id: "demo-fashion", niche: "fashion" }),
   HttpError: class extends Error {},
 }));
 const calls: { keys: string[] }[] = [];

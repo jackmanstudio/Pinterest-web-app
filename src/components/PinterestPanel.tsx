@@ -3,7 +3,7 @@ import { PageTitle } from "./PageTitle";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionInfo } from "@/lib/pinterest/connections";
-import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import { labelFromSlug, type WorkspaceKind } from "@/lib/types";
 
 interface Board { board_id: string; name: string; privacy: string | null; pin_count: number | null }
 interface Pin { pin_id: string; title: string | null; description: string | null; link: string | null; alt_text: string | null; image_url: string | null; pin_created_at: string | null }
@@ -85,7 +85,7 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
     }
   }
 
-  const label = WORKSPACE_LABELS[kind];
+  const label = labelFromSlug(kind);
   const conn = data?.connection;
 
   return (

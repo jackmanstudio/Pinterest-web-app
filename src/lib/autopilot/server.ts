@@ -12,7 +12,7 @@ import { PinterestApi } from "@/lib/pinterest/api";
 import { checkPinterestConfig, getPinterestConfig } from "@/lib/pinterest/config";
 import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { describePinterestError } from "@/lib/pinterest/sync";
-import { EMPTY_BRAND, type BrandSettings } from "@/lib/types";
+import { EMPTY_BRAND, isWorkspaceNiche, type BrandSettings } from "@/lib/types";
 import { brandArtFor, brandPinImage } from "@/lib/brand/server";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
@@ -353,7 +353,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
           // Photos from the source page first (free, and they show the real product); AI otherwise.
           const fromPage = photos.length ? await pagePhoto(photos[i % photos.length]).catch(() => null) : null;
           if (!fromPage) await assertWithinBudget(ledger, true);
-          const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.kind, overlay: art.template.style, angle: d.angle, palette: art.template.palette, imageStyle: brand.image_style });
+          const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.niche, overlay: art.template.style, angle: d.angle, palette: art.template.palette, imageStyle: brand.image_style });
           const img = await brandPinImage(fromPage ?? (await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE))), d.title, art, { angle: d.angle });
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
@@ -414,17 +414,26 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
 
 /** Loads every workspace with Autopilot switched on. */
 export async function enabledWorkspaces(admin: SupabaseClient, workspaceId?: string): Promise<AutopilotWorkspace[]> {
-  let q = admin
-    .from("autopilot_settings")
-    .select("workspace_id, board_id, board_name, pins_per_day, link, timezone, best_time, remix_winners, auto_trends, trend_interest, workspaces!inner(owner_id, kind)")
-    .eq("enabled", true);
-  if (workspaceId) q = q.eq("workspace_id", workspaceId);
-  const { data, error } = await q;
+  type Row = Omit<AutopilotWorkspace, "owner_id" | "kind" | "niche"> & { workspaces: WsJoin | WsJoin[] };
+  type WsJoin = { owner_id: string; kind: string; slug?: string };
+  const run = (ws: string) => {
+    let q = admin
+      .from("autopilot_settings")
+      .select("workspace_id, board_id, board_name, pins_per_day, link, timezone, best_time, remix_winners, auto_trends, trend_interest, " + `workspaces!inner(${ws})`)
+      .eq("enabled", true);
+    if (workspaceId) q = q.eq("workspace_id", workspaceId);
+    return q.returns<Row[]>();
+  };
+  let res = await run("owner_id, kind, slug");
+  // Database without migration 0013: no slugs yet, the niche is the slug.
+  if (isMissingColumn(res.error)) res = await run("owner_id, kind");
+  const { data, error } = res;
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => {
-    const w = (Array.isArray(r.workspaces) ? r.workspaces[0] : r.workspaces) as { owner_id: string; kind: AutopilotWorkspace["kind"] };
+    const w = Array.isArray(r.workspaces) ? r.workspaces[0] : r.workspaces;
     return {
-      workspace_id: r.workspace_id, owner_id: w.owner_id, kind: w.kind, board_id: r.board_id!, board_name: r.board_name, pins_per_day: r.pins_per_day, link: r.link,
+      workspace_id: r.workspace_id, owner_id: w.owner_id, kind: w.slug ?? w.kind, niche: isWorkspaceNiche(w.kind) ? w.kind : "macro",
+      board_id: r.board_id!, board_name: r.board_name, pins_per_day: r.pins_per_day, link: r.link,
       timezone: r.timezone, best_time: r.best_time, remix_winners: r.remix_winners, auto_trends: r.auto_trends, trend_interest: r.trend_interest,
     };
   });

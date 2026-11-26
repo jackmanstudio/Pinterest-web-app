@@ -1,6 +1,6 @@
 import type { TemplateStyle } from "@/lib/brand/template";
 import { LAYOUT_PALETTE, layoutForAngle, type Layout, type PaletteName } from "@/lib/brand/design";
-import type { WorkspaceKind } from "@/lib/types";
+import type { WorkspaceNiche } from "@/lib/types";
 
 /**
  * Builds the final prompt sent to the image model. The draft's image prompt
@@ -12,7 +12,7 @@ import type { WorkspaceKind } from "@/lib/types";
 export interface ImagePromptInput {
   title: string;
   scene: string;
-  kind: WorkspaceKind;
+  kind: WorkspaceNiche;
   /** Where the title overlay will sit, so the image keeps that area calm. */
   overlay?: TemplateStyle;
   /** The draft's angle (key or label); picks a distinct art direction per pin. */
@@ -51,7 +51,7 @@ function artDirection(angle: string | undefined, title: string): string {
   return ART_FALLBACK[h % ART_FALLBACK.length];
 }
 
-const AESTHETIC: Record<WorkspaceKind, string> = {
+const AESTHETIC: Record<WorkspaceNiche, string> = {
   fashion:
     "High-end fashion editorial photograph, luxury fashion magazine and Pinterest aesthetic: a stylish, well-fitted outfit with realistic fabric texture, tasteful accessories, refined and harmonious colour palette, aspirational yet wearable.",
   macro:

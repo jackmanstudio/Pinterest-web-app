@@ -8,9 +8,9 @@ import { pinterestContext } from "@/lib/pinterest/server";
 import { describePinterestError, ensureAccessToken, ReconnectRequired } from "@/lib/pinterest/sync";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
-const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS), days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30) });
+const Body = z.object({ workspace: WorkspaceSlug, days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30) });
 
 /** Pulls verified analytics from Pinterest and stores each response as a snapshot. Read-only. */
 export async function POST(request: Request) {

@@ -8,11 +8,11 @@ import { pinterestContext } from "@/lib/pinterest/server";
 import { describePinterestError, ensureAccessToken } from "@/lib/pinterest/sync";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
 const TREND_REGIONS = ["US", "CA", "GB+IE", "AU+NZ", "DE", "FR"] as const;
 const Body = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   region: z.enum(TREND_REGIONS).default("US"),
   type: z.enum(["growing", "monthly", "yearly", "seasonal"]).default("growing"),
   interest: z.enum(["womens_fashion", "mens_fashion", "beauty", "home_decor", "food_and_drinks", "travel", "art", "design"]).optional(),

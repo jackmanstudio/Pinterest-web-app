@@ -7,7 +7,7 @@ import type { BrandSettings, Category, DraftContent, GenerateResponse, PinDraft,
 import { detectCategory } from "@/lib/categories/taxonomy";
 import type { DesignReport } from "@/lib/brand/check";
 import { LANGUAGES } from "@/lib/brand/languages";
-import { WORKSPACE_LABELS } from "@/lib/types";
+import { labelFromSlug } from "@/lib/types";
 import { generateDraftImage, runPool } from "@/lib/client/pinImages";
 import { DraftEditor, draftErrors, SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
@@ -284,7 +284,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       );
       autoPlanBoards(store, workspace.id, kind, savedDrafts).catch(() => {});
       setNotice(
-        `Saved ${chosen.length} draft${chosen.length === 1 ? "" : "s"} to ${WORKSPACE_LABELS[kind]}${store.mode === "demo" ? " (Demo storage: this browser only)" : ""}.`,
+        `Saved ${chosen.length} draft${chosen.length === 1 ? "" : "s"} to ${labelFromSlug(kind)}${store.mode === "demo" ? " (Demo storage: this browser only)" : ""}.`,
       );
       setBatch(null);
       setIdea("");
@@ -489,7 +489,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             <>
               <input aria-label="Custom category" className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" placeholder="e.g. Eid outfits" maxLength={80} value={customCat} onChange={(e) => setCustomCat(e.target.value)} />
               <label className="flex items-center gap-1.5 text-xs">
-                <input type="checkbox" checked={saveCustom} onChange={(e) => setSaveCustom(e.target.checked)} /> Save to {WORKSPACE_LABELS[kind]} categories
+                <input type="checkbox" checked={saveCustom} onChange={(e) => setSaveCustom(e.target.checked)} /> Save to {labelFromSlug(kind)} categories
               </label>
             </>
           )}
@@ -523,7 +523,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         >
           {busy === "generating" ? `Writing ${count} draft${count === 1 ? "" : "s"}…` : "Or: write text only, so I can edit before saving"}
         </button>
-        <TrendIdeas kind={kind} store={store!} workspaceId={workspace.id} onPick={setIdea} />
+        <TrendIdeas kind={kind} niche={workspace.niche} store={store!} workspaceId={workspace.id} onPick={setIdea} />
         {error && (
           <div className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
             <span>{error.message}</span>
@@ -544,7 +544,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               {auto.phase === "saving" && "Saving drafts…"}
               {auto.phase === "images" && `Making images: ${auto.imagesDone} of ${auto.drafts.length} done…`}
               {auto.phase === "done" &&
-                `Done. ${auto.drafts.filter((d) => d.image_status === "ready").length} of ${auto.drafts.length} pins have images, saved as drafts in ${WORKSPACE_LABELS[kind]}.`}
+                `Done. ${auto.drafts.filter((d) => d.image_status === "ready").length} of ${auto.drafts.length} pins have images, saved as drafts in ${labelFromSlug(kind)}.`}
             </span>
             {auto.result && <SourceBadge source={auto.result.source} />}
           </div>

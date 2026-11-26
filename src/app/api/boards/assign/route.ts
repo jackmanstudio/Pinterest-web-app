@@ -8,34 +8,40 @@ import {
   CONTENT_CATEGORIES,
   MAX_BULK_KEYWORDS,
   MAX_RULES,
-  SAMPLE_BOARDS,
+  sampleBoardsFor,
+  withBoardCategories,
+  MAX_BOARD_CATEGORY,
   acceptAiAssignment,
   keywordAssign,
   presetAssignments,
   type Assignment,
   type Board,
 } from "@/lib/boards/automation";
-import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
+import { getRequestContext, HttpError, workspaceFor } from "@/lib/server/context";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { estimateTextCost } from "@/lib/usage/pricing";
-import { WORKSPACE_KINDS, type Category } from "@/lib/types";
+import { WORKSPACE_NICHES, type Category } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { detectCategory } from "@/lib/categories/taxonomy";
 
 const s = (n: number) => z.string().max(n);
 const Body = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   pins: z
     .array(z.object({ key: s(64).min(1), keyword: s(200), title: s(200).optional(), description: s(800).optional(), tags: z.array(s(60)).max(20).optional(), alt_text: s(500).optional() }))
     .min(1)
     .max(MAX_BULK_KEYWORDS),
   /** The workspace's own category names: picks use these when given. */
   categories: z.array(s(170)).max(200).optional(),
+  /** Demo mode only: the account's niche (the server can't read browser storage). */
+  niche: z.enum(WORKSPACE_NICHES).optional(),
   settings: z.object({
     mode: z.enum(BOARD_MODES),
     manual_board_id: s(64).nullable(),
     manual_board_name: s(180).nullable(),
     rules: z.array(z.object({ keyword: s(100), board_id: s(64), board_name: s(180) })).max(MAX_RULES),
     keyword_plan: z.array(z.object({ keyword: s(100), category: s(80), board_id: s(64).nullable(), board_name: s(180).nullable() })).max(MAX_BULK_KEYWORDS),
+    board_categories: z.record(s(64), s(MAX_BOARD_CATEGORY)).optional(),
   }),
 });
 
@@ -67,15 +73,19 @@ export async function POST(request: Request) {
 
   try {
     const ctx = await getRequestContext();
-    const workspaceId = await workspaceIdFor(ctx, workspace);
+    const found = await workspaceFor(ctx, workspace);
+    const workspaceId = found.id;
+    const niche = ctx.mode === "demo" ? (parsed.data.niche ?? found.niche) : found.niche;
     let boards: Board[] = [];
     if (ctx.mode === "supabase") {
-      const res = await ctx.db.from("pinterest_boards").select("board_id, name, description, privacy, pin_count").eq("workspace_id", workspaceId!).order("name");
+      const res = await ctx.db.from("pinterest_boards").select("board_id, name, description, privacy, pin_count").eq("workspace_id", workspaceId).order("name");
       if (res.error) throw new Error(res.error.message);
       boards = res.data ?? [];
     }
     const sample = boards.length === 0;
-    if (sample) boards = SAMPLE_BOARDS[workspace];
+    if (sample) boards = sampleBoardsFor(niche);
+    // Each board's category (the user's pick, else detected) guides matching.
+    boards = withBoardCategories(boards, settings.board_categories, own);
 
     const { done, rest } = presetAssignments(pins, settings, boards);
     let assignments: Assignment[] = [...done];

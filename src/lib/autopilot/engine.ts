@@ -1,4 +1,4 @@
-import type { WorkspaceKind } from "@/lib/types";
+import type { WorkspaceKind, WorkspaceNiche } from "@/lib/types";
 import { localHour } from "./bestTime";
 
 /**
@@ -18,6 +18,8 @@ export interface AutopilotWorkspace {
   workspace_id: string;
   owner_id: string;
   kind: WorkspaceKind;
+  /** Niche template; picks the image look. */
+  niche: WorkspaceNiche;
   board_id: string;
   board_name: string | null;
   pins_per_day: number;

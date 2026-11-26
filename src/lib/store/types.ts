@@ -1,6 +1,6 @@
 import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
-import type { AuditEvent, BrandSettings, Category, DraftContent, DraftVersion, PinDraft, Workspace, WorkspaceKind, ContentSource } from "@/lib/types";
+import type { AuditEvent, BrandSettings, Category, DraftContent, DraftVersion, PinDraft, Workspace, WorkspaceKind, WorkspaceNiche, ContentSource } from "@/lib/types";
 
 export type DraftPatch = Partial<DraftContent> & { link?: string | null; archived_at?: string | null; category_id?: string | null };
 
@@ -24,11 +24,17 @@ export interface NewDraft extends DraftContent {
 
 /**
  * Data access used by the UI. Every call is scoped to one workspace so
- * Fashion and Macro data can never be read or written together.
+ * two accounts' data can never be read or written together.
  */
 export interface Store {
   readonly mode: "supabase" | "demo";
+  /** All of the user's accounts, oldest first. There is no limit on how many. */
+  listWorkspaces(): Promise<Workspace[]>;
   getWorkspace(kind: WorkspaceKind): Promise<Workspace>;
+  /** Adds an account (its own brand, categories, boards and Pinterest connection). */
+  createWorkspace(name: string, niche: WorkspaceNiche): Promise<Workspace>;
+  /** Deletes an account and everything in it. The last account can't be deleted. */
+  deleteWorkspace(workspaceId: string): Promise<void>;
   getBrand(workspaceId: string): Promise<BrandSettings>;
   saveBrand(workspaceId: string, brand: BrandSettings): Promise<void>;
   listCategories(workspaceId: string): Promise<Category[]>;

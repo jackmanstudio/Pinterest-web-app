@@ -2,7 +2,7 @@
 import { PageTitle } from "./PageTitle";
 import { useEffect, useMemo, useState } from "react";
 import type { AuditEvent, Category, PinDraft, WorkspaceKind } from "@/lib/types";
-import { WORKSPACE_LABELS } from "@/lib/types";
+import { labelFromSlug } from "@/lib/types";
 import { buildUtmUrl, slugify, UTM_DEFAULTS, type UtmFields } from "@/lib/tools/utm";
 import { IMPORT_TEMPLATE, validateImport, type ImportReport } from "@/lib/tools/csv";
 import type { UrlCheckResult } from "@/lib/tools/urlCheck";
@@ -182,7 +182,7 @@ function CsvImport({ kind, categories, onImport }: { kind: WorkspaceKind; catego
       <h2 className="text-lg font-semibold">Bulk import pins from CSV</h2>
       <p className="text-sm text-zinc-600">
         Columns: <code>idea</code> or <code>title</code> (required), <code>description</code>, <code>tags</code>, <code>alt_text</code>, <code>link</code>, <code>category</code>.
-        Rows are checked first; nothing is saved until you press Import. Imported pins are drafts in {WORKSPACE_LABELS[kind]} only.
+        Rows are checked first; nothing is saved until you press Import. Imported pins are drafts in {labelFromSlug(kind)} only.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <input

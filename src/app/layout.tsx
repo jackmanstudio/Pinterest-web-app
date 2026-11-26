@@ -7,7 +7,7 @@ const inter = Inter({ variable: "--font-inter", subsets: ["latin"], preload: fal
 
 export const metadata: Metadata = {
   title: "Pinterest AI Studio",
-  description: "Plan, draft and optimise Pinterest pins across Fashion and Macro workspaces.",
+  description: "Plan, draft and optimise Pinterest pins across any number of Pinterest accounts.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

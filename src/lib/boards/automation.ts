@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { recommendBoard, type BoardLike } from "@/lib/publishing/boards";
-import type { WorkspaceKind } from "@/lib/types";
+import { isWorkspaceNiche, nicheFromSlug, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 
 /**
  * Spec 11: board & category automation. Pure logic shared by the client,
@@ -38,8 +38,12 @@ export interface BoardSettings {
   manual_board_name: string | null;
   rules: BoardRule[];
   keyword_plan: KeywordPlanRow[];
+  /** Categories the user picked for boards (board_id → category). Other boards use the detected one. */
+  board_categories?: Record<string, string>;
 }
-export const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [] };
+export const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [], board_categories: {} };
+export const MAX_BOARD_CATEGORY = 80;
+export const MAX_BOARD_CATEGORIES = 500;
 
 export type PlanMethod = "ai" | "keyword" | "rule" | "manual" | "custom" | "plan";
 export const METHOD_LABELS: Record<PlanMethod, string> = {
@@ -65,6 +69,13 @@ export interface BoardPlan {
 export interface Board extends BoardLike {
   privacy?: string | null;
   pin_count?: number | null;
+}
+
+/** A board's category: the one the user picked, else detected from its name and description. */
+export interface BoardCategory {
+  category: string;
+  /** "custom" = picked by the user; "auto" = detected. */
+  source: "auto" | "custom";
 }
 
 /** What we know about a pin (or a bulk keyword) when picking its board. */
@@ -127,6 +138,51 @@ export function guessCategory(text: string): { category: string; score: number }
     if (score > best.score) best = { category, score };
   }
   return best;
+}
+
+/** Detects a board's category from its name and description ("General" when nothing fits). */
+export function detectBoardCategory(board: Pick<BoardLike, "name" | "description">, categories: string[] = []): string {
+  const text = [board.name, board.description].filter(Boolean).join(" ");
+  // The account's own categories first: a board named like one of them is that category.
+  const t = norm(text);
+  let best: { name: string; score: number } | null = null;
+  for (const c of categories) {
+    const words = norm(c).trim().split(" ").filter((w) => w.length > 2 && !["and", "the", "for", "ideas", "tips"].includes(w));
+    if (!words.length) continue;
+    const hits = words.filter((w) => t.includes(` ${w} `) || t.includes(` ${w.replace(/s$/, "")} `)).length;
+    const score = hits / words.length;
+    if (hits && score >= 0.5 && (!best || score > best.score)) best = { name: c, score };
+  }
+  if (best) return best.name;
+  return guessCategory(text).category;
+}
+
+/** Category for every board: the user's pick wins, otherwise auto-detected. */
+export function boardCategories(boards: Pick<BoardLike, "board_id" | "name" | "description">[], picked: Record<string, string> = {}, categories: string[] = []): Record<string, BoardCategory> {
+  const out: Record<string, BoardCategory> = {};
+  for (const b of boards) {
+    const own = picked[b.board_id]?.trim();
+    out[b.board_id] = own ? { category: own, source: "custom" } : { category: detectBoardCategory(b, categories), source: "auto" };
+  }
+  return out;
+}
+
+/** Boards with their category attached, so pin matching and the AI can use it. */
+export function withBoardCategories<B extends BoardLike>(boards: B[], picked: Record<string, string> = {}, categories: string[] = []): (B & { category: string })[] {
+  const cats = boardCategories(boards, picked, categories);
+  return boards.map((b) => ({ ...b, category: cats[b.board_id].category }));
+}
+
+/** Keeps only valid picks (trimmed, short, known boards when given). */
+export function cleanBoardCategories(picked: Record<string, string> | undefined, boardIds?: Set<string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [id, c] of Object.entries(picked ?? {})) {
+    const v = (c ?? "").trim().slice(0, MAX_BOARD_CATEGORY);
+    if (!v || !id || id.length > 64 || (boardIds && !boardIds.has(id))) continue;
+    out[id] = v;
+    if (Object.keys(out).length >= MAX_BOARD_CATEGORIES) break;
+  }
+  return out;
 }
 
 export const factsText = (p: PinFacts) => [p.keyword, p.title, p.description, (p.tags ?? []).join(" "), p.alt_text].filter(Boolean).join(" ");
@@ -313,7 +369,7 @@ export function parseKeywords(text: string): { keywords: string[]; dropped: numb
 }
 
 /** Sample boards for demo mode, clearly labelled in the UI. */
-export const SAMPLE_BOARDS: Record<WorkspaceKind, Board[]> = {
+export const SAMPLE_BOARDS: Record<WorkspaceNiche, Board[]> = {
   fashion: [
     { board_id: "demo-fa-1", name: "Everyday Outfit Ideas", description: "Casual outfits, street style and capsule wardrobe looks" },
     { board_id: "demo-fa-2", name: "Modest Fashion & Abayas", description: "Hijab styles, abayas, modest eid outfits" },
@@ -332,3 +388,8 @@ export const SAMPLE_BOARDS: Record<WorkspaceKind, Board[]> = {
     { board_id: "demo-ma-7", name: "Christmas Ideas", description: "Christmas decor, gifts and holiday recipes" },
   ],
 };
+
+/** Demo boards for an account (by niche, or a guess from its slug). */
+export function sampleBoardsFor(kindOrNiche: WorkspaceKind | WorkspaceNiche): Board[] {
+  return SAMPLE_BOARDS[isWorkspaceNiche(kindOrNiche) ? kindOrNiche : nicheFromSlug(kindOrNiche)];
+}

@@ -7,14 +7,15 @@ import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { WORKSPACE_KINDS, type PinDraft } from "@/lib/types";
+import { type PinDraft } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { publishBlockers, validateRunAt } from "@/lib/workflow/checks";
 import { runPublishJob } from "@/lib/workflow/runner";
 import { audit, supabaseRunnerDeps } from "@/lib/workflow/server";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 
 const Body = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   draftId: z.string().uuid(),
   action: z.enum(["submit", "request_changes", "approve", "unapprove", "schedule", "cancel_schedule", "publish_now"]),
   boardId: z.string().max(64).optional(),
