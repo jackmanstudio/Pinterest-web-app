@@ -86,7 +86,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={() => {
-              demoSignIn({ name: "Demo user", email: "demo@example.com" });
+              demoSignIn({ email: "demo@example.com" });
               window.location.assign(next);
             }}
             className="text-sm font-medium text-[#b3262e] hover:underline"

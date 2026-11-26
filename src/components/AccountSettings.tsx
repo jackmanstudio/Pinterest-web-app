@@ -1,4 +1,5 @@
 "use client";
+import { demoDisplayName, getDemoUser, setDemoName } from "@/lib/auth/demo";
 import { PageTitle } from "./PageTitle";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -67,9 +68,12 @@ export function AccountSettings() {
     <div className="space-y-6">
       <PageTitle title="Your" accent="account" sub="Your profile, sign-in, notifications and connected Pinterest accounts." />
       {!isSupabaseConfigured ? (
-        <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Demo mode: there are no accounts, so name, email and password settings are off. Connect Supabase to turn them on.
-        </p>
+        <>
+          <DemoNameCard />
+          <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Demo mode: there are no accounts, so email and password settings are off. Connect Supabase to turn them on.
+          </p>
+        </>
       ) : loadErr ? (
         <p role="alert" className="text-sm text-red-700">{loadErr}</p>
       ) : !p ? (
@@ -239,6 +243,36 @@ function NotificationsCard({ p, onSaved }: { p: Profile; onSaved: (prefs: Profil
       <p className="mt-2 text-xs text-zinc-500">Your choices are saved now. These emails start once an email provider is set up for the app; failures always show in the app too.</p>
       <button disabled={!dirty} onClick={save} className={`${primary} mt-3`}>Save notifications</button>
       <Status msg={msg} />
+    </section>
+  );
+}
+
+/** Demo mode: the name the dashboard greets you with, saved in this browser. */
+function DemoNameCard() {
+  const [name, setName] = useState("");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the saved name lives in this browser only
+    setName(demoDisplayName(getDemoUser()));
+    if (window.location.hash === "#name") document.getElementById("display-name")?.focus();
+  }, []);
+  return (
+    <section id="name" className={card}>
+      <h2 className="font-semibold">Your name</h2>
+      <p className="mt-1 text-sm text-zinc-600">Shown in the dashboard greeting. Saved in this browser only.</p>
+      <form
+        className="mt-3 flex flex-col gap-2 sm:flex-row"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const u = setDemoName(name);
+          setMsg(u ? { ok: true, text: name.trim() ? `Saved. The dashboard will say hello to ${name.trim()}.` : "Name cleared." } : { ok: false, text: "Sign in again to save a name." });
+        }}
+      >
+        <label className="sr-only" htmlFor="display-name">Your name</label>
+        <input id="display-name" className="h-11 flex-1 rounded-xl border px-3.5 text-sm" placeholder="e.g. Ajaz" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+        <button className="h-11 rounded-xl bg-zinc-900 px-5 text-sm font-semibold text-white">Save name</button>
+      </form>
+      {msg && <p role={msg.ok ? "status" : "alert"} className={`mt-2 text-sm ${msg.ok ? "text-emerald-700" : "text-red-700"}`}>{msg.text}</p>}
     </section>
   );
 }
