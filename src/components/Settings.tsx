@@ -151,7 +151,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       <div className="md:col-span-2">
         <PageTitle kind={kind} title="Brand &" accent="categories" sub={`Used only for ${WORKSPACE_LABELS[kind]} generations. The other workspace has its own settings.`} />
       </div>
@@ -234,14 +234,14 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
             ))}
         </ul>
         <form
-          className="flex gap-2"
+          className="flex flex-wrap gap-2 sm:flex-nowrap"
           onSubmit={(e) => {
             e.preventDefault();
             if (newCat.trim()) addCategory();
           }}
         >
           <input className={input} placeholder={newParent ? "New sub-category" : "New category"} value={newCat} maxLength={80} onChange={(e) => setNewCat(e.target.value)} />
-          <select aria-label="Parent category" className="rounded-md border border-zinc-300 px-2 text-sm" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
+          <select aria-label="Parent category" className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 text-sm sm:flex-none" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
             <option value="">Top level</option>
             {categories.filter((c) => !c.parent_id).map((c) => (
               <option key={c.id} value={c.id}>Under {c.name}</option>
