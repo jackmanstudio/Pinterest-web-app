@@ -78,12 +78,18 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
   };
 
   const base = byAngle[key];
+  // Search-style tags: the full keyword phrase first, then long-tail variants people type, then brand focus keywords.
+  const kw = idea.toLowerCase().replace(/[^\p{L}\p{N}\s'-]/gu, " ").replace(/\s+/g, " ").trim();
+  const ANGLE_TAG: Record<PinAngleKey, string> = { how_to: "how to", list: "ideas", inspiration: "inspiration", problem_solution: "tips", seasonal: season };
+  const tail = ANGLE_TAG[key];
   const tags = [
-    ...idea.toLowerCase().split(/\s+/).filter((w) => w.length > 3).slice(0, 3),
-    key.replace("_", " "),
-    ...req.brand.focus_keywords.slice(0, 3),
-    req.workspace,
-  ];
+    kw,
+    key === "how_to" ? `${kw} guide` : key === "seasonal" ? `${season} ${kw}` : `${kw} ${tail}`,
+    `${kw} ideas`,
+    req.category ? req.category.toLowerCase() : "",
+    ...req.brand.focus_keywords.slice(0, 3).map((k) => k.toLowerCase()),
+    `${req.workspace} ideas`,
+  ].filter((t) => t && t.length <= 60);
   return {
     angle: label,
     concept: base.concept,
