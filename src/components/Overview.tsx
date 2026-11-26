@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import Link from "./NavLink";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { workspaceHealth, type WorkspaceHealth } from "@/lib/account/health";
-import { STATUS_LABELS, WORKSPACE_KINDS, WORKSPACE_LABELS, type DraftStatus, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { AccountHealth } from "./AccountHealth";
+import { WORKSPACE_KINDS, WORKSPACE_LABELS, type Workspace, type WorkspaceKind } from "@/lib/types";
 
 interface Row {
   kind: WorkspaceKind;
@@ -11,12 +12,6 @@ interface Row {
   health: WorkspaceHealth;
   autopilot: "on" | "off" | "unavailable";
 }
-
-const PRIORITY = {
-  high: { pill: "border-red-400/30 bg-red-500/15 text-red-200" },
-  medium: { pill: "border-amber-300/30 bg-amber-300/10 text-amber-200" },
-  low: { pill: "border-white/15 bg-white/[0.06] text-white/75" },
-};
 
 const ACCENT: Record<WorkspaceKind, { badge: string; glow: string }> = {
   fashion: { badge: "bg-gradient-to-br from-[#e60023] to-[#ff7a45]", glow: "bg-rose-500/30" },
@@ -124,46 +119,7 @@ export function Overview() {
               </span>
             </div>
 
-            <dl className="relative grid grid-cols-3 gap-2">
-              {(
-                [
-                  ["Pins", h?.total],
-                  ["This week", h?.madeLast7Days],
-                  ["Published 30d", h?.publishedLast30Days],
-                  ["Scheduled 7d", h?.scheduledNext7Days],
-                  ["No image", h?.noImage],
-                  ["Need fixes", h?.lowQuality],
-                ] as const
-              ).map(([label, v]) => (
-                <div key={label} className="flex flex-col-reverse rounded-xl bg-white/[0.05] px-3 py-2.5 ring-1 ring-white/10">
-                  <dt className="text-[11px] font-medium text-white/60">{label}</dt>
-                  <dd className="text-2xl font-bold tabular-nums">{v ?? "–"}</dd>
-                </div>
-              ))}
-            </dl>
-
-            {h && (
-              <p className="relative text-xs text-white/60">
-                {(Object.keys(h.byStatus) as DraftStatus[]).map((s) => `${STATUS_LABELS[s]} ${h.byStatus[s]}`).join(" · ")}
-                {h.archived ? ` · Archived ${h.archived}` : ""}
-              </p>
-            )}
-
-            <div className="relative border-t border-white/10 pt-4">
-              <h3 className="text-[15px] font-semibold">What to do next</h3>
-              {h && h.recommendations.length === 0 && <p className="mt-2 text-sm text-emerald-200">All good. Nothing needs attention.</p>}
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {h?.recommendations.map((r) => (
-                  <li key={r.text}>
-                    <Link href={`/w/${kind}${r.href ? `/${r.href}` : ""}?todo=${r.todo}`} className="flex items-start gap-2.5 rounded-xl bg-white/[0.04] px-3 py-2 text-[13px] text-white/85 ring-1 ring-white/10 transition hover:bg-white/[0.09]">
-                      <span className={`mt-0.5 shrink-0 rounded-full border px-2 py-px text-[10px] font-bold uppercase tracking-wide ${PRIORITY[r.priority].pill}`}>{r.priority}</span>
-                      <span className="flex-1">{r.text}</span>
-                      <span aria-hidden className="text-white/40">→</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <AccountHealth h={h} base={`/w/${kind}`} />
 
             <div className="relative mt-auto flex flex-wrap gap-2">
               <Link href={`/w/${kind}`} className="rounded-xl bg-[#fff] px-4 py-2 text-sm font-bold text-[#0b0912]">Open studio</Link>

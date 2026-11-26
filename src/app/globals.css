@@ -129,3 +129,34 @@ body {
 .app-main input.au-date.au-date.au-date:hover { background: rgb(255 255 255 / 0.07); }
 .app-main input.au-date.au-date.au-date:focus { background: rgb(255 255 255 / 0.09); box-shadow: 0 0 0 2px rgb(255 122 69 / 0.45); border: 0; }
 .app-main input.au-date.au-date.au-date::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
+
+/* ===== Site-wide consistency pass =====
+   Every native select gets the same glass chevron and height; plain inputs share one height;
+   small underlined text buttons read as accent links instead of faded underlines. */
+.app-main select:not(.au-field):not([multiple]) {
+  appearance: none; -webkit-appearance: none; min-height: 2.5rem; padding-right: 2.25rem; font-weight: 500;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-opacity='0.55' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 1rem;
+  background-color: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.12);
+}
+.app-main select:not(.au-field):not([multiple]):hover { border-color: rgb(255 255 255 / 0.28); background-color: rgb(255 255 255 / 0.08); }
+.app-main input:not(.au-field):not(.au-date):is([type="text"], [type="url"], [type="email"], [type="search"], [type="number"], [type="password"], [type="date"], [type="time"], [type="datetime-local"], :not([type])) {
+  min-height: 2.5rem; background-color: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.12);
+}
+.app-main textarea:not(.au-field) { background-color: rgb(255 255 255 / 0.05); border: 1px solid rgb(255 255 255 / 0.12); }
+.app-main :is(input, textarea):not(.au-field):not(.au-date):hover { border-color: rgb(255 255 255 / 0.24); }
+.app-main :is(input[type="date"], input[type="time"], input[type="datetime-local"]) { color-scheme: dark; }
+.app-main button.underline { text-decoration: none; color: #ff9a7a; font-weight: 600; }
+.app-main button.underline:hover:not(:disabled) { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+.app-main :is(button, a).bg-emerald-700, .app-main :is(button, a).bg-emerald-600 { background-image: linear-gradient(90deg, #059669, #10b981); font-weight: 700; }
+.app-main input[type="file"] { font-size: 0.8125rem; color: rgb(255 255 255 / 0.6); }
+.app-main input[type="file"]::file-selector-button {
+  margin-right: 0.75rem; border: 1px solid rgb(255 255 255 / 0.15); border-radius: 0.75rem; padding: 0.5rem 0.9rem;
+  background: rgb(255 255 255 / 0.08); color: #fff; font-weight: 600; cursor: pointer; transition: background-color .15s;
+}
+.app-main input[type="file"]::file-selector-button:hover { background: rgb(255 255 255 / 0.14); }
+/* Dividers default to the text colour in Tailwind 4: keep them as hairlines. */
+.app-main :where(.divide-y, .divide-x) > * { border-color: rgb(255 255 255 / 0.08); }
+.app-main :is(.divide-zinc-200, .divide-zinc-300) > * { border-color: rgb(255 255 255 / 0.08); }
+.app-main a.underline { color: #ff9a7a; font-weight: 600; text-decoration-color: rgb(255 154 122 / 0.4); text-underline-offset: 3px; }
+.app-main a.underline:hover { color: #fff; text-decoration-color: currentColor; }
