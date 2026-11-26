@@ -30,7 +30,7 @@ export function Usage({ kind }: { kind: WorkspaceKind }) {
 
   const pct = data.budget_usd > 0 ? Math.min(100, (data.spent_usd / data.budget_usd) * 100) : 100;
   const rows = data.recent.filter((r) => r.workspace_kind === kind);
-  const usd = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
+  const usd = (n: number) => `$${n.toFixed(n > 0 && n < 1 ? 4 : 2)}`;
 
   return (
     <div className="flex flex-col gap-6">

@@ -232,10 +232,10 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
               role="radio"
               aria-checked={settings.mode === m}
               onClick={() => setSettings({ ...settings, mode: m })}
-              className={`rounded-lg border p-3 text-left ${settings.mode === m ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-200 hover:border-zinc-400"}`}
+              className={`relative rounded-xl p-3.5 text-left transition ${settings.mode === m ? "bg-white/[0.1] ring-2 ring-[#ff7a45]" : "bg-white/[0.03] ring-1 ring-white/12 hover:bg-white/[0.07] hover:ring-white/25"}`}
             >
               <span className="block text-sm font-semibold">{BOARD_MODE_LABELS[m].title}{m === "auto" ? " (default)" : ""}</span>
-              <span className={`mt-1 block text-xs ${settings.mode === m ? "text-zinc-200" : "text-zinc-600"}`}>{BOARD_MODE_LABELS[m].detail}</span>
+              <span className={`mt-1 block text-xs ${settings.mode === m ? "text-white/75" : "text-white/55"}`}>{BOARD_MODE_LABELS[m].detail}</span>
             </button>
           ))}
         </div>

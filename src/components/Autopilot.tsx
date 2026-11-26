@@ -180,7 +180,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid items-start gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
           <h2 className="font-semibold">Settings</h2>
           <fieldset disabled={!live || busy} className="mt-3 flex flex-col gap-3 disabled:opacity-60">

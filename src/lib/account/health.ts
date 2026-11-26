@@ -62,13 +62,17 @@ export function workspaceHealth(drafts: PinDraft[], brand: BrandSettings | null,
   const r = h.recommendations;
   if (!brand?.brand_name || !brand.audience) r.push({ priority: "high", text: "Fill in brand name and audience so every pin is written for the right people.", href: "settings", todo: "brand" });
   if (h.total === 0) r.push({ priority: "high", text: "No pins yet. Type a title in the Studio to make your first pins.", href: "", todo: "first-pins" });
-  if (byStatus.in_review) r.push({ priority: "high", text: `${byStatus.in_review} pin(s) are waiting for your review.`, href: "publish", todo: "review" });
-  if (byStatus.approved && !byStatus.scheduled) r.push({ priority: "medium", text: `${byStatus.approved} approved pin(s) are not scheduled yet.`, href: "publish", todo: "schedule-approved" });
+  if (byStatus.in_review) r.push({ priority: "high", text: `${pins(byStatus.in_review)} ${byStatus.in_review === 1 ? "is" : "are"} waiting for your review.`, href: "publish", todo: "review" });
+  if (byStatus.approved && !byStatus.scheduled) r.push({ priority: "medium", text: `${byStatus.approved} approved ${byStatus.approved === 1 ? "pin is" : "pins are"} not scheduled yet.`, href: "publish", todo: "schedule-approved" });
   if (h.scheduledNext7Days === 0 && h.total > 0) r.push({ priority: "medium", text: "Nothing is scheduled for the next 7 days. Regular posting keeps the account active.", href: "calendar", todo: "schedule" });
-  if (noImage) r.push({ priority: "medium", text: `${noImage} unpublished pin(s) have no image yet.`, href: "drafts", todo: "no-image" });
-  if (lowQuality) r.push({ priority: "medium", text: `${lowQuality} pin(s) score below 65 on the quality check. Open them to see what to fix.`, href: "drafts", todo: "low-quality" });
-  if (duplicates) r.push({ priority: "low", text: `${duplicates} pin(s) look very similar to another pin. Change the angle or archive one.`, href: "drafts", todo: "duplicates" });
-  if (noLink) r.push({ priority: "low", text: `${noLink} unpublished pin(s) have no destination link.`, href: "drafts", todo: "no-link" });
+  if (noImage) r.push({ priority: "medium", text: `${noImage} unpublished ${noImage === 1 ? "pin has" : "pins have"} no image yet.`, href: "drafts", todo: "no-image" });
+  if (lowQuality) r.push({ priority: "medium", text: `${pins(lowQuality)} ${lowQuality === 1 ? "scores" : "score"} below 65 on the quality check. Open them to see what to fix.`, href: "drafts", todo: "low-quality" });
+  if (duplicates) r.push({ priority: "low", text: `${pins(duplicates)} ${duplicates === 1 ? "looks" : "look"} very similar to another pin. Change the angle or archive one.`, href: "drafts", todo: "duplicates" });
+  if (noLink) r.push({ priority: "low", text: `${noLink} unpublished ${noLink === 1 ? "pin has" : "pins have"} no destination link.`, href: "drafts", todo: "no-link" });
   if (lastPublished && now - lastPublished > 14 * DAY) r.push({ priority: "medium", text: "Nothing published in the last 14 days.", href: "publish", todo: "stale" });
   return h;
+}
+
+function pins(n: number): string {
+  return `${n} ${n === 1 ? "pin" : "pins"}`;
 }
