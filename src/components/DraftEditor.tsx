@@ -50,29 +50,37 @@ interface Props {
   media?: React.ReactNode;
   /** Brand rules and link used by the quality check. */
   quality?: QualityContext;
+  /** "card": image on top, then the main text, with the rest folded under "More details" (Pin library). */
+  layout?: "form" | "card";
+  /** Small line under the image in card layout (status, category, date). */
+  meta?: React.ReactNode;
 }
 
-export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality }: Props) {
+export function DraftEditor({ index, draft, source, imageStatus = "not_generated", onChange, footer, media, quality, layout = "form", meta }: Props) {
   const set = <K extends keyof DraftContent>(k: K, v: DraftContent[K]) => onChange({ ...draft, [k]: v });
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
   const errors = draftErrors(draft);
 
-  return (
-    <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-          Pin {index + 1} · {draft.angle || "Custom"}
-        </span>
-        <span className="flex items-center gap-2">
-          <CopyButton text={pinAsText({ ...draft, link: quality?.link })} label="Copy whole pin" />
-          <SourceBadge source={source} />
-        </span>
-      </div>
-
+  const header = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+        Pin {index + 1} · {draft.angle || "Custom"}
+      </span>
+      <span className="flex items-center gap-2">
+        <CopyButton text={pinAsText({ ...draft, link: quality?.link })} label="Copy whole pin" />
+        <SourceBadge source={source} />
+      </span>
+    </div>
+  );
+  const concept = (
+    <>
       <label className="text-xs font-medium text-zinc-700" htmlFor={id("concept")}>Concept</label>
       <textarea id={id("concept")} className={input} rows={2} value={draft.concept} onChange={(e) => set("concept", e.target.value)} />
-
+    </>
+  );
+  const main = (
+    <>
       <div className="flex items-baseline justify-between">
         <label className="text-xs font-medium text-zinc-700" htmlFor={id("title")}>Title</label>
         <span className="flex gap-2"><CopyButton text={draft.title} /><Counter value={draft.title} max={LIMITS.title} /></span>
@@ -95,7 +103,10 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
         defaultValue={draft.tags.join(", ")}
         onBlur={(e) => set("tags", parseList(e.target.value))}
       />
-
+    </>
+  );
+  const extra = (
+    <>
       <div className="flex items-baseline justify-between">
         <label className="text-xs font-medium text-zinc-700" htmlFor={id("alt")}>Alt text</label>
         <span className="flex gap-2"><CopyButton text={draft.alt_text} /><Counter value={draft.alt_text} max={LIMITS.alt_text} /></span>
@@ -111,10 +122,11 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       <p className="text-xs text-zinc-600">
         <span className="font-medium">Image status:</span> {IMAGE_LABEL[imageStatus]}
       </p>
-      {media}
-
+    </>
+  );
+  const tail = (
+    <>
       <QualityPanel draft={draft} ctx={quality} />
-
       {errors.length > 0 && (
         <ul className="rounded-md bg-red-50 p-2 text-xs text-red-700" role="alert">
           {errors.map((e) => (
@@ -123,6 +135,41 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
         </ul>
       )}
       {footer}
+    </>
+  );
+
+  if (layout === "card") {
+    return (
+      <article className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300">
+        {media && <div className="p-2.5 pb-0">{media}</div>}
+        <div className="flex flex-col gap-3 p-4">
+          {meta}
+          {header}
+          {main}
+          <details className="group rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+            <summary className="cursor-pointer list-none text-[13px] font-semibold text-zinc-700 marker:hidden">
+              <span className="inline-block transition group-open:rotate-90" aria-hidden>›</span> More details
+              <span className="font-normal text-zinc-500"> · concept, alt text, image prompt</span>
+            </summary>
+            <div className="mt-3 flex flex-col gap-3">
+              {concept}
+              {extra}
+            </div>
+          </details>
+          {tail}
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
+      {header}
+      {concept}
+      {main}
+      {extra}
+      {media}
+      {tail}
     </article>
   );
 }

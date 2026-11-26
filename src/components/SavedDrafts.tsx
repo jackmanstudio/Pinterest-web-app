@@ -18,6 +18,14 @@ const pick = (d: PinDraft): DraftContent => ({
 
 const PAGE = 24;
 
+const STATUS_PILL: Record<DraftStatus, string> = {
+  draft: "bg-white/10 text-white/80",
+  in_review: "bg-amber-400/15 text-amber-200",
+  approved: "bg-sky-400/15 text-sky-200",
+  scheduled: "bg-violet-400/15 text-violet-200",
+  published: "bg-emerald-400/15 text-emerald-200",
+};
+
 export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
   const trendKeywords = useTrendKeywords(kind);
@@ -170,7 +178,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
     setShown(PAGE);
   };
   const ctl = "rounded-md border border-zinc-300 px-2 py-1.5 text-sm";
-  const btn = "text-sm text-zinc-700 hover:underline disabled:opacity-40";
+  const btn = "rounded-lg bg-white/[0.06] px-2.5 py-1 text-[13px] font-medium text-white/80 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white disabled:opacity-40";
   const archivedCount = drafts.filter((d) => d.archived_at).length;
 
   return (
@@ -230,17 +238,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
           const similar = dupes.get(d.id) ?? [];
           const locked = d.status === "scheduled" || d.status === "published";
           return (
-            <div key={d.id} className={`flex flex-col gap-1 ${d.archived_at ? "opacity-70" : ""}`}>
-              <p className="text-xs text-zinc-500">
-                Idea: “{d.idea}”{catName(d.category_id) ? ` · ${catName(d.category_id)}` : ""} · {STATUS_LABELS[d.status]}
-                {d.archived_at ? " · Archived" : ""} · {new Date(d.created_at).toLocaleString()} · Job {d.batch_id.slice(0, 8)}
-              </p>
-              {d.duplicate_of && <p className="text-xs text-sky-700">Intentional copy of “{drafts.find((x) => x.id === d.duplicate_of)?.title ?? "a deleted pin"}”</p>}
-              {similar.length > 0 && (
-                <p className="rounded bg-amber-50 px-2 py-1 text-xs text-amber-800">
-                  Looks very similar to “{drafts.find((x) => x.id === similar[0])?.title}”{similar.length > 1 ? ` and ${similar.length - 1} more` : ""}. Change the angle or archive one.
-                </p>
-              )}
+            <div key={d.id} className={d.archived_at ? "opacity-70" : ""}>
               <DraftEditor
                 key={d.updated_at}
                 index={i}
@@ -249,6 +247,24 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 imageStatus={d.image_status}
                 quality={{ bannedWords: brand?.banned_words, focusKeywords: brand?.focus_keywords, trendKeywords, today: new Date(), idea: d.idea, link: d.link }}
                 onChange={(nd) => setEdits((all) => ({ ...all, [d.id]: nd }))}
+                layout="card"
+                meta={
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+                      <span className={`rounded-full px-2 py-0.5 ${STATUS_PILL[d.status]}`}>{STATUS_LABELS[d.status]}</span>
+                      {d.archived_at && <span className="rounded-full bg-white/10 px-2 py-0.5 text-white/70">Archived</span>}
+                      {catName(d.category_id) && <span className="max-w-full truncate rounded-full bg-white/[0.07] px-2 py-0.5 text-white/70 ring-1 ring-white/10">{catName(d.category_id)}</span>}
+                      <span className="ml-auto font-medium text-white/45">{new Date(d.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="truncate text-xs text-white/50" title={`Idea: ${d.idea} · Job ${d.batch_id.slice(0, 8)}`}>Idea: “{d.idea}”</p>
+                    {d.duplicate_of && <p className="text-xs text-sky-700">Intentional copy of “{drafts.find((x) => x.id === d.duplicate_of)?.title ?? "a deleted pin"}”</p>}
+                    {similar.length > 0 && (
+                      <p className="rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-800">
+                        Looks very similar to “{drafts.find((x) => x.id === similar[0])?.title}”{similar.length > 1 ? ` and ${similar.length - 1} more` : ""}. Change the angle or archive one.
+                      </p>
+                    )}
+                  </div>
+                }
                 media={
                   <DraftImage
                     kind={kind}
@@ -261,7 +277,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 footer={
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <button onClick={() => saveEdit(d)} disabled={!edits[d.id]} className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white disabled:opacity-40">
+                      <button onClick={() => saveEdit(d)} disabled={!edits[d.id]} className="rounded-md bg-zinc-900 px-3.5 py-1.5 text-sm text-white disabled:opacity-40">
                         Save changes
                       </button>
                       <button onClick={() => regenerate(d)} disabled={locked || busyId === d.id} className={btn}>{busyId === d.id ? "Rewriting…" : "Rewrite this pin"}</button>
@@ -269,7 +285,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                       <button onClick={() => showHistory(d)} className={btn}>{history?.id === d.id ? "Hide history" : "History"}</button>
                       {d.image_status === "ready" && <button onClick={() => downloadImage(d)} className={btn}>Download image</button>}
                       <button onClick={() => archive(d, !d.archived_at)} disabled={d.status === "scheduled"} className={btn}>{d.archived_at ? "Unarchive" : "Archive"}</button>
-                      <button onClick={() => remove(d)} className="text-sm text-red-700 hover:underline">Delete</button>
+                      <button onClick={() => remove(d)} className="rounded-lg px-2.5 py-1 text-[13px] font-medium text-red-700 hover:bg-red-500/10">Delete</button>
                     </div>
                     {msg?.id === d.id && <span className={`text-sm ${msg.ok ? "text-emerald-700" : "text-red-700"}`}>{msg.text}</span>}
                     {history?.id === d.id && (
