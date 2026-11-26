@@ -63,20 +63,25 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
     <div className="flex flex-col gap-4">
       <PageTitle kind={kind} title="Content" accent="calendar" sub="What is published, scheduled and still in draft, day by day." />
       <div className="au-glass flex flex-wrap items-center gap-3 rounded-2xl p-2.5">
-        <div className="flex rounded-md bg-zinc-100 p-0.5">
+        <div className="inline-flex h-10 gap-1 rounded-[0.75rem] bg-white/[0.05] p-1 ring-1 ring-white/12" role="radiogroup" aria-label="Calendar view">
           {(["month", "week", "day"] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={`rounded px-2.5 py-1 text-xs font-medium capitalize ${view === v ? "bg-white shadow-sm" : "text-zinc-600"}`}>{v}</button>
+            <button key={v} role="radio" aria-checked={view === v} onClick={() => setView(v)} className={`rounded-[0.55rem] px-3.5 text-[13px] font-semibold capitalize transition ${view === v ? "bg-white/[0.16] text-white shadow" : "text-white/60 hover:text-white"}`}>{v}</button>
           ))}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={() => move(-1)} className="rounded px-2 py-1 hover:bg-zinc-100" aria-label="Previous">‹</button>
-          <span className="min-w-44 text-center text-sm font-medium">{heading}</span>
-          <button onClick={() => move(1)} className="rounded px-2 py-1 hover:bg-zinc-100" aria-label="Next">›</button>
-          <button onClick={() => setCursor(new Date())} className="ml-1 text-xs underline">Today</button>
+        <div className="flex flex-1 items-center gap-1 sm:flex-none">
+          <button onClick={() => move(-1)} className="grid h-9 w-9 place-items-center rounded-lg text-lg text-white/75 hover:bg-white/[0.08] hover:text-white" aria-label="Previous">‹</button>
+          <span className="min-w-0 flex-1 text-center text-sm font-semibold sm:min-w-44 sm:flex-none">{heading}</span>
+          <button onClick={() => move(1)} className="grid h-9 w-9 place-items-center rounded-lg text-lg text-white/75 hover:bg-white/[0.08] hover:text-white" aria-label="Next">›</button>
+          <button onClick={() => setCursor(new Date())} className="ml-1 h-9 rounded-lg bg-white/[0.07] px-3 text-[13px] font-semibold text-white/85 ring-1 ring-white/12 hover:bg-white/[0.12]">Today</button>
         </div>
-        <span className="ml-auto text-xs text-zinc-600">
-          {count("published")} published · {count("scheduled")} scheduled · {count("created")} not scheduled yet (draft, in review or approved)
-        </span>
+        <ul className="flex w-full flex-wrap gap-1.5 sm:ml-auto sm:w-auto" aria-label="In this range">
+          {([["published", "published"], ["scheduled", "scheduled"], ["created", "not scheduled yet"]] as const).map(([k, label]) => (
+            <li key={k} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1 text-xs text-white/70 ring-1 ring-white/10" title={k === "created" ? "Draft, in review or approved" : undefined}>
+              <span className={`h-2 w-2 rounded-full ${KIND_DOT[k]}`} aria-hidden />
+              <span className="font-semibold text-white tabular-nums">{count(k)}</span> {label}
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className={`grid gap-px overflow-hidden rounded-xl border border-zinc-200 bg-zinc-200 ${view === "day" ? "grid-cols-1" : "grid-cols-7"}`}>
@@ -87,22 +92,28 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
           const dim = view === "month" && d.getMonth() !== cursor.getMonth();
           const max = view === "month" ? 3 : 20;
           return (
-            <div key={k} className={`flex flex-col gap-1 bg-white p-1.5 ${view === "month" ? "min-h-28" : "min-h-64"} ${dim ? "bg-zinc-50 text-zinc-400" : ""}`}>
+            <div key={k} className={`flex min-w-0 flex-col gap-1 bg-white p-1.5 ${view === "month" ? "min-h-16 sm:min-h-28" : "min-h-64"} ${dim ? "bg-zinc-50 text-zinc-400" : ""}`}>
               <button onClick={() => { setCursor(d); setView("day"); }} className={`self-start rounded px-1 text-xs ${k === today ? "bg-red-700 font-semibold text-white" : "hover:bg-zinc-100"}`}>
                 {d.getDate()}
               </button>
+              {view === "month" && list.length > 0 && (
+                <span className="flex flex-wrap gap-0.5 sm:hidden" aria-label={`${list.length} pins`}>
+                  {list.slice(0, 4).map((it) => <span key={it.draft.id} className={`h-1.5 w-1.5 rounded-full ${KIND_DOT[it.kind]}`} />)}
+                  {list.length > 4 && <span className="text-[9px] leading-none text-white/55">+{list.length - 4}</span>}
+                </span>
+              )}
               {list.slice(0, max).map((it) => (
                 <Link
                   key={it.draft.id}
                   href={it.kind === "created" ? `/w/${kind}/drafts` : `/w/${kind}/publish`}
                   title={`${KIND_LABEL[it.kind]} · ${STATUS_LABELS[it.draft.status]} · ${it.draft.title}`}
-                  className={`truncate rounded border-l-2 px-1 py-0.5 text-[11px] text-zinc-800 ${KIND_STYLE[it.kind]}`}
+                  className={`truncate rounded border-l-2 px-1 py-0.5 text-[11px] text-zinc-800 ${KIND_STYLE[it.kind]} ${view === "month" ? "hidden sm:block" : ""}`}
                 >
                   {it.kind !== "created" && `${it.at.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} `}
                   {it.draft.title}
                 </Link>
               ))}
-              {list.length > max && <span className="text-[11px] text-zinc-500">+{list.length - max} more</span>}
+              {list.length > max && <span className={`text-[11px] text-zinc-500 ${view === "month" ? "hidden sm:inline" : ""}`}>+{list.length - max} more</span>}
             </div>
           );
         })}
@@ -119,7 +130,7 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
         <p className="text-xs text-zinc-500">Seasonal calendar ideas (evergreen suggestions, not live trend data). Pins are made only when you click.</p>
         <div className="mt-2 flex flex-wrap gap-2">
           {ideas.map((i) => (
-            <Link key={i} href={`/w/${kind}?idea=${encodeURIComponent(i)}`} className="rounded-full border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-50">{i}</Link>
+            <Link key={i} href={`/w/${kind}?idea=${encodeURIComponent(i)}`} className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3.5 py-1.5 text-[13px] font-medium text-white/85 ring-1 ring-white/12 transition hover:bg-white/[0.12] hover:text-white"><span aria-hidden className="text-[#ff9a7a]">+</span> {i}</Link>
           ))}
         </div>
       </section>
