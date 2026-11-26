@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ContentSource } from "@/lib/types";
 import { startOfMonthUtc } from "./pricing";
+import { isMissingColumn } from "@/lib/supabase/compat";
 
 export interface UsageEntry {
   workspace_id: string | null;
@@ -52,16 +53,26 @@ export class SupabaseLedger implements UsageLedger {
     if (error) throw new Error(error.message);
   }
   async recent(limit: number) {
-    const { data, error } = await this.db
-      .from("ai_usage")
-      .select("workspace_id, kind, provider, model, source, input_tokens, output_tokens, images, est_cost_usd, status, error, created_at, workspaces(kind)")
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    const run = (ws: string) =>
+      this.db
+        .from("ai_usage")
+        .select("workspace_id, kind, provider, model, source, input_tokens, output_tokens, images, est_cost_usd, status, error, created_at, " + ws)
+        .order("created_at", { ascending: false })
+        .limit(limit)
+        .returns<(Omit<UsageEntry, "workspace_kind"> & { workspaces: WsJoin | WsJoin[] | null })[]>();
+    type WsJoin = { kind?: string; slug?: string };
+    let res = await run("workspaces(kind, slug)");
+    // Database without migration 0013: the niche is the slug.
+    if (isMissingColumn(res.error)) res = await run("workspaces(kind)");
+    const { data, error } = res;
     if (error) throw new Error(error.message);
     return (data ?? []).map((r) => {
-      const ws = r.workspaces as { kind?: string } | { kind?: string }[] | null;
-      const kind = Array.isArray(ws) ? ws[0]?.kind : ws?.kind;
-      return { ...r, est_cost_usd: Number(r.est_cost_usd), workspace_kind: kind } as UsageEntry;
+      const ws = r.workspaces;
+      const w = Array.isArray(ws) ? ws[0] : ws;
+      const kind = w?.slug ?? w?.kind;
+      const { workspaces: _omit, ...rest } = r;
+      void _omit;
+      return { ...rest, est_cost_usd: Number(r.est_cost_usd), workspace_kind: kind } as UsageEntry;
     });
   }
 }

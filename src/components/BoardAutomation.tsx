@@ -5,6 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BOARD_MODES,
   BOARD_MODE_LABELS,
+  CONTENT_CATEGORIES,
+  MAX_BOARD_CATEGORY,
+  boardCategories,
+  cleanBoardCategories,
   DEFAULT_BOARD_SETTINGS,
   MAX_BULK_KEYWORDS,
   METHOD_LABELS,
@@ -65,7 +69,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     (async () => {
       try {
         const [s, bs, ds, plans, cats] = await Promise.all([
-          loadBoardSource(kind), store.getBoardSettings(workspace.id), store.listDrafts(workspace.id), store.listBoardPlans(workspace.id), store.listCategories(workspace.id).catch(() => [] as Category[]),
+          loadBoardSource(kind, workspace.niche), store.getBoardSettings(workspace.id), store.listDrafts(workspace.id), store.listBoardPlans(workspace.id), store.listCategories(workspace.id).catch(() => [] as Category[]),
         ]);
         if (cancelled) return;
         setCategories(cats);
@@ -119,7 +123,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     setBusy(`Reading ${targets.length} pin${targets.length === 1 ? "" : "s"} and picking boards…`);
     setMsg(null);
     try {
-      const r = await requestAssignments(kind, targets.map(draftFacts), settings, categories.map((c) => c.name));
+      const r = await requestAssignments(kind, targets.map(draftFacts), settings, categories.map((c) => c.name), workspace!.niche);
       setNote(r.note);
       const byKey = new Map(r.assignments.map((a) => [a.key, a]));
       let rows = pinRows.map((row) => (byKey.has(row.key) ? { ...fromAssignment(byKey.get(row.key)!, row.label, row.keyword), saved: false } : row));
@@ -163,7 +167,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
     setBusy(`Categorising ${keywords.length} keyword${keywords.length === 1 ? "" : "s"}…`);
     setMsg(null);
     try {
-      const r = await requestAssignments(kind, keywords.map((k, i) => ({ key: `kw-${i}`, keyword: k })), { ...settings, keyword_plan: [] }, categories.map((c) => c.name));
+      const r = await requestAssignments(kind, keywords.map((k, i) => ({ key: `kw-${i}`, keyword: k })), { ...settings, keyword_plan: [] }, categories.map((c) => c.name), workspace!.niche);
       setNote(r.note);
       setKwRows(r.assignments.map((a, i) => fromAssignment(a, keywords[i], keywords[i])));
       setMsg({ ok: true, text: `${keywords.length} keywords sorted into boards.${dropped ? ` ${dropped} extra keywords were left out (max ${MAX_BULK_KEYWORDS}).` : ""} Review, then save the plan.` });
@@ -252,6 +256,19 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
           {settingsDirty && <span className="text-xs text-zinc-500">Unsaved changes</span>}
         </div>
       </section>
+
+      {/* Board categories ------------------------------------------------------ */}
+      <BoardCategories
+        boards={boards}
+        categories={categories.filter((c) => !c.parent_id).map((c) => c.name)}
+        picked={settings.board_categories ?? {}}
+        sample={src.sample}
+        onSave={async (picked) => {
+          const next = { ...settings, board_categories: cleanBoardCategories(picked, new Set(boards.map((b) => b.board_id))) };
+          setSettings(next);
+          await saveSettings(next);
+        }}
+      />
 
       {/* 2. Pins ------------------------------------------------------------- */}
       <section className={card} aria-labelledby="pins-h">
@@ -520,5 +537,115 @@ function NewBoardCard({ kind, suggestion, count, src, onCreated }: { kind: Works
         </div>
       )}
     </article>
+  );
+}
+
+const CUSTOM = "__custom";
+
+/** Each board's category: detected from its name and description, or picked by the user. */
+function BoardCategories({ boards, categories, picked, sample, onSave }: { boards: Board[]; categories: string[]; picked: Record<string, string>; sample: boolean; onSave: (picked: Record<string, string>) => Promise<void> }) {
+  const [draft, setDraft] = useState<Record<string, string>>(picked);
+  const [customFor, setCustomFor] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
+  const pickedKey = JSON.stringify(picked);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the editor when saved settings change
+    setDraft(JSON.parse(pickedKey));
+  }, [pickedKey]);
+  const detected = useMemo(() => boardCategories(boards, {}, categories), [boards, categories]);
+  const options = useMemo(() => Array.from(new Set([...categories, ...Object.keys(CONTENT_CATEGORIES), "General"])), [categories]);
+  const dirty = JSON.stringify(cleanBoardCategories(draft)) !== JSON.stringify(cleanBoardCategories(picked));
+  const customCount = Object.keys(cleanBoardCategories(draft)).length;
+  if (!boards.length) return null;
+  const shown = open ? boards : boards.slice(0, 8);
+
+  return (
+    <section className={card} aria-labelledby="board-cats-h">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <h2 id="board-cats-h" className="font-semibold">Board categories</h2>
+        <span className="text-xs text-zinc-500">{customCount ? `${customCount} picked by you · ${boards.length - customCount} auto` : `All ${boards.length} auto-detected`}</span>
+      </div>
+      <p className="mt-1 text-xs text-zinc-600">
+        Each board&apos;s category is detected from its name and description. Pick your own when it&apos;s wrong, or type a custom one. Pins then go to boards with the same category.
+        {sample ? " (Demo boards.)" : ""}
+      </p>
+      <ul className="mt-3 divide-y divide-zinc-100">
+        {shown.map((b) => {
+          const own = draft[b.board_id]?.trim() ?? "";
+          const isCustom = customFor.has(b.board_id) || Boolean(own && !options.includes(own));
+          const value = isCustom ? CUSTOM : own;
+          return (
+            <li key={b.board_id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+              <span className="min-w-0 flex-1 basis-40">
+                <span className="block truncate font-medium">{b.name}</span>
+                {typeof b.pin_count === "number" && <span className="text-xs text-zinc-500">{b.pin_count} pins</span>}
+              </span>
+              <label className="sr-only" htmlFor={`bc-${b.board_id}`}>Category for {b.name}</label>
+              <select
+                id={`bc-${b.board_id}`}
+                value={value}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const next = { ...draft };
+                  const nextCustom = new Set(customFor);
+                  if (v === CUSTOM) {
+                    nextCustom.add(b.board_id);
+                    next[b.board_id] = own && !options.includes(own) ? own : "";
+                  } else {
+                    nextCustom.delete(b.board_id);
+                    if (v) next[b.board_id] = v;
+                    else delete next[b.board_id];
+                  }
+                  setCustomFor(nextCustom);
+                  setDraft(next);
+                }}
+                className="min-w-0 max-w-full rounded-md border border-zinc-300 px-2 py-1 text-sm"
+              >
+                <option value="">Auto: {detected[b.board_id]?.category ?? "General"}</option>
+                {options.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                <option value={CUSTOM}>Custom…</option>
+              </select>
+              {isCustom && (
+                <input
+                  aria-label={`Custom category for ${b.name}`}
+                  value={own}
+                  maxLength={MAX_BOARD_CATEGORY}
+                  placeholder="Type a category"
+                  onChange={(e) => setDraft({ ...draft, [b.board_id]: e.target.value })}
+                  className="min-w-0 basis-40 rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                />
+              )}
+              <span className={`rounded px-1.5 py-0.5 text-[11px] ${own ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-600"}`}>{own ? "You picked" : "Auto"}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {boards.length > 8 && (
+        <button onClick={() => setOpen(!open)} className="mt-2 text-xs underline">
+          {open ? "Show fewer boards" : `Show all ${boards.length} boards`}
+        </button>
+      )}
+      <div className="mt-3 flex items-center gap-3">
+        <button
+          disabled={!dirty || saving}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(draft);
+              setCustomFor(new Set());
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className={`${btn} bg-zinc-900 text-white`}
+        >
+          {saving ? "Saving…" : "Save board categories"}
+        </button>
+        {dirty && <span className="text-xs text-zinc-500">Unsaved changes</span>}
+      </div>
+    </section>
   );
 }

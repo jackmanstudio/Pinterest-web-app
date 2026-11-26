@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStore } from "@/lib/store";
-import { WORKSPACE_KINDS } from "@/lib/types";
 
 interface Step {
   title: string;
@@ -24,9 +23,13 @@ export function Welcome() {
       const store = getStore();
       const profile = store.mode === "supabase" ? await fetch("/api/auth/profile").then((r) => r.json()).catch(() => ({})) : {};
       let brand = false, drafts = 0, plans = 0, connected = false, scheduled = 0;
-      for (const k of WORKSPACE_KINDS) {
+      const list = await store.listWorkspaces().catch(() => []);
+      const first = list[0]?.kind ?? null;
+      /** No account yet: each step starts by adding one. */
+      const at = (sub: string) => (first ? `/w/${first}${sub}` : "/overview?add=1");
+      for (const ws of list) {
+        const k = ws.kind;
         try {
-          const ws = await store.getWorkspace(k);
           const [b, d, p] = await Promise.all([store.getBrand(ws.id), store.listDrafts(ws.id), store.listBoardPlans(ws.id)]);
           brand ||= Boolean(b.brand_name?.trim() || b.website_url?.trim());
           drafts += d.length;
@@ -41,11 +44,12 @@ export function Welcome() {
       if (cancelled) return;
       setName(typeof profile.full_name === "string" ? profile.full_name.split(" ")[0] : "");
       setSteps([
-        { title: "Set up your brand", detail: "Name, website, voice and pin design, so every pin looks like you.", href: "/w/fashion/settings", done: brand },
-        { title: "Connect Pinterest", detail: "Link your account so we can read your boards. Nothing is posted without your OK.", href: "/w/fashion/pinterest", done: connected },
-        { title: "Make your first pins", detail: "Type a keyword and get finished, designed pins.", href: "/w/fashion", done: drafts > 0 },
-        { title: "Organise boards", detail: "Let AI pick the right board for each pin, or set your own rules.", href: "/w/fashion/boards", done: plans > 0 },
-        { title: "Review & schedule", detail: "Approve pins and schedule them, or turn on Autopilot later.", href: "/w/fashion/publish", done: scheduled > 0 },
+        { title: "Add a Pinterest account", detail: "Name it after your Pinterest profile or niche. You can add as many as you run.", href: "/overview?add=1", done: list.length > 0 },
+        { title: "Set up your brand", detail: "Name, website, voice and pin design, so every pin looks like you.", href: at("/settings"), done: brand },
+        { title: "Connect Pinterest", detail: "Link your account so we can read your boards. Nothing is posted without your OK.", href: at("/pinterest"), done: connected },
+        { title: "Make your first pins", detail: "Type a keyword and get finished, designed pins.", href: at(""), done: drafts > 0 },
+        { title: "Organise boards", detail: "Let AI pick the right board for each pin, or set your own rules.", href: at("/boards"), done: plans > 0 },
+        { title: "Review & schedule", detail: "Approve pins and schedule them, or turn on Autopilot later.", href: at("/publish"), done: scheduled > 0 },
       ]);
     })();
     return () => {
@@ -64,7 +68,7 @@ export function Welcome() {
       <h1 className="text-3xl text-[#2a1416]" style={{ fontFamily: '"Playfair Display", Georgia, serif' }}>
         Welcome{name ? `, ${name}` : ""}.
       </h1>
-      <p className="mt-2 text-zinc-600">Five steps to your first scheduled pins. You can come back to this list any time from Account.</p>
+      <p className="mt-2 text-zinc-600">Six steps to your first scheduled pins. You can come back to this list any time from Account.</p>
       {!steps ? (
         <p className="mt-6 text-zinc-500">Loading…</p>
       ) : (

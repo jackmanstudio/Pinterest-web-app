@@ -1,6 +1,6 @@
 "use client";
 import {
-  SAMPLE_BOARDS,
+  sampleBoardsFor,
   type Assignment,
   type Board,
   type BoardPlan,
@@ -8,7 +8,7 @@ import {
   type PinFacts,
 } from "@/lib/boards/automation";
 import type { Store } from "@/lib/store";
-import type { Category, PinDraft, WorkspaceKind } from "@/lib/types";
+import type { Category, PinDraft, WorkspaceKind, WorkspaceNiche } from "@/lib/types";
 
 export interface BoardSource {
   boards: Board[];
@@ -22,14 +22,14 @@ export interface BoardSource {
 }
 
 /** The account's synced boards, or demo sample boards until Pinterest is connected. */
-export async function loadBoardSource(kind: WorkspaceKind): Promise<BoardSource> {
-  const fallback: BoardSource = { boards: SAMPLE_BOARDS[kind], sample: true, username: null, active: false, ready: false, env: "sandbox", scopes: [] };
+export async function loadBoardSource(kind: WorkspaceKind, niche?: WorkspaceNiche): Promise<BoardSource> {
+  const fallback: BoardSource = { boards: sampleBoardsFor(niche ?? kind), sample: true, username: null, active: false, ready: false, env: "sandbox", scopes: [] };
   try {
     const s = await (await fetch(`/api/pinterest/status?workspace=${kind}`)).json();
     if (s.error) return fallback;
     const boards: Board[] = (s.boards ?? []).map((b: Board) => ({ board_id: b.board_id, name: b.name, description: b.description ?? null, privacy: b.privacy ?? null, pin_count: b.pin_count ?? null }));
     return {
-      boards: boards.length ? boards : SAMPLE_BOARDS[kind],
+      boards: boards.length ? boards : sampleBoardsFor(niche ?? kind),
       sample: boards.length === 0,
       username: s.connection?.username ?? null,
       active: s.connection?.status === "active",
@@ -53,13 +53,14 @@ export interface AssignResult {
 }
 
 /** Asks the server for board + category picks, 50 pins per request. */
-export async function requestAssignments(kind: WorkspaceKind, pins: PinFacts[], settings: BoardSettings, categories: string[] = []): Promise<AssignResult> {
+/** `niche` only matters in demo mode, where it picks the sample boards. */
+export async function requestAssignments(kind: WorkspaceKind, pins: PinFacts[], settings: BoardSettings, categories: string[] = [], niche?: WorkspaceNiche): Promise<AssignResult> {
   const out: AssignResult = { assignments: [], boards: [], sampleBoards: false, engine: "none", note: null };
   for (let i = 0; i < pins.length; i += 50) {
     const res = await fetch("/api/boards/assign", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: kind, pins: pins.slice(i, i + 50), settings, categories: categories.slice(0, 200) }),
+      body: JSON.stringify({ workspace: kind, pins: pins.slice(i, i + 50), settings, categories: categories.slice(0, 200), ...(niche ? { niche } : {}) }),
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error ?? `Board assignment failed (${res.status})`);
@@ -87,7 +88,8 @@ export async function autoPlanBoards(store: Store, workspaceId: string, kind: Wo
   const settings = await store.getBoardSettings(workspaceId);
   if (settings.mode === "custom") return 0;
   const categories = await store.listCategories(workspaceId).catch(() => [] as Category[]);
-  const r = await requestAssignments(kind, drafts.map(draftFacts), settings, categories.map((c) => c.name));
+  const niche = store.mode === "demo" ? (await store.getWorkspace(kind).catch(() => null))?.niche : undefined;
+  const r = await requestAssignments(kind, drafts.map(draftFacts), settings, categories.map((c) => c.name), niche);
   const plans = r.assignments.map(toPlan).filter((p): p is BoardPlan => p !== null);
   await store.saveBoardPlans(workspaceId, plans);
   await fillCategories(store, workspaceId, drafts, r.assignments, categories);

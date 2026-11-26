@@ -2,6 +2,8 @@ export interface BoardLike {
   board_id: string;
   name: string;
   description?: string | null;
+  /** The board's category (picked by the user or auto-detected), when known. */
+  category?: string | null;
 }
 
 export interface BoardPick {
@@ -42,8 +44,14 @@ export function recommendBoard(boards: BoardLike[], pin: { title: string; tags: 
       hits.push(w);
     }
     for (const w of new Set(descWords)) if (pinWords.has(w) && !nameWords.includes(w) && !GENERIC.has(w)) score += 1;
+    // Same category as the pin (the user's pick or auto-detected): a solid extra signal.
+    const sameCategory = Boolean(pin.category && b.category && b.category !== "General" && b.category.toLowerCase() === pin.category.toLowerCase());
+    if (sameCategory) {
+      score += MIN_BOARD_SCORE;
+      if (!hits.length) hits.push(`category ${b.category}`);
+    }
     if (score >= MIN_BOARD_SCORE && (!best || score > best.score)) {
-      best = { board: b, score, reason: hits.length ? `board name matches “${hits.join("”, “")}”` : "board description matches the pin" };
+      best = { board: b, score, reason: hits.length === 1 && hits[0].startsWith("category ") ? `board category is “${b.category}”` : hits.length ? `board name matches “${hits.join("”, “")}”` : "board description matches the pin" };
     }
   }
   return best;

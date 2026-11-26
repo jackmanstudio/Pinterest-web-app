@@ -3,7 +3,7 @@ import { PageTitle } from "./PageTitle";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, PinDraft, WorkspaceKind } from "@/lib/types";
-import { STATUS_LABELS } from "@/lib/types";
+import { STATUS_LABELS, nicheFromSlug } from "@/lib/types";
 import { calendarItems, dayKey, monthGrid, weekDays, type CalendarKind } from "@/lib/planning/calendar";
 import { seasonalIdeas } from "@/lib/ideas/seasonal";
 import { useWorkspace } from "./useWorkspace";
@@ -55,7 +55,7 @@ export function Calendar({ kind }: { kind: WorkspaceKind }) {
       : view === "week"
         ? `Week of ${days[0].toLocaleDateString(undefined, { day: "numeric", month: "short" })}`
         : cursor.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
-  const ideas = seasonalIdeas(kind, new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1), brand?.focus_keywords ?? []).slice(0, 6);
+  const ideas = seasonalIdeas(workspace?.niche ?? nicheFromSlug(kind), new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1), brand?.focus_keywords ?? []).slice(0, 6);
   const inRange = days.flatMap((d) => items.get(dayKey(d)) ?? []);
   const count = (k: CalendarKind) => inRange.filter((i) => i.kind === k).length;
 

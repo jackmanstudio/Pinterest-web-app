@@ -1,15 +1,68 @@
 import type { PinStyle } from "@/lib/drafts/angles";
-export const WORKSPACE_KINDS = ["fashion", "macro"] as const;
-export type WorkspaceKind = (typeof WORKSPACE_KINDS)[number];
-
-export function isWorkspaceKind(value: string): value is WorkspaceKind {
-  return (WORKSPACE_KINDS as readonly string[]).includes(value);
+/**
+ * Niche template of an account. It only picks starter categories, sample
+ * boards and the default image look. Any number of accounts can share one.
+ */
+export const WORKSPACE_NICHES = ["fashion", "macro"] as const;
+export type WorkspaceNiche = (typeof WORKSPACE_NICHES)[number];
+export const NICHE_LABELS: Record<WorkspaceNiche, string> = {
+  fashion: "Fashion",
+  macro: "All topics",
+};
+export function isWorkspaceNiche(value: unknown): value is WorkspaceNiche {
+  return typeof value === "string" && (WORKSPACE_NICHES as readonly string[]).includes(value);
 }
 
-export const WORKSPACE_LABELS: Record<WorkspaceKind, string> = {
-  fashion: "Fashion",
-  macro: "Macro",
-};
+/**
+ * URL slug of one of the user's accounts (a workspace), e.g. "my-recipes-2".
+ * Users start with none and add as many as they like; slugs are unique per user.
+ */
+export type WorkspaceKind = string;
+export const WORKSPACE_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
+export const MAX_WORKSPACE_NAME = 60;
+
+export function isWorkspaceKind(value: string): value is WorkspaceKind {
+  return WORKSPACE_SLUG_PATTERN.test(value);
+}
+
+/** Turns an account name into a URL slug ("My Recipes!" → "my-recipes"). */
+export function slugify(name: string): string {
+  const s = name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replace(/-+$/g, "");
+  return s || "account";
+}
+
+/** A slug for `name` that isn't in `taken` ("recipes", "recipes-2", ...). */
+export function uniqueSlug(name: string, taken: Iterable<string>): string {
+  const used = new Set(taken);
+  const base = slugify(name).slice(0, 36).replace(/-+$/g, "") || "account";
+  if (!used.has(base)) return base;
+  for (let i = 2; ; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
+}
+
+/** Best guess of an account's niche when only its slug is known (demo server). */
+export function nicheFromSlug(kind: string): WorkspaceNiche {
+  return /fashion|style|outfit|wear/.test(kind) ? "fashion" : "macro";
+}
+
+const knownNames = new Map<string, string>();
+/** Stores account names as they load, so labels show the user's own name. */
+export function rememberWorkspaceNames(list: Pick<Workspace, "kind" | "name">[]) {
+  for (const w of list) knownNames.set(w.kind, w.name);
+}
+
+/** The account's name (once loaded), else a readable name from its slug. */
+export function labelFromSlug(kind: string): string {
+  const known = knownNames.get(kind);
+  if (known) return known;
+  return kind.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export type DraftStatus = "draft" | "in_review" | "approved" | "scheduled" | "published";
 export type ImageStatus = "not_generated" | "pending" | "ready" | "failed";
@@ -18,7 +71,10 @@ export type ContentSource = "demo" | "ai" | "manual";
 
 export interface Workspace {
   id: string;
+  /** URL slug, unique per user. */
   kind: WorkspaceKind;
+  /** Niche template (starter categories, sample boards, image look). */
+  niche: WorkspaceNiche;
   name: string;
 }
 

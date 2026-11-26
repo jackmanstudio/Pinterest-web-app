@@ -5,9 +5,9 @@ import { pinterestContext } from "@/lib/pinterest/server";
 import { describePinterestError, ensureAccessToken, fetchBoardsAndPins, ReconnectRequired } from "@/lib/pinterest/sync";
 import { PinterestApiError } from "@/lib/pinterest/api";
 import { HttpError } from "@/lib/server/context";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
-const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS) });
+const Body = z.object({ workspace: WorkspaceSlug });
 
 /** Read-only sync of boards and pins. Never creates, edits or deletes anything on Pinterest. */
 export async function POST(request: Request) {

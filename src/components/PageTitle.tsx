@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { WORKSPACE_LABELS, type WorkspaceKind } from "@/lib/types";
+import { labelFromSlug, type WorkspaceKind } from "@/lib/types";
 
 /**
  * The page heading used across the app, matching the dashboard: small chips, a big title with one
@@ -12,8 +12,8 @@ export function PageTitle({ title, accent, sub, kind, chips }: { title: string; 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {kind && (
           <span className="au-glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold text-white/80">
-            <span aria-hidden className={`h-2 w-2 rounded-full ${kind === "fashion" ? "bg-[#ff5a4a]" : "bg-violet-400"}`} />
-            {WORKSPACE_LABELS[kind]}
+            <span aria-hidden className={`h-2 w-2 rounded-full bg-[#ff5a4a]`} />
+            {labelFromSlug(kind)}
           </span>
         )}
         {!isSupabaseConfigured && <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 font-semibold text-amber-200">Demo mode · this browser</span>}

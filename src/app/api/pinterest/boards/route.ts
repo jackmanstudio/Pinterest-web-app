@@ -7,10 +7,10 @@ import { describePinterestError, ensureAccessToken, ReconnectRequired } from "@/
 import { PinterestApiError, type PinterestBoard } from "@/lib/pinterest/api";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
 const Body = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   name: z.string().trim().min(1).max(50),
   description: z.string().trim().max(500).default(""),
   privacy: z.enum(["PUBLIC", "SECRET"]).default("PUBLIC"),

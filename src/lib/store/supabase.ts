@@ -1,7 +1,7 @@
 import { DEFAULT_BOARD_SETTINGS, type BoardPlan, type BoardSettings } from "@/lib/boards/automation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
-import { EMPTY_BRAND, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { EMPTY_BRAND, isWorkspaceNiche, rememberWorkspaceNames, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 import type { WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 import { BRAND_BASE_COLUMNS, BRAND_V8_KEYS, isMissingColumn, isMissingTable, NEEDS_BOARD_MIGRATION, NEEDS_MIGRATION, type DbError } from "@/lib/supabase/compat";
@@ -11,6 +11,12 @@ type Res<T> = { data: T | null; error: DbError | null };
 const LEGACY_DRAFT_COLUMNS =
   "id, workspace_id, category_id, batch_id, idea, angle, concept, title, description, tags, alt_text, image_prompt, image_status, image_path, image_source, status, link, board_id, board_name, review_note, approved_at, scheduled_for, published_at, external_pin_id, source, created_at, updated_at";
 const DRAFT_COLUMNS = `${LEGACY_DRAFT_COLUMNS}, archived_at, duplicate_of`;
+
+/** Workspace columns: the URL slug is `kind` in the app, the DB `kind` column is the niche. */
+const WS_COLUMNS = "id, kind:slug, niche:kind, name, created_at";
+const LEGACY_WS_COLUMNS = "id, kind, niche:kind, name, created_at";
+type WsRow = { id: string; kind: string; niche: string; name: string };
+const toWorkspace = (r: WsRow): Workspace => ({ id: r.id, kind: r.kind, niche: isWorkspaceNiche(r.niche) ? r.niche : "macro", name: r.name });
 
 function check<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
@@ -36,8 +42,43 @@ export class SupabaseStore implements Store {
     return check(await q(LEGACY_DRAFT_COLUMNS));
   }
 
+  /** Set once the database turns out not to have migration 0013 (account slugs) yet. */
+  private legacyWorkspaces = false;
+
+  private async workspaceQuery<T>(q: (cols: string, slugCol: string) => PromiseLike<Res<T>>): Promise<T> {
+    if (!this.legacyWorkspaces) {
+      const res = await q(WS_COLUMNS, "slug");
+      if (!isMissingColumn(res.error)) return check(res);
+      this.legacyWorkspaces = true;
+    }
+    return check(await q(LEGACY_WS_COLUMNS, "kind"));
+  }
+
+  async listWorkspaces(): Promise<Workspace[]> {
+    const rows = await this.workspaceQuery<WsRow[]>((cols) => this.db.from("workspaces").select(cols).order("created_at").returns<WsRow[]>());
+    const list = rows.map(toWorkspace);
+    rememberWorkspaceNames(list);
+    return list;
+  }
   async getWorkspace(kind: WorkspaceKind): Promise<Workspace> {
-    return check(await this.db.from("workspaces").select("id, kind, name").eq("kind", kind).single());
+    const w = toWorkspace(await this.workspaceQuery<WsRow>((cols, slugCol) => this.db.from("workspaces").select(cols).eq(slugCol, kind).single<WsRow>()));
+    rememberWorkspaceNames([w]);
+    return w;
+  }
+  async createWorkspace(name: string, niche: WorkspaceNiche): Promise<Workspace> {
+    const { data, error } = await this.db.rpc("create_workspace", { p_name: name.trim(), p_niche: niche });
+    if (error) {
+      if (/create_workspace/.test(error.message) || error.code === "PGRST202") throw new Error("Adding accounts needs a database update. Run supabase/migrations/0013_unlimited_accounts.sql in the Supabase SQL editor.");
+      throw new Error(error.message);
+    }
+    const row = data as { id: string; slug: string; kind: string; name: string };
+    const w = toWorkspace({ id: row.id, kind: row.slug, niche: row.kind, name: row.name });
+    rememberWorkspaceNames([w]);
+    return w;
+  }
+  async deleteWorkspace(workspaceId: string): Promise<void> {
+    const { error } = await this.db.rpc("delete_workspace", { p_workspace: workspaceId });
+    if (error) throw new Error(error.message);
   }
   async getBrand(workspaceId: string): Promise<BrandSettings> {
     const sel = (cols: string) => this.db.from("brand_settings").select(cols).eq("workspace_id", workspaceId).maybeSingle();
@@ -115,7 +156,7 @@ export class SupabaseStore implements Store {
     return data.signedUrl;
   }
   async transition(workspaceId: string, id: string, action: WorkflowAction, opts: TransitionOptions = {}): Promise<PinDraft> {
-    const kind = (await this.db.from("workspaces").select("kind").eq("id", workspaceId).single()).data?.kind;
+    const kind = (await this.workspaceQuery<WsRow>((cols) => this.db.from("workspaces").select(cols).eq("id", workspaceId).single<WsRow>())).kind;
     const res = await fetch("/api/drafts/transition", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -137,7 +178,9 @@ export class SupabaseStore implements Store {
     );
   }
   async renameWorkspace(workspaceId: string, name: string): Promise<Workspace> {
-    return check(await this.db.from("workspaces").update({ name: name.trim() }).eq("id", workspaceId).select("id, kind, name").single());
+    const w = toWorkspace(await this.workspaceQuery<WsRow>((cols) => this.db.from("workspaces").update({ name: name.trim() }).eq("id", workspaceId).select(cols).single<WsRow>()));
+    rememberWorkspaceNames([w]);
+    return w;
   }
   async duplicateDraft(workspaceId: string, id: string): Promise<PinDraft> {
     const d = await this.getDraft(workspaceId, id);
@@ -162,13 +205,23 @@ export class SupabaseStore implements Store {
     return check(res) as DraftVersion[];
   }
   async getBoardSettings(workspaceId: string): Promise<BoardSettings> {
-    const res = await this.db.from("board_settings").select("mode, manual_board_id, manual_board_name, rules, keyword_plan").eq("workspace_id", workspaceId).maybeSingle();
+    const sel = (cols: string) => this.db.from("board_settings").select(cols).eq("workspace_id", workspaceId).maybeSingle();
+    let res = await sel("mode, manual_board_id, manual_board_name, rules, keyword_plan, board_categories");
+    // Database without migration 0013: no board categories yet.
+    if (isMissingColumn(res.error)) res = await sel("mode, manual_board_id, manual_board_name, rules, keyword_plan");
     if (isMissingTable(res.error)) return { ...DEFAULT_BOARD_SETTINGS };
     if (res.error) throw new Error(res.error.message);
     return { ...DEFAULT_BOARD_SETTINGS, ...((res.data ?? {}) as Partial<BoardSettings>) };
   }
   async saveBoardSettings(workspaceId: string, s: BoardSettings) {
-    const res = await this.db.from("board_settings").upsert({ workspace_id: workspaceId, ...s, updated_at: new Date().toISOString() }, { onConflict: "workspace_id" });
+    const row = { workspace_id: workspaceId, ...s, board_categories: s.board_categories ?? {}, updated_at: new Date().toISOString() };
+    let res = await this.db.from("board_settings").upsert(row, { onConflict: "workspace_id" });
+    if (isMissingColumn(res.error)) {
+      if (Object.keys(s.board_categories ?? {}).length) throw new Error("Saving board categories needs a database update. Run supabase/migrations/0013_unlimited_accounts.sql in the Supabase SQL editor.");
+      const { board_categories: _skip, ...older } = row;
+      void _skip;
+      res = await this.db.from("board_settings").upsert(older, { onConflict: "workspace_id" });
+    }
     if (isMissingTable(res.error)) throw new Error(NEEDS_BOARD_MIGRATION);
     if (res.error) throw new Error(res.error.message);
   }

@@ -9,9 +9,9 @@ import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/conte
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { estimateTextCost } from "@/lib/usage/pricing";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
-const Body = z.object({ workspace: z.enum(WORKSPACE_KINDS) });
+const Body = z.object({ workspace: WorkspaceSlug });
 
 /**
  * Growth insights agent. Runs only on stored, verified Pinterest snapshots and

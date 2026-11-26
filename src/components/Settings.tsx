@@ -3,7 +3,7 @@ import { PageTitle } from "./PageTitle";
 import { useEffect, useState } from "react";
 import { parseList } from "@/lib/drafts/validation";
 import type { BrandSettings, Category, WorkspaceKind } from "@/lib/types";
-import { WORKSPACE_LABELS } from "@/lib/types";
+import { labelFromSlug } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
 import { PinDesign } from "./PinDesign";
 import { readTemplate } from "@/lib/brand/template";
@@ -112,7 +112,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       await store!.saveBrand(workspace!.id, next);
       if (displayName.trim() && displayName.trim() !== workspace!.name) await store!.renameWorkspace(workspace!.id, displayName);
       setBrand(next);
-      setMsg({ text: `${WORKSPACE_LABELS[kind]} brand settings saved.`, ok: true });
+      setMsg({ text: `${labelFromSlug(kind)} brand settings saved.`, ok: true });
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
@@ -133,7 +133,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
     try {
       const have = new Set(categories.filter((c) => !c.parent_id).map((c) => c.name.toLowerCase()));
       const added = [];
-      for (const name of defaultCategories(kind)) if (!have.has(name.toLowerCase())) added.push(await store!.addCategory(workspace!.id, name));
+      for (const name of defaultCategories(workspace!.niche)) if (!have.has(name.toLowerCase())) added.push(await store!.addCategory(workspace!.id, name));
       setCategories([...categories, ...added]);
       setMsg({ text: added.length ? `Added ${added.length} starter categories.` : "All starter categories are already there.", ok: true });
     } catch (e) {
@@ -153,7 +153,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
       <div className="md:col-span-2">
-        <PageTitle kind={kind} title="Brand &" accent="categories" sub={`Used only for ${WORKSPACE_LABELS[kind]} generations. The other workspace has its own settings.`} />
+        <PageTitle kind={kind} title="Brand &" accent="categories" sub={`Used only for ${labelFromSlug(kind)} generations. Each of your other accounts has its own settings.`} />
       </div>
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
         <h2 className="text-[15px] font-semibold">Brand settings</h2>
@@ -203,7 +203,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       </section>
 
       <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold">{WORKSPACE_LABELS[kind]} categories</h2>
+        <h2 className="text-lg font-semibold">{labelFromSlug(kind)} categories</h2>
         {categories.length === 0 && <p className="text-sm text-zinc-600">No categories yet. Add the ones this workspace uses.</p>}
         <div className="flex items-center justify-between text-xs text-zinc-500">
           <span>{categories.filter((c) => !c.parent_id).length} categories · {categories.filter((c) => c.parent_id).length} sub-categories</span>
@@ -256,7 +256,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         store={store}
         workspaceId={workspace.id}
         brand={brand}
-        sampleTitle={kind === "fashion" ? "7 Autumn Trench Coat Outfits Worth Saving" : "Your Pin Title Goes Right Here"}
+        sampleTitle={workspace?.niche === "fashion" ? "7 Autumn Trench Coat Outfits Worth Saving" : "Your Pin Title Goes Right Here"}
         onSaved={setBrand}
       />
     </div>

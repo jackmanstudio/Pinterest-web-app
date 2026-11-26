@@ -1,6 +1,6 @@
 import { PIN_STYLE_KEYS, type PinStyle } from "./angles";
 import { z } from "zod";
-import { WORKSPACE_KINDS } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
 /** Pinterest field limits (title 100, description 500, alt text 500). */
 export const LIMITS = { title: 100, description: 500, alt_text: 500, tags: 10, idea: 500 } as const;
@@ -33,7 +33,7 @@ const BrandSchema = z.object({
 });
 
 export const GenerateRequestSchema = z.object({
-  workspace: z.enum(WORKSPACE_KINDS),
+  workspace: WorkspaceSlug,
   idea: z.string().trim().min(3, "Describe the pin idea in a few words").max(LIMITS.idea),
   category: z.string().max(170).optional(),
   language: z.string().max(40).optional(),

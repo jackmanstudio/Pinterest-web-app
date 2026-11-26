@@ -2,15 +2,15 @@ import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
 
 // Same as DEFAULT_BOARD_SETTINGS in boards/automation; kept here so the browser
 // store doesn't pull that module's zod schemas into the page.
-const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [] };
+const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [], board_categories: {} };
 import { defaultCategories } from "@/lib/categories/taxonomy";
-import { EMPTY_BRAND, WORKSPACE_LABELS, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind } from "@/lib/types";
+import { EMPTY_BRAND, MAX_WORKSPACE_NAME, isWorkspaceKind, isWorkspaceNiche, rememberWorkspaceNames, uniqueSlug, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 import type { ImageCache } from "@/lib/client/imageCache";
 
-/** Starter taxonomy from the spec: Macro gets all 40 categories, Fashion the first ten. */
-export const DEFAULT_CATEGORIES: Record<WorkspaceKind, string[]> = {
+/** Starter categories per template: "All topics" gets all 40, "Fashion" the first ten. */
+export const DEFAULT_CATEGORIES: Record<WorkspaceNiche, string[]> = {
   fashion: defaultCategories("fashion"),
   macro: defaultCategories("macro"),
 };
@@ -29,7 +29,11 @@ interface WorkspaceData {
 export interface KeyValue {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
+
+type WorkspaceEntry = { kind: WorkspaceKind; niche: WorkspaceNiche; name: string };
+const LIST_KEY = "pin-ai-studio:v1:workspaces";
 
 const uuid = () => crypto.randomUUID();
 
@@ -49,22 +53,25 @@ export class LocalStore implements Store {
     return `pin-ai-studio:v1:workspace:${kind}`;
   }
 
-  private load(kind: WorkspaceKind): WorkspaceData {
-    const raw = this.kv.getItem(this.key(kind));
-    if (raw) return JSON.parse(raw) as WorkspaceData;
-    const data: WorkspaceData = {
-      workspace: { id: `demo-${kind}`, kind, name: WORKSPACE_LABELS[kind] },
-      brand: { ...EMPTY_BRAND },
-      categories: DEFAULT_CATEGORIES[kind].map((name) => ({ id: uuid(), name, parent_id: null })),
-      drafts: [],
-    };
-    this.write(data);
-    return data;
+  /** The browser's account list. Empty until the user adds an account. */
+  private entries(): WorkspaceEntry[] {
+    const raw = this.kv.getItem(LIST_KEY);
+    if (raw) {
+      try {
+        return (JSON.parse(raw) as WorkspaceEntry[]).filter((e) => e && isWorkspaceKind(e.kind) && isWorkspaceNiche(e.niche));
+      } catch {
+        /* unreadable list: start empty */
+      }
+    }
+    return [];
   }
-
-  private write(data: WorkspaceData) {
+  private saveEntries(list: WorkspaceEntry[]) {
+    this.set(LIST_KEY, JSON.stringify(list));
+  }
+  /** setItem with a clear message when browser storage is full. */
+  private set(key: string, value: string) {
     try {
-      this.kv.setItem(this.key(data.workspace.kind), JSON.stringify(data));
+      this.kv.setItem(key, value);
     } catch (e) {
       if ((e as Error).name === "QuotaExceededError" || /quota/i.test((e as Error).message))
         throw new Error("This browser's storage is full. Delete or archive old pins, or connect Supabase to keep everything online.");
@@ -72,14 +79,65 @@ export class LocalStore implements Store {
     }
   }
 
-  private byId(workspaceId: string): WorkspaceData {
-    const kind = workspaceId.replace(/^demo-/, "");
-    if (kind !== "fashion" && kind !== "macro") throw new Error("Unknown workspace");
-    return this.load(kind);
+  private load(kind: WorkspaceKind): WorkspaceData {
+    const entry = this.entries().find((e) => e.kind === kind);
+    if (!entry) throw new Error("Unknown workspace");
+    const raw = this.kv.getItem(this.key(kind));
+    if (raw) {
+      const data = JSON.parse(raw) as WorkspaceData;
+      // Data saved before accounts had a niche.
+      if (!isWorkspaceNiche(data.workspace.niche)) data.workspace = { ...data.workspace, niche: entry.niche };
+      return data;
+    }
+    const data: WorkspaceData = {
+      workspace: { id: `demo-${kind}`, kind, niche: entry.niche, name: entry.name },
+      brand: { ...EMPTY_BRAND },
+      categories: DEFAULT_CATEGORIES[entry.niche].map((name) => ({ id: uuid(), name, parent_id: null })),
+      drafts: [],
+    };
+    this.write(data);
+    return data;
   }
 
+  private write(data: WorkspaceData) {
+    this.set(this.key(data.workspace.kind), JSON.stringify(data));
+  }
+
+  private byId(workspaceId: string): WorkspaceData {
+    if (!workspaceId.startsWith("demo-")) throw new Error("Unknown workspace");
+    return this.load(workspaceId.slice(5));
+  }
+
+  async listWorkspaces() {
+    const list = this.entries().map((e) => ({ ...this.load(e.kind).workspace, niche: e.niche }));
+    rememberWorkspaceNames(list);
+    return list;
+  }
   async getWorkspace(kind: WorkspaceKind) {
-    return this.load(kind).workspace;
+    const w = this.load(kind).workspace;
+    rememberWorkspaceNames([w]);
+    return w;
+  }
+  async createWorkspace(name: string, niche: WorkspaceNiche) {
+    const n = name.trim();
+    if (!n || n.length > MAX_WORKSPACE_NAME) throw new Error(`Account name must be 1-${MAX_WORKSPACE_NAME} characters`);
+    if (!isWorkspaceNiche(niche)) throw new Error("Unknown account type");
+    const list = this.entries();
+    const kind = uniqueSlug(n, list.map((e) => e.kind));
+    // A leftover from a deleted account with the same slug must not come back.
+    this.kv.removeItem?.(this.key(kind));
+    this.saveEntries([...list, { kind, niche, name: n }]);
+    return this.getWorkspace(kind);
+  }
+  async deleteWorkspace(workspaceId: string) {
+    const kind = workspaceId.replace(/^demo-/, "");
+    const list = this.entries();
+    if (!list.some((e) => e.kind === kind)) throw new Error("Account not found");
+    const d = this.load(kind);
+    if (this.images) for (const p of d.drafts) if (p.image_path?.startsWith("idb:")) await this.images.remove(p.image_path).catch(() => {});
+    this.saveEntries(list.filter((e) => e.kind !== kind));
+    if (this.kv.removeItem) this.kv.removeItem(this.key(kind));
+    else this.kv.setItem(this.key(kind), "");
   }
   async getBrand(workspaceId: string) {
     return this.byId(workspaceId).brand;
@@ -238,9 +296,11 @@ export class LocalStore implements Store {
   async renameWorkspace(workspaceId: string, name: string) {
     const d = this.byId(workspaceId);
     const n = name.trim();
-    if (!n || n.length > 40) throw new Error("Name must be 1-40 characters");
+    if (!n || n.length > MAX_WORKSPACE_NAME) throw new Error(`Name must be 1-${MAX_WORKSPACE_NAME} characters`);
     d.workspace = { ...d.workspace, name: n };
     this.write(d);
+    this.saveEntries(this.entries().map((e) => (e.kind === d.workspace.kind ? { ...e, name: n } : e)));
+    rememberWorkspaceNames([d.workspace]);
     return d.workspace;
   }
   async duplicateDraft(workspaceId: string, id: string) {

@@ -5,10 +5,11 @@ import { enabledWorkspaces, loadPinSamples, serverReadiness, supabaseAutopilotDe
 import { bestPostingHours } from "@/lib/autopilot/bestTime";
 import { getPinterestConfig } from "@/lib/pinterest/config";
 import { ConnectionRepo } from "@/lib/pinterest/connections";
-import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
+import { getRequestContext, HttpError, workspaceIdFor, workspaceFor } from "@/lib/server/context";
 import { rateLimited } from "@/lib/server/rateLimit";
 import { getAdminSupabase } from "@/lib/supabase/admin";
-import { WORKSPACE_KINDS, isWorkspaceKind } from "@/lib/types";
+import { isWorkspaceKind } from "@/lib/types";
+import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { audit } from "@/lib/workflow/server";
 import { isMissingColumn, isMissingTable } from "@/lib/supabase/compat";
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     if (ctx.mode === "demo") {
       return NextResponse.json({ mode: "demo", readiness: ["Connect Supabase (Autopilot runs on the server, so it needs a real database).", ...readiness] });
     }
-    const workspaceId = (await workspaceIdFor(ctx, kind))!;
+    const { id: workspaceId, niche } = await workspaceFor(ctx, kind);
     const sources = await ctx.db.from("content_sources").select("id, url, kind, enabled, last_checked_at, last_error").eq("workspace_id", workspaceId).order("created_at");
     const [settings, ideas, boards, recent] = await Promise.all([
       ctx.db.from("autopilot_settings").select("enabled, board_id, board_name, pins_per_day, link, enabled_at, paused_reason, last_run_at, timezone, best_time, remix_winners, auto_trends, trend_interest").eq("workspace_id", workspaceId).maybeSingle(),
@@ -55,7 +56,7 @@ export async function GET(request: Request) {
       mode: "supabase",
       settings: settings.data ?? {
         enabled: false, board_id: null, board_name: null, pins_per_day: 3, link: null, enabled_at: null, paused_reason: null, last_run_at: null,
-        timezone: "UTC", best_time: true, remix_winners: true, auto_trends: false, trend_interest: kind === "fashion" ? "womens_fashion" : null,
+        timezone: "UTC", best_time: true, remix_winners: true, auto_trends: false, trend_interest: niche === "fashion" ? "womens_fashion" : null,
       },
       bestTime,
       ideas: ideas.data,
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
 const Body = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("save"),
-    workspace: z.enum(WORKSPACE_KINDS),
+    workspace: WorkspaceSlug,
     enabled: z.boolean(),
     consent: z.string().max(40).optional(),
     boardId: z.string().max(64).nullable(),
@@ -93,21 +94,21 @@ const Body = z.discriminatedUnion("action", [
     autoTrends: z.boolean().default(false),
     trendInterest: z.enum(["womens_fashion", "mens_fashion", "beauty", "home_decor", "food_and_drinks", "travel", "art", "design"]).nullable().default(null),
   }),
-  z.object({ action: z.literal("add_ideas"), workspace: z.enum(WORKSPACE_KINDS), ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
+  z.object({ action: z.literal("add_ideas"), workspace: WorkspaceSlug, ideas: z.array(z.string().trim().min(3).max(500)).min(1).max(100) }),
   z.object({
     action: z.literal("add_pages"),
-    workspace: z.enum(WORKSPACE_KINDS),
+    workspace: WorkspaceSlug,
     pages: z
       .array(z.object({ idea: z.string().trim().min(3).max(500), link: z.url().max(2048), context: z.string().max(2000).optional(), image_urls: z.array(z.url().max(2048)).max(6).default([]) }))
       .min(1)
       .max(50),
   }),
-  z.object({ action: z.literal("add_source"), workspace: z.enum(WORKSPACE_KINDS), url: z.string().trim().min(8).max(2048) }),
-  z.object({ action: z.literal("toggle_source"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid(), enabled: z.boolean() }),
-  z.object({ action: z.literal("delete_source"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
-  z.object({ action: z.literal("delete_idea"), workspace: z.enum(WORKSPACE_KINDS), id: z.uuid() }),
-  z.object({ action: z.literal("run_now"), workspace: z.enum(WORKSPACE_KINDS) }),
-  z.object({ action: z.literal("pause"), workspace: z.enum(WORKSPACE_KINDS) }),
+  z.object({ action: z.literal("add_source"), workspace: WorkspaceSlug, url: z.string().trim().min(8).max(2048) }),
+  z.object({ action: z.literal("toggle_source"), workspace: WorkspaceSlug, id: z.uuid(), enabled: z.boolean() }),
+  z.object({ action: z.literal("delete_source"), workspace: WorkspaceSlug, id: z.uuid() }),
+  z.object({ action: z.literal("delete_idea"), workspace: WorkspaceSlug, id: z.uuid() }),
+  z.object({ action: z.literal("run_now"), workspace: WorkspaceSlug }),
+  z.object({ action: z.literal("pause"), workspace: WorkspaceSlug }),
 ]);
 
 export async function POST(request: Request) {

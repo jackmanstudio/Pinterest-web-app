@@ -1,4 +1,4 @@
-import type { WorkspaceKind } from "@/lib/types";
+import type { WorkspaceNiche } from "@/lib/types";
 
 /**
  * Seasonal topic suggestions used when live Pinterest Trends aren't available.
@@ -35,7 +35,7 @@ const GENERAL: Record<number, string[]> = {
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-export function seasonalIdeas(kind: WorkspaceKind, date: Date, focusKeywords: string[] = []): string[] {
+export function seasonalIdeas(kind: WorkspaceNiche, date: Date, focusKeywords: string[] = []): string[] {
   const m = date.getMonth();
   const next = (m + 1) % 12;
   const fromKeywords = focusKeywords.slice(0, 3).flatMap((k) => [`${k}: ${MONTHS[m]} guide`, `${k} ideas for ${MONTHS[next]}`]);

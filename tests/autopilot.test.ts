@@ -105,7 +105,7 @@ describe("Cloudflare image adapter", () => {
 
 // ---------------------------------------------------------------------------
 
-const ws: AutopilotWorkspace = { workspace_id: "w1", owner_id: "u1", kind: "fashion", board_id: "b1", board_name: "Board", pins_per_day: 3, link: null, timezone: "UTC", best_time: false, remix_winners: false, auto_trends: false, trend_interest: null };
+const ws: AutopilotWorkspace = { workspace_id: "w1", owner_id: "u1", kind: "fashion", niche: "fashion", board_id: "b1", board_name: "Board", pins_per_day: 3, link: null, timezone: "UTC", best_time: false, remix_winners: false, auto_trends: false, trend_interest: null };
 const NOW = new Date("2026-11-25T12:00:00Z");
 
 function fakeDeps(opts: Partial<Omit<AutopilotDeps, "ideas">> & { ideas?: Idea[]; ready?: string[] } = {}) {

@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { Overview } from "@/components/Overview";
 
 export default function OverviewPage() {
-  return <Overview />;
+  return (
+    <Suspense>
+      <Overview />
+    </Suspense>
+  );
 }

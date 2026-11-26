@@ -80,7 +80,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
   const [ideasText, setIdeasText] = useState("");
   const [form, setForm] = useState({
     boardId: "", pinsPerDay: 3, link: "", consent: "", bestTime: true, remixWinners: true, autoTrends: false,
-    trendInterest: (kind === "fashion" ? "womens_fashion" : "") as string,
+    trendInterest: "" as string,
   });
 
   const load = useCallback(async () => {
@@ -269,7 +269,7 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
           <h2 className="font-semibold">Idea queue {live && <span className="font-normal text-zinc-500">· {queued} waiting</span>}</h2>
           <p className="mt-1 text-xs text-zinc-500">One title or idea per line. Each one becomes a set of 5 pins, one per angle (in the Studio you choose 1 to 5).</p>
           <textarea rows={4} disabled={!live || busy} className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 text-sm disabled:opacity-60"
-            placeholder={kind === "fashion" ? "Autumn trench coat outfits\nMinimalist capsule wardrobe for work" : "One idea per line"}
+            placeholder={"One idea per line, e.g.\nAutumn trench coat outfits\nEasy weeknight dinners"}
             value={ideasText} onChange={(e) => setIdeasText(e.target.value)} />
           <button
             disabled={!live || busy || !ideasText.trim()}
