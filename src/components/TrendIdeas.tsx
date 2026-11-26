@@ -58,33 +58,33 @@ export function TrendIdeas({ kind, niche, store, workspaceId, onPick }: Props) {
   }
 
   const live = trends?.data?.length ? trends : null;
-  const chip = "rounded-full border px-3 py-1 text-sm hover:bg-zinc-50";
+  const chip = "inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-3.5 py-1.5 text-[13px] font-medium text-white/85 ring-1 transition hover:bg-white/[0.12] hover:text-white";
   return (
-    <div className="mt-4 border-t border-zinc-100 pt-4">
+    <div className="mt-5 border-t border-white/10 pt-5">
       <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold">{live ? "Trending on Pinterest" : "Seasonal ideas"}</h2>
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-white/60">{live ? "Trending on Pinterest" : "Seasonal ideas"}</h2>
         {live ? (
           <span className="text-xs text-zinc-500">Pinterest Trends · {freshness(live.fetched_at)}</span>
         ) : (
-          <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">Calendar suggestions, not live trend data</span>
+          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/50 ring-1 ring-white/10">Calendar suggestions, not live trend data</span>
         )}
         {canFetch && (
-          <button onClick={refresh} disabled={busy} className="ml-auto text-xs text-zinc-600 underline disabled:opacity-50">
+          <button onClick={refresh} disabled={busy} className="ml-auto rounded-lg px-2.5 py-1 text-xs font-semibold text-[#ff9a7a] hover:bg-white/[0.06] disabled:opacity-50">
             {busy ? "Fetching…" : live ? "Refresh trends" : "Get live trends"}
           </button>
         )}
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         {live
           ? live.data.slice(0, 12).map((t) => (
-              <button key={t.keyword} onClick={() => onPick(t.keyword)} className={`${chip} border-emerald-200`}>
+              <button key={t.keyword} onClick={() => onPick(t.keyword)} className={`${chip} ring-emerald-400/30`}>
                 {t.keyword}
-                {pct(t) != null && <span className="ml-1 text-xs text-emerald-700">+{Math.round(pct(t)!)}%</span>}
+                {pct(t) != null && <span className="text-xs font-semibold text-emerald-300">+{Math.round(pct(t)!)}%</span>}
               </button>
             ))
           : seasonal.map((s) => (
-              <button key={s} onClick={() => onPick(s)} className={`${chip} border-zinc-200`}>
-                {s}
+              <button key={s} onClick={() => onPick(s)} className={`${chip} ring-white/12`}>
+                <span aria-hidden className="text-[#ff9a7a]">+</span> {s}
               </button>
             ))}
       </div>

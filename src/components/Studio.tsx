@@ -301,8 +301,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   return (
     <div className="flex flex-col gap-6">
       <PageTitle kind={kind} title="Create" accent="pins" sub="Type an idea and get finished pins with title, description, tags and image. They are saved as drafts; nothing goes to Pinterest until you approve it." />
-      <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex rounded-lg bg-zinc-100 p-0.5 text-sm sm:inline-flex" role="radiogroup" aria-label="Start from">
+      <section className="au-glass rounded-2xl p-5 sm:p-6">
+        <div className="flex rounded-[0.875rem] bg-white/[0.05] p-1 text-sm ring-1 ring-white/10 sm:inline-flex" role="radiogroup" aria-label="Start from">
           {(["idea", "link"] as const).map((m) => (
             <button
               key={m}
@@ -310,14 +310,14 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               role="radio"
               aria-checked={source === m}
               onClick={() => setSource(m)}
-              className={`flex-1 whitespace-nowrap rounded-md px-3 py-1.5 font-medium ${source === m ? "bg-white shadow-sm" : "text-zinc-600"}`}
+              className={`flex-1 whitespace-nowrap rounded-[0.6rem] px-4 py-2 font-semibold transition ${source === m ? "bg-white/[0.14] text-white shadow" : "text-white/60 hover:text-white"}`}
             >
               {m === "idea" ? "From an idea" : <>From a link<span className="hidden sm:inline"> (blog post or product)</span></>}
             </button>
           ))}
         </div>
         {source === "link" && (
-          <div className="mt-3 flex flex-col gap-3 rounded-lg border border-zinc-200 bg-stone-50 p-3">
+          <div className="mt-4 flex flex-col gap-3 rounded-xl bg-white/[0.04] p-3 ring-1 ring-white/10">
             <form
               className="flex flex-col gap-2 sm:flex-row"
               onSubmit={(e) => {
@@ -326,8 +326,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               }}
             >
               <label className="sr-only" htmlFor="page-url">Page address</label>
-              <input id="page-url" type="url" inputMode="url" className="flex-1 rounded-md border border-zinc-300 bg-white px-3 py-2" placeholder="https://yourblog.com/post or a product page" value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} />
-              <button disabled={reading || pageUrl.trim().length < 4} className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{reading ? "Reading…" : "Read page"}</button>
+              <input id="page-url" type="url" inputMode="url" className="au-field h-11 w-full min-w-0 px-4 text-sm sm:flex-1" placeholder="https://yourblog.com/post or a product page" value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} />
+              <button disabled={reading || pageUrl.trim().length < 4} className="h-11 rounded-[0.875rem] bg-white/[0.1] px-5 text-sm font-semibold text-white ring-1 ring-white/15 hover:bg-white/[0.16] disabled:opacity-50">{reading ? "Reading…" : "Read page"}</button>
             </form>
             {page && (
               <div className="flex flex-col gap-2 text-sm">
@@ -383,7 +383,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <label className="sr-only" htmlFor="idea">Pin title or idea</label>
           <input
             id="idea"
-            className="flex-1 rounded-lg border border-zinc-300 px-3.5 py-2.5 focus:border-red-600 focus:outline-none focus:ring-2 focus:ring-red-100"
+            className="au-field h-12 w-full min-w-0 px-4 text-[15px] sm:flex-1"
             placeholder={kind === "fashion" ? "e.g. Layering a trench coat for autumn" : "Describe your pin idea"}
             value={idea}
             maxLength={500}
@@ -392,137 +392,113 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <button
             type="submit"
             disabled={busy !== "idle" || idea.trim().length < 3}
-            className="rounded-lg bg-red-700 px-5 py-2.5 font-semibold text-white hover:bg-red-800 disabled:opacity-50"
+            className={`inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-[0.875rem] bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-6 text-[15px] font-bold text-white shadow-[0_10px_28px_-12px_rgba(255,90,60,0.95)] transition hover:brightness-110 disabled:cursor-not-allowed ${idea.trim().length < 3 && busy === "idle" ? "disabled:opacity-80 disabled:saturate-[0.85]" : "disabled:opacity-60"}`}
           >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></svg>
             {busy === "auto" ? "Making pins…" : `Make ${count} complete pin${count === 1 ? "" : "s"}`}
           </button>
         </form>
-        <div className="mt-5 flex flex-col gap-4 rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-100">
-        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
-          <span className="font-medium">How many pins</span>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex rounded-full border border-zinc-200 bg-stone-50 p-0.5" role="radiogroup" aria-label="Number of pins">
-            {[2, 3, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={!customCount && count === n}
-                onClick={() => {
+        <div className="mt-5 divide-y divide-white/[0.07] rounded-xl bg-white/[0.03] ring-1 ring-white/10">
+          <OptRow label="How many pins" hint="Each pin gets its own angle, layout and colour story.">
+            <Seg
+              label="Number of pins"
+              options={[
+                ...[2, 3, 5].map((n) => ({ value: String(n), label: `${n} pins` })),
+                { value: "custom", label: "Custom" },
+              ]}
+              value={customCount ? "custom" : String(count)}
+              onChange={(v) => {
+                if (v === "custom") setCustomCount(true);
+                else {
                   setCustomCount(false);
-                  setCount(n);
-                }}
-                className={`rounded-full px-3.5 py-1 text-xs font-medium ${!customCount && count === n ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
-              >
-                {n} Pins
-              </button>
-            ))}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={customCount}
-              onClick={() => setCustomCount(true)}
-              className={`rounded-full px-3.5 py-1 text-xs font-medium ${customCount ? "bg-zinc-900 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-900"}`}
-            >
-              Custom
-            </button>
-          </div>
-          {customCount && (
-            <select aria-label="Custom number of pins" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={count} onChange={(e) => setCount(Number(e.target.value))}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option key={n} value={n}>{n} {n === 1 ? "Pin" : "Pins"}</option>
-              ))}
-            </select>
-          )}
-          <span className="text-xs text-zinc-500">Each pin gets its own angle, layout and colour story.</span>
-          </div>
-        </div>
-        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
-          <label htmlFor="pin-style" className="font-medium">Pin type</label>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <select id="pin-style" className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-xs" value={style} onChange={(e) => setStyle(e.target.value as PinStyle)}>
-            {PIN_STYLE_KEYS.map((k) => (
-              <option key={k} value={k}>{PIN_STYLES[k].label}</option>
-            ))}
-          </select>
-          <span className="text-xs text-zinc-500">{PIN_STYLES[style].hint}</span>
-          </div>
-        </div>
-        <div className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
-          <span className="font-medium">Category</span>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <div className="flex rounded-md bg-zinc-100 p-0.5" role="radiogroup" aria-label="Category mode">
-            {(["auto", "manual", "custom"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={catMode === m}
-                onClick={() => setCatMode(m)}
-                className={`rounded px-2.5 py-1 text-xs font-medium ${catMode === m ? "bg-white shadow-sm" : "text-zinc-600"}`}
-              >
-                {m === "auto" ? "Automatic" : m === "manual" ? "Choose" : "Custom"}
-              </button>
-            ))}
-          </div>
-          {catMode === "auto" && (
-            <span className="text-xs text-zinc-600" aria-live="polite">
-              {idea.trim().length < 3
-                ? "Type a title and the best category is picked for you."
-                : detected
-                  ? <>Detected: <strong>{pathOf(detected.category)}</strong> (matched “{detected.matched.slice(0, 3).join("”, “")}”). <button type="button" className="underline" onClick={() => { setCategoryId(detected.category.id); setCatMode("manual"); }}>Change</button></>
-                  : "No clear match; pins will be made without a category. Use Choose or Custom to set one."}
-            </span>
-          )}
-          {catMode === "manual" && (
-            <select id="category" aria-label="Category" className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">No category</option>
-              {categories
-                .filter((c) => !c.parent_id)
-                .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
-                .map((c) => (
-                  <option key={c.id} value={c.id}>{c.parent_id ? `   ${pathOf(c)}` : c.name}</option>
+                  setCount(Number(v));
+                }
+              }}
+            />
+            {customCount && (
+              <GlassSelect label="Custom number of pins" value={String(count)} onChange={(v) => setCount(Number(v))} className="w-32">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <option key={n} value={n}>{n} {n === 1 ? "pin" : "pins"}</option>
                 ))}
-            </select>
-          )}
-          {catMode === "custom" && (
-            <>
-              <input aria-label="Custom category" className="rounded-md border border-zinc-300 px-2 py-1.5 text-sm" placeholder="e.g. Eid outfits" maxLength={80} value={customCat} onChange={(e) => setCustomCat(e.target.value)} />
-              <label className="flex items-center gap-1.5 text-xs">
-                <input type="checkbox" checked={saveCustom} onChange={(e) => setSaveCustom(e.target.checked)} /> Save to {labelFromSlug(kind)} categories
-              </label>
-            </>
-          )}
-          </div>
-        </div>
-        <label className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
-          <span className="font-medium">Language</span>
-          <span className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <select className="rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              </GlassSelect>
+            )}
+          </OptRow>
+          <OptRow label="Pin type" htmlFor="pin-style" hint={PIN_STYLES[style].hint}>
+            <GlassSelect id="pin-style" value={style} onChange={(v) => setStyle(v as PinStyle)} className="w-full sm:w-64">
+              {PIN_STYLE_KEYS.map((k) => (
+                <option key={k} value={k}>{PIN_STYLES[k].label}</option>
+              ))}
+            </GlassSelect>
+          </OptRow>
+          <OptRow
+            label="Category"
+            hint={
+              catMode === "auto" ? (
+                <span aria-live="polite">
+                  {idea.trim().length < 3
+                    ? "Type a title and the best category is picked for you."
+                    : detected
+                      ? <>Detected: <strong className="text-white/85">{pathOf(detected.category)}</strong> (matched “{detected.matched.slice(0, 3).join("”, “")}”). <button type="button" className="font-semibold text-[#ff9a7a] hover:underline" onClick={() => { setCategoryId(detected.category.id); setCatMode("manual"); }}>Change</button></>
+                      : "No clear match; pins will be made without a category. Use Choose or Custom to set one."}
+                </span>
+              ) : undefined
+            }
+          >
+            <Seg
+              label="Category mode"
+              options={[{ value: "auto", label: "Automatic" }, { value: "manual", label: "Choose" }, { value: "custom", label: "Custom" }]}
+              value={catMode}
+              onChange={(v) => setCatMode(v as typeof catMode)}
+            />
+            {catMode === "manual" && (
+              <GlassSelect id="category" label="Category" value={categoryId} onChange={setCategoryId} className="w-full sm:w-64">
+                <option value="">No category</option>
+                {categories
+                  .filter((c) => !c.parent_id)
+                  .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>{c.parent_id ? `   ${pathOf(c)}` : c.name}</option>
+                  ))}
+              </GlassSelect>
+            )}
+            {catMode === "custom" && (
+              <>
+                <input aria-label="Custom category" className="au-field h-10 w-full px-3.5 text-sm sm:w-56" placeholder="e.g. Eid outfits" maxLength={80} value={customCat} onChange={(e) => setCustomCat(e.target.value)} />
+                <label className="flex items-center gap-2 text-[13px] text-white/70">
+                  <input type="checkbox" className="h-4 w-4" checked={saveCustom} onChange={(e) => setSaveCustom(e.target.checked)} /> Save to {labelFromSlug(kind)} categories
+                </label>
+              </>
+            )}
+          </OptRow>
+          <OptRow label="Language" htmlFor="pin-language">
+            <GlassSelect id="pin-language" value={language} onChange={setLanguage} className="w-full sm:w-64">
               <option value="">English</option>
               {LANGUAGES.filter((l) => l !== "English").map((l) => <option key={l} value={l}>{l}</option>)}
-            </select>
-          </span>
-        </label>
-        <label className="grid gap-2 text-sm text-zinc-700 sm:grid-cols-[9rem_1fr] sm:items-center sm:gap-4">
-          <span className="font-medium">Link on these pins</span>
-          <input
-            type="url"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm"
-            placeholder="https://your-blog.com/post or a product page (optional)"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-          />
-        </label>
+            </GlassSelect>
+          </OptRow>
+          <OptRow label="Link on these pins" htmlFor="pin-link" hint="Optional. Pins with a link can send clicks to your site.">
+            <input
+              id="pin-link"
+              type="url"
+              className="au-field h-10 w-full px-3.5 text-sm"
+              placeholder="https://your-blog.com/post or a product page"
+              value={link}
+              onChange={(e) => setLink(e.target.value)}
+            />
+          </OptRow>
         </div>
-        <button
-          type="button"
-          onClick={generate}
-          disabled={busy !== "idle" || idea.trim().length < 3}
-          className="mt-3 block text-left text-sm text-zinc-600 underline decoration-zinc-300 hover:text-zinc-900 disabled:opacity-50"
-        >
-          {busy === "generating" ? `Writing ${count} draft${count === 1 ? "" : "s"}…` : "Or: write text only, so I can edit before saving"}
-        </button>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <button
+            type="button"
+            onClick={generate}
+            disabled={busy !== "idle" || idea.trim().length < 3}
+            className="inline-flex h-10 items-center gap-2 rounded-[0.75rem] bg-white/[0.06] px-4 text-[13px] font-semibold text-white/85 ring-1 ring-white/12 transition hover:bg-white/[0.12] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z" /></svg>
+            {busy === "generating" ? `Writing ${count} draft${count === 1 ? "" : "s"}…` : "Write text only"}
+          </button>
+          <span className="text-xs text-white/45">Text first, so you can edit before saving. No images are made.</span>
+        </div>
         <TrendIdeas kind={kind} niche={workspace.niche} store={store!} workspaceId={workspace.id} onPick={setIdea} />
         {error && (
           <div className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -641,5 +617,49 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         </section>
       )}
     </div>
+  );
+}
+
+/** One option row: label on the left (top on phones), controls and a hint under them. */
+function OptRow({ label, htmlFor, hint, children }: { label: string; htmlFor?: string; hint?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="grid gap-2 px-4 py-3.5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-5">
+      <label htmlFor={htmlFor} className="pt-2 text-[13.5px] font-semibold text-white/85 sm:pt-2.5">{label}</label>
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <div className="flex flex-wrap items-center gap-2.5">{children}</div>
+        {hint && <p className="text-[12.5px] leading-snug text-white/50">{hint}</p>}
+      </div>
+    </div>
+  );
+}
+
+/** Segmented control in the glass style, same height as the selects next to it. */
+function Seg({ label, options, value, onChange }: { label: string; options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex h-10 max-w-full gap-1 overflow-x-auto rounded-[0.75rem] bg-white/[0.05] p-1 ring-1 ring-white/12">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`whitespace-nowrap rounded-[0.55rem] px-3.5 text-[13px] font-semibold transition ${value === o.value ? "bg-white/[0.16] text-white shadow" : "text-white/60 hover:text-white"}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function GlassSelect({ id, label, value, onChange, className = "", children }: { id?: string; label?: string; value: string; onChange: (v: string) => void; className?: string; children: React.ReactNode }) {
+  return (
+    <span className={`relative flex items-center ${className}`}>
+      <select id={id} aria-label={label} className="au-field h-10 w-full min-w-0 appearance-none truncate pl-3.5 pr-9 text-[13.5px] font-medium" value={value} onChange={(e) => onChange(e.target.value)}>
+        {children}
+      </select>
+      <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute right-3 h-4 w-4 text-white/55" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+    </span>
   );
 }

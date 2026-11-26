@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "./NavLink";
 import { useRouter } from "next/navigation";
-import { getDemoUser } from "@/lib/auth/demo";
+import { demoDisplayName, getDemoUser } from "@/lib/auth/demo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEFAULT_WORKSPACES, type PinDraft, type WorkspaceKind } from "@/lib/types";
 
@@ -43,7 +43,7 @@ const sum = (a: number[]) => a.reduce((x, y) => x + y, 0);
 /** Home after sign-in. Every number comes from this app's own pins; nothing here is mock data. */
 export function Dashboard() {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState<string | null>(null);
   const [hello, setHello] = useState("Welcome back");
   const [today, setToday] = useState<Date | null>(null);
   const [pins, setPins] = useState<Pin[] | null>(null);
@@ -78,10 +78,10 @@ export function Dashboard() {
       const h = now.getHours();
       setToday(now);
       setHello(h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening");
-      if (store.mode === "demo") setName(getDemoUser()?.name ?? "");
+      if (store.mode === "demo") setName(demoDisplayName(getDemoUser()).split(" ")[0]);
       else {
         const p: { full_name?: unknown } = await fetch("/api/auth/profile").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-        if (!cancelled && typeof p.full_name === "string") setName(p.full_name.split(" ")[0]);
+        if (!cancelled) setName(typeof p.full_name === "string" ? p.full_name.trim().split(" ")[0] : "");
       }
       fetch("/api/usage").then((r) => (r.ok ? r.json() : null)).then((u) => !cancelled && setUsage(u)).catch(() => {});
       fetch("/api/status").then((r) => (r.ok ? r.json() : null)).then((s) => !cancelled && setStatus(s)).catch(() => {});
@@ -187,7 +187,11 @@ export function Dashboard() {
         </div>
         <p className="mt-6 h-6 text-base font-semibold text-white/80">
           {hello}
-          {name ? <>, <span className="au-grad">{name}</span></> : ""}
+          {name ? (
+            <>, <span className="au-grad">{name}</span></>
+          ) : name === null ? null : (
+            <Link href="/account#name" className="ml-2 text-sm font-medium text-white/45 underline-offset-4 hover:text-white hover:underline">Add your name</Link>
+          )}
         </p>
         <h1 className="mt-1 text-[2.5rem] font-bold leading-[1.02] tracking-tight sm:text-6xl">
           Ready to make

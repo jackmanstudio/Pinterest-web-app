@@ -121,7 +121,11 @@ body {
 .app-main button:disabled { cursor: not-allowed; }
 
 /* Glass form fields (filter bars): roomy, clear hover and focus */
-.app-main .au-field:is(input, select) { border-radius: 0.875rem; border: 1px solid rgb(255 255 255 / 0.12); background-color: rgb(255 255 255 / 0.05); color: #f3f1f4; }
-.app-main .au-field:is(input, select):hover { border-color: rgb(255 255 255 / 0.28); background-color: rgb(255 255 255 / 0.08); }
-.app-main .au-field:is(input, select):focus { border-color: #ff7a45; background-color: rgb(255 255 255 / 0.08); box-shadow: 0 0 0 3px rgb(255 122 69 / 0.22); }
-.app-main input.au-field[type="date"] { color-scheme: dark; }
+.app-main .au-field.au-field.au-field:is(input, select) { border-radius: 0.875rem; border: 1px solid rgb(255 255 255 / 0.12); background-color: rgb(255 255 255 / 0.05); color: #f3f1f4; }
+.app-main .au-field.au-field.au-field:is(input, select):hover { border-color: rgb(255 255 255 / 0.28); background-color: rgb(255 255 255 / 0.08); }
+.app-main .au-field.au-field.au-field:is(input, select):focus { border-color: #ff7a45; background-color: rgb(255 255 255 / 0.08); box-shadow: 0 0 0 3px rgb(255 122 69 / 0.22); }
+.app-main input.au-field.au-field[type="date"] { color-scheme: dark; }
+.app-main input.au-date.au-date.au-date { height: 2.25rem; border: 0; background: transparent; padding: 0 0.5rem; border-radius: 0.625rem; color: #efeaf6; font-size: 0.8125rem; font-weight: 500; color-scheme: dark; box-shadow: none; }
+.app-main input.au-date.au-date.au-date:hover { background: rgb(255 255 255 / 0.07); }
+.app-main input.au-date.au-date.au-date:focus { background: rgb(255 255 255 / 0.09); box-shadow: 0 0 0 2px rgb(255 122 69 / 0.45); border: 0; }
+.app-main input.au-date.au-date.au-date::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
