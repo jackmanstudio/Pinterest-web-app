@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { LIMITS, parseList } from "@/lib/drafts/validation";
 import type { QualityContext } from "@/lib/drafts/quality";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
@@ -138,29 +139,7 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
     </>
   );
 
-  if (layout === "card") {
-    return (
-      <article className="flex flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm transition hover:border-zinc-300">
-        {media && <div className="p-2.5 pb-0">{media}</div>}
-        <div className="flex flex-col gap-3 p-4">
-          {meta}
-          {header}
-          {main}
-          <details className="group rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-            <summary className="cursor-pointer list-none text-[13px] font-semibold text-zinc-700 marker:hidden">
-              <span className="inline-block transition group-open:rotate-90" aria-hidden>›</span> More details
-              <span className="font-normal text-zinc-500"> · concept, alt text, image prompt</span>
-            </summary>
-            <div className="mt-3 flex flex-col gap-3">
-              {concept}
-              {extra}
-            </div>
-          </details>
-          {tail}
-        </div>
-      </article>
-    );
-  }
+  if (layout === "card") return <CardView {...{ index, draft, source, media, meta, quality, header, concept, main, extra, tail, errors }} />;
 
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
@@ -170,6 +149,70 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       {extra}
       {media}
       {tail}
+    </article>
+  );
+}
+
+/** Pin library card: image, then a clean read view; the form opens only when you choose Edit. */
+function CardView({ index, draft, source, media, meta, quality, concept, main, extra, tail }: {
+  index: number;
+  draft: DraftContent;
+  source: ContentSource;
+  media?: React.ReactNode;
+  meta?: React.ReactNode;
+  quality?: QualityContext;
+  header: React.ReactNode;
+  concept: React.ReactNode;
+  main: React.ReactNode;
+  extra: React.ReactNode;
+  tail: React.ReactNode;
+  errors: string[];
+}) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <article className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] transition duration-200 hover:border-white/20 hover:bg-white/[0.07]">
+      {media && <div className="p-2.5 pb-0">{media}</div>}
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        {meta}
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-white/45">
+            Pin {index + 1} · {draft.angle || "Custom"}
+          </p>
+          <h3 className="mt-1.5 text-[17px] font-semibold leading-snug text-white">{draft.title || "Untitled pin"}</h3>
+          {!editing && (
+            <>
+              <p className="mt-2 line-clamp-3 text-[13.5px] leading-relaxed text-white/65">{draft.description}</p>
+              {draft.tags.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tags">
+                  {draft.tags.map((t) => (
+                    <li key={t} className="rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[11.5px] font-medium text-white/70 ring-1 ring-white/10">#{t.replace(/\s+/g, "")}</li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(!editing)}
+            aria-expanded={editing}
+            className="rounded-lg bg-white/[0.08] px-3 py-1.5 text-[13px] font-semibold text-white ring-1 ring-white/15 hover:bg-white/[0.14]"
+          >
+            {editing ? "Close editor" : "Edit text"}
+          </button>
+          <CopyButton text={pinAsText({ ...draft, link: quality?.link })} label="Copy pin" className="!rounded-lg !px-3 !py-1.5 !text-[13px] !font-semibold !text-white/80 !no-underline ring-1 ring-white/10 hover:!bg-white/[0.1]" />
+          <span className="ml-auto"><SourceBadge source={source} /></span>
+        </div>
+        {editing && (
+          <div className="flex flex-col gap-3 rounded-xl bg-black/20 p-3 ring-1 ring-white/10">
+            {main}
+            {concept}
+            {extra}
+          </div>
+        )}
+        <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-3">{tail}</div>
+      </div>
     </article>
   );
 }

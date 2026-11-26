@@ -177,7 +177,8 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
     setFilter({ ...filter, [k]: v });
     setShown(PAGE);
   };
-  const ctl = "rounded-md border border-zinc-300 px-2 py-1.5 text-sm";
+  const ctl = "au-field h-11 px-3.5 text-sm";
+  const menu = "rounded-lg px-3 py-2 text-left text-[13px] font-medium text-white/85 hover:bg-white/[0.08] disabled:opacity-40";
   const btn = "rounded-lg bg-white/[0.06] px-2.5 py-1 text-[13px] font-medium text-white/80 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white disabled:opacity-40";
   const archivedCount = drafts.filter((d) => d.archived_at).length;
 
@@ -204,29 +205,47 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-zinc-200 bg-white p-3" role="search">
-        <input aria-label="Search pins" className={`${ctl} min-w-48 flex-1`} placeholder="Search titles, descriptions, tags…" value={filter.q} onChange={(e) => set("q", e.target.value)} />
-        <select aria-label="Status" className={ctl} value={filter.status} onChange={(e) => set("status", e.target.value as LibraryFilter["status"])}>
-          <option value="">All statuses</option>
-          {(Object.keys(STATUS_LABELS) as DraftStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-          <option value="archived">Archived</option>
-        </select>
-        <select aria-label="Category" className={`${ctl} max-w-56`} value={filter.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
-          <option value="">All categories</option>
-          {categories
-            .filter((c) => !c.parent_id)
-            .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
-            .map((c) => <option key={c.id} value={c.id}>{c.parent_id ? `   ${catName(c.id)}` : c.name}</option>)}
-        </select>
-        <label className="flex items-center gap-1 text-xs text-zinc-600">From <input type="date" className={ctl} value={filter.from} onChange={(e) => set("from", e.target.value)} /></label>
-        <label className="flex items-center gap-1 text-xs text-zinc-600">To <input type="date" className={ctl} value={filter.to} onChange={(e) => set("to", e.target.value)} /></label>
-        <label className="flex items-center gap-1 text-xs text-zinc-600">
-          <input type="checkbox" checked={filter.showArchived} onChange={(e) => set("showArchived", e.target.checked)} /> Include archived
-        </label>
-        {JSON.stringify(filter) !== JSON.stringify(EMPTY_FILTER) && (
-          <button className="text-xs underline" onClick={() => setFilter(EMPTY_FILTER)}>Clear</button>
-        )}
-        <span className="ml-auto text-xs text-zinc-500">{visible.length} shown</span>
+      <div className="au-glass flex flex-col gap-3 rounded-2xl p-3 sm:p-4" role="search">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <label className="au-ctl group relative flex min-w-0 flex-1 items-center">
+            <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute left-3.5 h-4 w-4 text-white/45 group-focus-within:text-[#ff8a6a]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <span className="sr-only">Search pins</span>
+            <input className={`${ctl} w-full !pl-10`} placeholder="Search titles, descriptions, tags…" value={filter.q} onChange={(e) => set("q", e.target.value)} />
+          </label>
+          <div className="grid grid-cols-2 gap-3 sm:flex">
+            <select aria-label="Status" className={`${ctl} sm:w-40`} value={filter.status} onChange={(e) => set("status", e.target.value as LibraryFilter["status"])}>
+              <option value="">All statuses</option>
+              {(Object.keys(STATUS_LABELS) as DraftStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              <option value="archived">Archived</option>
+            </select>
+            <select aria-label="Category" className={`${ctl} sm:w-60`} value={filter.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
+              <option value="">All categories</option>
+              {categories
+                .filter((c) => !c.parent_id)
+                .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
+                .map((c) => <option key={c.id} value={c.id}>{c.parent_id ? `   ${catName(c.id)}` : c.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-white/10 pt-3">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+            <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-white/50 sm:flex-row sm:items-center sm:gap-2">
+              From <input type="date" className={`${ctl} normal-case`} value={filter.from} onChange={(e) => set("from", e.target.value)} />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-white/50 sm:flex-row sm:items-center sm:gap-2">
+              To <input type="date" className={`${ctl} normal-case`} value={filter.to} onChange={(e) => set("to", e.target.value)} />
+            </label>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+            <input type="checkbox" className="h-4 w-4" checked={filter.showArchived} onChange={(e) => set("showArchived", e.target.checked)} /> Include archived
+          </label>
+          <div className="ml-auto flex items-center gap-3">
+            {JSON.stringify(filter) !== JSON.stringify(EMPTY_FILTER) && (
+              <button className="rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#ff8a6a] hover:bg-white/[0.06]" onClick={() => setFilter(EMPTY_FILTER)}>Clear filters</button>
+            )}
+            <span className="rounded-full bg-white/[0.07] px-3 py-1 text-xs font-semibold text-white/70 ring-1 ring-white/10">{visible.length} shown</span>
+          </div>
+        </div>
       </div>
 
       {msg?.id === "" && <p className="text-sm text-red-700">{msg.text}</p>}
@@ -276,16 +295,23 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
                 }
                 footer={
                   <div className="flex flex-col gap-2">
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <button onClick={() => saveEdit(d)} disabled={!edits[d.id]} className="rounded-md bg-zinc-900 px-3.5 py-1.5 text-sm text-white disabled:opacity-40">
-                        Save changes
-                      </button>
-                      <button onClick={() => regenerate(d)} disabled={locked || busyId === d.id} className={btn}>{busyId === d.id ? "Rewriting…" : "Rewrite this pin"}</button>
-                      <button onClick={() => duplicate(d)} className={btn}>Duplicate</button>
-                      <button onClick={() => showHistory(d)} className={btn}>{history?.id === d.id ? "Hide history" : "History"}</button>
-                      {d.image_status === "ready" && <button onClick={() => downloadImage(d)} className={btn}>Download image</button>}
-                      <button onClick={() => archive(d, !d.archived_at)} disabled={d.status === "scheduled"} className={btn}>{d.archived_at ? "Unarchive" : "Archive"}</button>
-                      <button onClick={() => remove(d)} className="rounded-lg px-2.5 py-1 text-[13px] font-medium text-red-700 hover:bg-red-500/10">Delete</button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {edits[d.id] && (
+                        <button onClick={() => saveEdit(d)} className="rounded-lg bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3.5 py-1.5 text-[13px] font-bold text-white shadow-[0_8px_20px_-10px_rgba(255,90,60,0.9)] hover:brightness-110">
+                          Save changes
+                        </button>
+                      )}
+                      <button onClick={() => regenerate(d)} disabled={locked || busyId === d.id} className={btn}>{busyId === d.id ? "Rewriting…" : "Rewrite"}</button>
+                      {d.image_status === "ready" && <button onClick={() => downloadImage(d)} className={btn}>Download</button>}
+                      <details className="relative ml-auto">
+                        <summary className={`${btn} cursor-pointer list-none`} aria-label="More actions">More ▾</summary>
+                        <div className="absolute bottom-full right-0 z-20 mb-2 flex w-44 flex-col rounded-xl border border-white/10 bg-[#1a1426] p-1.5 shadow-2xl">
+                          <button onClick={() => duplicate(d)} className={menu}>Duplicate</button>
+                          <button onClick={() => showHistory(d)} className={menu}>{history?.id === d.id ? "Hide history" : "History"}</button>
+                          <button onClick={() => archive(d, !d.archived_at)} disabled={d.status === "scheduled"} className={menu}>{d.archived_at ? "Unarchive" : "Archive"}</button>
+                          <button onClick={() => remove(d)} className={`${menu} !text-[#ff6b80] hover:!bg-red-500/10`}>Delete</button>
+                        </div>
+                      </details>
                     </div>
                     {msg?.id === d.id && <span className={`text-sm ${msg.ok ? "text-emerald-700" : "text-red-700"}`}>{msg.text}</span>}
                     {history?.id === d.id && (
