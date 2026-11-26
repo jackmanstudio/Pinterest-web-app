@@ -4,6 +4,7 @@ import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
 import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
 import { AiAssignmentSetSchema } from "@/lib/boards/automation";
+import { GROWTH_SYSTEM, GrowthIdeasSchema, growthUserPrompt, type GrowthInput, type GrowthOutput } from "@/lib/agents/growth";
 import { ProviderError, type BoardsOutput, type BrandOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
 export const CLOUDFLARE_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
@@ -108,6 +109,13 @@ export class CloudflareTextProvider implements TextProvider {
     const parsed = DraftSetSchema.safeParse(normalizeDrafts(out, anglesFor(req.style)));
     if (!parsed.success) throw new ProviderError("The AI returned incomplete drafts. Please retry.", 502, true);
     return { source: "ai", provider: this.name, model: this.model, drafts: parsed.data.drafts, usage };
+  }
+
+  async generateGrowthIdeas(input: GrowthInput): Promise<GrowthOutput> {
+    const { out, usage } = await this.run(GROWTH_SYSTEM, growthUserPrompt(input), GrowthIdeasSchema, 3000);
+    const parsed = GrowthIdeasSchema.safeParse(out);
+    if (!parsed.success) throw new ProviderError("The AI response was incomplete. Please retry.", 502, true);
+    return { ideas: parsed.data.ideas, model: this.model, usage };
   }
 
   async generateInsights(input: InsightsInput): Promise<InsightsOutput> {

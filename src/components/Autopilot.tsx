@@ -1,5 +1,6 @@
 "use client";
 import { PageTitle } from "./PageTitle";
+import { GrowthAgent } from "@/components/GrowthAgent";
 import { ContentSources, type SourceRow } from "./ContentSources";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -301,6 +302,8 @@ export function Autopilot({ kind }: { kind: WorkspaceKind }) {
           </ul>
         </section>
       </div>
+
+      <GrowthAgent kind={kind} autopilotOn={Boolean(s?.enabled)} onQueued={load} />
 
       <ContentSources sources={live?.sources ?? []} needsMigration={Boolean(live?.sourcesNeedMigration)} disabled={!live || busy} post={post} />
 

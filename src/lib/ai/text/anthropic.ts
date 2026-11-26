@@ -6,6 +6,7 @@ import { ProviderError, type BrandOutput, type BoardsOutput, type InsightsInput,
 
 import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFTS_SYSTEM as SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
 import { AiAssignmentSetSchema } from "@/lib/boards/automation";
+import { GROWTH_SYSTEM, GrowthIdeasSchema, growthUserPrompt, type GrowthInput, type GrowthOutput } from "@/lib/agents/growth";
 
 export class AnthropicTextProvider implements TextProvider {
   readonly name = "Claude (Anthropic)";
@@ -17,6 +18,32 @@ export class AnthropicTextProvider implements TextProvider {
     private readonly model: string,
   ) {
     this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 90_000 });
+  }
+
+  async generateGrowthIdeas(input: GrowthInput): Promise<GrowthOutput> {
+    try {
+      const response = await this.client.beta.messages.parse({
+        model: this.model,
+        max_tokens: 16000,
+        system: GROWTH_SYSTEM,
+        messages: [{ role: "user", content: growthUserPrompt(input) }],
+        output_config: { effort: "medium", format: betaZodOutputFormat(GrowthIdeasSchema) },
+        betas: ["server-side-fallback-2026-07-01"],
+        fallbacks: "default",
+      });
+      if (response.stop_reason === "refusal") throw new ProviderError("The AI provider declined this request.", 422);
+      if (!response.parsed_output) throw new ProviderError("The AI response was incomplete. Please retry.", 502, true);
+      return {
+        ideas: response.parsed_output.ideas,
+        model: response.model,
+        usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
+      };
+    } catch (err) {
+      if (err instanceof ProviderError) throw err;
+      if (err instanceof Anthropic.RateLimitError) throw new ProviderError("The AI provider is rate limiting requests. Retry shortly.", 429, true);
+      if (err instanceof Anthropic.APIError) throw new ProviderError(`The AI provider returned an error (${err.status ?? "network"}).`, 502, true);
+      throw err;
+    }
   }
 
   async generateInsights(input: InsightsInput): Promise<InsightsOutput> {
