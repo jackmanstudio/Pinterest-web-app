@@ -196,32 +196,45 @@ function CardView({ index, draft, source, media, meta, quality, owner, concept, 
     <article className="flex h-full flex-col overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/[0.05] transition duration-200 hover:border-white/20 hover:bg-white/[0.07]">
       {media && <div className="p-2.5 pb-0">{media}</div>}
       <div className="flex flex-1 flex-col gap-4 p-4">
-        {/* Pin text, in the order a pin shows it */}
-        <div className="flex flex-col gap-2">
-          {domain && (
-            <a href={quality?.link ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1.5 rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[12px] font-semibold text-white/75 hover:bg-white/[0.12] hover:text-white">
-              <span aria-hidden>↗</span> {domain}
-            </a>
+        {/* Pin fields, in the order Pinterest asks for them: Title, Description, Link, Board, Tagged topics */}
+        <dl className="flex flex-col divide-y divide-white/[0.08] rounded-xl bg-white/[0.03] ring-1 ring-white/10">
+          <Field label="Title">
+            <h3 className="text-[17px] font-bold leading-snug tracking-tight text-white">{draft.title || "Untitled pin"}</h3>
+          </Field>
+          {!editing && (
+            <Field label="Description">
+              <span className="line-clamp-4 text-[13.5px] leading-relaxed text-white/75">{draft.description || "—"}</span>
+            </Field>
           )}
-          <h3 className="text-[19px] font-bold leading-snug tracking-tight text-white">{draft.title || "Untitled pin"}</h3>
-          {!editing && <p className="line-clamp-3 text-[14px] leading-relaxed text-white/70">{draft.description}</p>}
-          {owner && (
-            <div className="mt-1 flex items-center gap-2.5">
-              <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#e60023] to-[#ff7a45] text-[13px] font-bold text-white">{owner.name.charAt(0).toUpperCase()}</span>
-              <span className="min-w-0 leading-tight">
-                <span className="block truncate text-[13px] font-semibold text-white">{owner.name}</span>
-                {owner.board && <span className="block truncate text-[12px] text-white/50">Board: {owner.board}</span>}
-              </span>
-            </div>
+          <Field label="Link">
+            {domain ? (
+              <a href={quality?.link ?? "#"} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1.5 truncate text-[13.5px] font-semibold text-[#ff9a7a] hover:text-white hover:underline">
+                <span aria-hidden>↗</span> <span className="truncate">{domain}</span>
+              </a>
+            ) : (
+              <span className="text-[13.5px] text-white/45">No link yet</span>
+            )}
+          </Field>
+          <Field label="Board">
+            <span className="flex items-center gap-2">
+              <span aria-hidden className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-gradient-to-br from-[#e60023] to-[#ff7a45] text-[11px] font-bold text-white">{(owner?.board || owner?.name || "B").charAt(0).toUpperCase()}</span>
+              <span className="truncate text-[13.5px] font-semibold text-white">{owner?.board || "Picked when you publish"}</span>
+            </span>
+          </Field>
+          {!editing && (
+            <Field label="Tagged topics">
+              {draft.tags.length > 0 ? (
+                <ul className="flex flex-wrap gap-1.5" aria-label="Tagged topics">
+                  {draft.tags.map((t) => (
+                    <li key={t} className="rounded-full bg-white/[0.08] px-2.5 py-0.5 text-[12px] font-medium text-white/80 ring-1 ring-white/10">{t}</li>
+                  ))}
+                </ul>
+              ) : (
+                <span className="text-[13.5px] text-white/45">No topics yet</span>
+              )}
+            </Field>
           )}
-          {!editing && draft.tags.length > 0 && (
-            <ul className="mt-1 flex flex-wrap gap-1.5" aria-label="Tags">
-              {draft.tags.map((t) => (
-                <li key={t} className="rounded-full bg-white/[0.07] px-2.5 py-0.5 text-[11.5px] font-medium text-white/70 ring-1 ring-white/10">#{t.replace(/\s+/g, "")}</li>
-              ))}
-            </ul>
-          )}
-        </div>
+        </dl>
 
         <QualityScoreCard draft={draft} ctx={quality} />
 
@@ -251,5 +264,14 @@ function CardView({ index, draft, source, media, meta, quality, owner, concept, 
         <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-3">{tail}</div>
       </div>
     </article>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 px-3.5 py-2.5">
+      <dt className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-white/45">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
   );
 }

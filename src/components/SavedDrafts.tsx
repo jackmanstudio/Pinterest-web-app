@@ -26,6 +26,19 @@ const STATUS_PILL: Record<DraftStatus, string> = {
   published: "bg-emerald-400/15 text-emerald-200",
 };
 
+/** Glass select with its own chevron, so every filter looks the same in every browser. */
+function Select({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+  return (
+    <label className="relative flex min-w-0 items-center">
+      <span className="sr-only">{label}</span>
+      <select aria-label={label} className="au-field h-11 w-full min-w-0 appearance-none truncate pl-4 pr-10 text-sm font-medium" value={value} onChange={(e) => onChange(e.target.value)}>
+        {children}
+      </select>
+      <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute right-3.5 h-4 w-4 text-white/55" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+    </label>
+  );
+}
+
 export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
   const { store, workspace, error: wsError } = useWorkspace(kind);
   const trendKeywords = useTrendKeywords(kind);
@@ -177,7 +190,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
     setFilter({ ...filter, [k]: v });
     setShown(PAGE);
   };
-  const ctl = "au-field h-11 px-3.5 text-sm";
+  const ctl = "au-field h-11 px-4 text-sm font-medium";
   const menu = "rounded-lg px-3 py-2 text-left text-[13px] font-medium text-white/85 hover:bg-white/[0.08] disabled:opacity-40";
   const btn = "rounded-lg bg-white/[0.06] px-2.5 py-1 text-[13px] font-medium text-white/80 ring-1 ring-white/10 hover:bg-white/[0.12] hover:text-white disabled:opacity-40";
   const archivedCount = drafts.filter((d) => d.archived_at).length;
@@ -205,45 +218,46 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
         </p>
       )}
 
-      <div className="au-glass flex flex-col gap-3 rounded-2xl p-3 sm:p-4" role="search">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-          <label className="au-ctl group relative flex min-w-0 flex-1 items-center">
-            <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute left-3.5 h-4 w-4 text-white/45 group-focus-within:text-[#ff8a6a]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+      <div className="au-glass flex flex-col gap-4 rounded-2xl px-4 py-4 sm:px-6 sm:py-5" role="search">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_11rem_15rem]">
+          <label className="group relative flex min-w-0 items-center">
+            <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute left-4 h-4 w-4 text-white/45 transition-colors group-focus-within:text-[#ff8a6a]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
             <span className="sr-only">Search pins</span>
-            <input className={`${ctl} w-full !pl-10`} placeholder="Search titles, descriptions, tags…" value={filter.q} onChange={(e) => set("q", e.target.value)} />
+            <input className={`${ctl} w-full !pl-11`} placeholder="Search titles, descriptions, tags…" value={filter.q} onChange={(e) => set("q", e.target.value)} />
           </label>
-          <div className="grid grid-cols-2 gap-3 sm:flex">
-            <select aria-label="Status" className={`${ctl} sm:w-40`} value={filter.status} onChange={(e) => set("status", e.target.value as LibraryFilter["status"])}>
+          <div className="grid grid-cols-2 gap-3 lg:contents">
+            <Select label="Status" value={filter.status} onChange={(v) => set("status", v as LibraryFilter["status"])}>
               <option value="">All statuses</option>
               {(Object.keys(STATUS_LABELS) as DraftStatus[]).map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
               <option value="archived">Archived</option>
-            </select>
-            <select aria-label="Category" className={`${ctl} sm:w-60`} value={filter.categoryId} onChange={(e) => set("categoryId", e.target.value)}>
+            </Select>
+            <Select label="Category" value={filter.categoryId} onChange={(v) => set("categoryId", v)}>
               <option value="">All categories</option>
               {categories
                 .filter((c) => !c.parent_id)
                 .flatMap((c) => [c, ...categories.filter((s) => s.parent_id === c.id)])
                 .map((c) => <option key={c.id} value={c.id}>{c.parent_id ? `   ${catName(c.id)}` : c.name}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-white/10 pt-3">
-          <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
-            <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-white/50 sm:flex-row sm:items-center sm:gap-2">
-              From <input type="date" className={`${ctl} normal-case`} value={filter.from} onChange={(e) => set("from", e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-white/50 sm:flex-row sm:items-center sm:gap-2">
-              To <input type="date" className={`${ctl} normal-case`} value={filter.to} onChange={(e) => set("to", e.target.value)} />
-            </label>
+        <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex h-11 w-full min-w-0 items-center gap-1.5 rounded-[0.875rem] border border-white/12 bg-white/[0.05] pl-3.5 pr-1.5 transition-colors hover:border-white/25 sm:w-auto sm:gap-2">
+            <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-white/45" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" /></svg>
+            <span className="hidden text-[13px] font-medium text-white/55 sm:inline">Date</span>
+            <input type="date" aria-label="From date" className={`au-date min-w-0 flex-1 sm:flex-none ${filter.from ? "" : "!text-white/50"}`} value={filter.from} onChange={(e) => set("from", e.target.value)} />
+            <span aria-hidden className="text-white/35">–</span>
+            <input type="date" aria-label="To date" className={`au-date min-w-0 flex-1 sm:flex-none ${filter.to ? "" : "!text-white/50"}`} value={filter.to} onChange={(e) => set("to", e.target.value)} />
           </div>
-          <label className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] font-medium text-white/70 hover:bg-white/[0.06] hover:text-white">
+          <div className="flex items-center justify-between gap-2 sm:contents">
+          <label className="flex h-11 cursor-pointer items-center gap-2.5 rounded-[0.875rem] px-3 text-[13px] font-medium text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white">
             <input type="checkbox" className="h-4 w-4" checked={filter.showArchived} onChange={(e) => set("showArchived", e.target.checked)} /> Include archived
           </label>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:ml-auto">
             {JSON.stringify(filter) !== JSON.stringify(EMPTY_FILTER) && (
-              <button className="rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#ff8a6a] hover:bg-white/[0.06]" onClick={() => setFilter(EMPTY_FILTER)}>Clear filters</button>
+              <button className="h-9 rounded-lg px-3 text-[13px] font-semibold text-[#ff8a6a] hover:bg-white/[0.06]" onClick={() => setFilter(EMPTY_FILTER)}>Clear filters</button>
             )}
             <span className="rounded-full bg-white/[0.07] px-3 py-1 text-xs font-semibold text-white/70 ring-1 ring-white/10">{visible.length} shown</span>
+          </div>
           </div>
         </div>
       </div>
