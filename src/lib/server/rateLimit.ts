@@ -13,6 +13,7 @@ export const LIMITS = {
   account: { limit: 5, windowMs: 60_000 },
   autopilot: { limit: 20, windowMs: 60_000 },
   autopilotRun: { limit: 3, windowMs: 60_000 },
+  agentRun: { limit: 3, windowMs: 60_000 },
   urlCheck: { limit: 15, windowMs: 60_000 },
   // Auth (spec 12): per IP, plus per email below, against brute force and email bombing.
   authLogin: { limit: 10, windowMs: 10 * 60_000 },

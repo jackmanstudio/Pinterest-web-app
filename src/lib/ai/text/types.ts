@@ -1,6 +1,7 @@
 import type { AiAssignment } from "@/lib/boards/automation";
 import type { BoardsPromptInput, BrandAnalysis } from "./prompt";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
+import type { GrowthInput, GrowthOutput } from "@/lib/agents/growth";
 
 /**
  * Server-side text provider adapter. Swap providers by adding another
@@ -16,6 +17,8 @@ export interface TextProvider {
   generateInsights?(input: InsightsInput): Promise<InsightsOutput>;
   /** Board & category picks (spec 11). Demo providers don't implement this; the keyword fallback is used instead. */
   assignBoards?(input: BoardsPromptInput): Promise<BoardsOutput>;
+  /** Growth agent: new pin ideas from the account's own data. Demo providers don't implement this. */
+  generateGrowthIdeas?(input: GrowthInput): Promise<GrowthOutput>;
   /** Brand voice, audience, keywords, image style and CTA from a website's text. */
   analyzeBrand?(pageText: string): Promise<BrandOutput>;
 }
