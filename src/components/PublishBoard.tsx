@@ -117,7 +117,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       )}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p>}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5" role="tablist" aria-label="Pins by status">
+      <div className="-mx-4 flex snap-x gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-5 sm:overflow-visible sm:px-0 sm:pb-0" role="tablist" aria-label="Pins by status">
         {ORDER.map((s) => {
           const active = tab === s;
           return (
@@ -126,7 +126,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
               role="tab"
               aria-selected={active}
               onClick={() => setTab(s)}
-              className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a45] ${active ? "border-[#ff7a45]/60 bg-gradient-to-br from-[#e60023]/25 to-[#ff7a45]/10 shadow-[0_14px_40px_-18px_rgba(255,90,60,0.8)]" : "border-white/10 bg-white/[0.05] hover:border-white/25 hover:bg-white/[0.09]"}`}
+              className={`group relative w-[8.5rem] shrink-0 snap-start overflow-hidden rounded-2xl border p-4 text-left transition sm:w-auto duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#ff7a45] ${active ? "border-[#ff7a45]/60 bg-gradient-to-br from-[#e60023]/25 to-[#ff7a45]/10 shadow-[0_14px_40px_-18px_rgba(255,90,60,0.8)]" : "border-white/10 bg-white/[0.05] hover:border-white/25 hover:bg-white/[0.09]"}`}
             >
               <span className="flex items-center gap-2 text-[13px] font-medium text-white/70 group-hover:text-white">
                 <span aria-hidden className={`h-2 w-2 rounded-full ${STATUS_DOT[s]}`} />
