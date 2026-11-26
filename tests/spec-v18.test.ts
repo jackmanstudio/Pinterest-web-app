@@ -9,8 +9,9 @@ import { recommendBoard } from "@/lib/publishing/boards";
 import { calendarItems, dayKey, monthGrid, weekDays } from "@/lib/planning/calendar";
 import { workspaceHealth } from "@/lib/account/health";
 import { draftsUserPrompt } from "@/lib/ai/text/prompt";
-import { LocalStore, type KeyValue } from "@/lib/store/local";
+import { type KeyValue } from "@/lib/store/local";
 import { EMPTY_BRAND, type Category, type PinDraft } from "@/lib/types";
+import { seededStore } from "./seed";
 
 class MemoryKV implements KeyValue {
   m = new Map<string, string>();
@@ -59,7 +60,7 @@ describe("40-category taxonomy", () => {
     expect(detectCategory("Chicken biryani recipe for Eid", cats)?.category.id).toBe("s");
   });
   it("new demo workspaces start with the spec taxonomy", async () => {
-    const store = new LocalStore(new MemoryKV());
+    const store = seededStore(new MemoryKV());
     const m = await store.getWorkspace("macro");
     expect(await store.listCategories(m.id)).toHaveLength(40);
   });
@@ -161,7 +162,7 @@ describe("pin library", () => {
     expect(d.has(other.id)).toBe(false);
   });
   it("demo store keeps versions, duplicates and archives", async () => {
-    const store = new LocalStore(new MemoryKV());
+    const store = seededStore(new MemoryKV());
     const f = await store.getWorkspace("fashion");
     const [d] = await store.saveDrafts(f.id, [{ ...content, idea: "i", batch_id: "b", category_id: null, source: "ai" }]);
     await store.updateDraft(f.id, d.id, { title: "New title for this pin" });

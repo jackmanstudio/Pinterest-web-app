@@ -15,7 +15,7 @@ Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pi
 | Autopilot | **Built, not yet tested live.** Off by default. Turns queued ideas into pins and publishes them to Pinterest automatically within a daily limit and the AI budget. Needs Supabase, AI keys, Pinterest with publishing, and an hourly scheduler. |
 | Production hardening | **Built.** Rate limits, security headers, structured logs, `/api/health`, data export and account deletion, CI. Rate limits are in-memory (one server instance); swap in Redis/Upstash for multi-instance hosting. |
 | Spec v1.8 content tools | **Built and tested (unit + database tests).** 40-category taxonomy with automatic/manual/custom category, multi-language output, copy buttons, explainable quality score and proofreader, pin library search/filters/archive/duplicate/version history/rewrite one pin, CSV import/export, content calendar, destination link checker, UTM builder, board suggestion, activity log, all-accounts overview with pause-all. |
-| Unlimited accounts | **Built and tested (unit + database tests).** Every user can add any number of Pinterest accounts on **All accounts** (each with its own brand, categories, boards, pins, Autopilot and Pinterest connection) and delete ones they no longer need. Needs migration `0013_unlimited_accounts.sql`; until it runs, the two starter accounts keep working. |
+| Unlimited accounts | **Built and tested (unit + database tests).** Every user can add any number of Pinterest accounts on **All accounts** (each with its own brand, categories, boards, pins, Autopilot and Pinterest connection) and delete ones they no longer need. New users start with no accounts. Needs migrations `0013` and `0014`. |
 | Competitor tracking | **Not available.** Pinterest v5 has no API for other accounts' analytics, so this is intentionally not built. |
 | Pinterest API v5 | **OAuth, sync and approval-based publishing built, not yet tested against a live Pinterest app.** Needs your developer-app credentials. Publishing is off until `PINTEREST_ENABLE_PUBLISHING=true`, and every publish needs approval plus confirmation. |
 
@@ -94,7 +94,7 @@ Verified against the official Pinterest v5 docs and OpenAPI spec (Nov 2026).
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local`.
 4. In Supabase Auth → URL configuration, add `http://localhost:3000/auth/callback` (and your production URL) as a redirect URL.
 
-The migration creates both workspaces for every new user, enables row-level security on all tables, and uses composite foreign keys so a draft can't reference a category from the other workspace.
+The migrations enable row-level security on all tables and use composite foreign keys so a draft can't reference a category from another account. New users start with no accounts and add their own.
 
 ## One-step pins
 
@@ -137,11 +137,11 @@ Run `supabase/migrations/0009_board_automation.sql` once on the live database. U
 
 ## Accounts (no limit)
 
-Run `supabase/migrations/0013_unlimited_accounts.sql` once on the live database. It adds a URL slug to each workspace (existing ones keep `/w/fashion` and `/w/macro`), removes the one-per-kind limit, and adds `create_workspace` / `delete_workspace` functions.
+Run `supabase/migrations/0013_unlimited_accounts.sql` and then `0014_no_starter_accounts.sql` once on the live database. 0013 adds a URL slug to each account, removes the one-per-kind limit, and adds `create_workspace` / `delete_workspace`. 0014 stops creating built-in accounts on sign-up: **new users start with no accounts** and add their own. The old Fashion / Macro starter accounts are deleted where they were never used (no pins, brand, Pinterest connection or Autopilot ideas); any that hold data are kept as ordinary accounts the user can rename or delete.
 
-- **Add an account:** sidebar account menu → **+ Add account**, or **All accounts** → *Add a Pinterest account*. Pick *Fashion* (10 starter categories) or *All topics* (all 40). Then connect that account's Pinterest.
+- **Add an account:** sidebar account menu → **+ Add account** (or **+ Add your first account**), or **All accounts** → *Add a Pinterest account*. Pick starter categories: *Fashion* (10) or *All topics* (all 40). Then connect that account's Pinterest.
 - **Isolation:** every table is scoped by `workspace_id` and protected by row-level security on `owner_id`, so users only ever see their own accounts. Slugs are unique per user, so two users can both have `/w/recipes`.
-- **Delete:** **All accounts** → *Delete* removes that account with its pins, boards, settings and Pinterest tokens. The last account can't be deleted.
+- **Delete:** **All accounts** → *Delete* removes that account with its pins, boards, settings and Pinterest tokens.
 - **Scale:** lookups go through the `(owner_id, slug)` unique index and per-workspace indexes. The dashboard loads accounts in parallel; for users with hundreds of accounts, a server-side summary endpoint would be the next step.
 
 ## Switch the image API
@@ -171,7 +171,7 @@ The brief requires approval before publishing. Autopilot is the owner's standing
 - **Audit log:** every review, approval, schedule, publish attempt, export and account deletion is recorded in `audit_events`.
 - **Security headers:** CSP (`frame-ancestors 'none'`, `object-src 'none'`), `X-Frame-Options: DENY`, `nosniff`, HSTS, strict referrer, permissions policy; `no-store` on every API response.
 - **Monitoring:** `GET /api/health` returns which integrations are configured and whether the database answers (503 if not), with no secrets. Server errors go out as one-line JSON logs via `instrumentation.ts`, ready for any log drain (Vercel, Datadog, Axiom). Point an uptime monitor at `/api/health`.
-- **Export & delete:** *Account & data* (top right) downloads a JSON export of both workspaces (never tokens) and deletes the account after typing `DELETE MY ACCOUNT`. Deletion removes images, drafts, connections and the auth user; pins already on Pinterest are left alone. In Demo mode the same page exports or clears browser data.
+- **Export & delete:** *Account & data* (top right) downloads a JSON export of all your accounts (never tokens) and deletes the account after typing `DELETE MY ACCOUNT`. Deletion removes images, drafts, connections and the auth user; pins already on Pinterest are left alone. In Demo mode the same page exports or clears browser data.
 - **Automated tests:** unit tests (`npm test`), database tests (below) and GitHub Actions CI (`.github/workflows/ci.yml`) on every push and PR.
 
 ### Backup and recovery

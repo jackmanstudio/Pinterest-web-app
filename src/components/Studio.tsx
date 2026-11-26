@@ -384,7 +384,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
           <input
             id="idea"
             className="au-field h-12 w-full min-w-0 px-4 text-[15px] sm:flex-1"
-            placeholder={kind === "fashion" ? "e.g. Layering a trench coat for autumn" : "Describe your pin idea"}
+            placeholder={workspace?.niche === "fashion" ? "e.g. Layering a trench coat for autumn" : "Describe your pin idea"}
             value={idea}
             maxLength={500}
             onChange={(e) => setIdea(e.target.value)}

@@ -40,16 +40,23 @@ describe("LocalStore: unlimited accounts", () => {
   let kv: MemoryKV;
   beforeEach(() => { kv = new MemoryKV(); store = new LocalStore(kv); });
 
-  it("starts with the two starter accounts", async () => {
-    expect((await store.listWorkspaces()).map((w) => w.kind)).toEqual(["fashion", "macro"]);
+  it("starts with no accounts (no built-in Fashion or Macro)", async () => {
+    expect(await store.listWorkspaces()).toEqual([]);
+    await expect(store.getWorkspace("fashion")).rejects.toThrow(/Unknown workspace/);
+    await expect(store.getWorkspace("macro")).rejects.toThrow(/Unknown workspace/);
   });
 
-  it("adds more than two accounts, each with its own data", async () => {
+  it("hides starter accounts saved by older demo versions", async () => {
+    kv.setItem("pin-ai-studio:v1:workspace:fashion", JSON.stringify({ workspace: { id: "demo-fashion", kind: "fashion", name: "Fashion" }, brand: {}, categories: [], drafts: [] }));
+    expect(await store.listWorkspaces()).toEqual([]);
+  });
+
+  it("adds any number of accounts, each with its own data", async () => {
     const a = await store.createWorkspace("Easy Recipes", "macro");
     const b = await store.createWorkspace("Easy Recipes", "macro");
     const c = await store.createWorkspace("Abaya Shop", "fashion");
     expect([a.kind, b.kind, c.kind]).toEqual(["easy-recipes", "easy-recipes-2", "abaya-shop"]);
-    expect((await store.listWorkspaces()).length).toBe(5);
+    expect((await store.listWorkspaces()).length).toBe(3);
     expect(labelFromSlug("abaya-shop")).toBe("Abaya Shop");
     expect((await store.listCategories(c.id)).length).toBe(10);
     expect((await store.listCategories(a.id)).length).toBe(40);
@@ -59,22 +66,21 @@ describe("LocalStore: unlimited accounts", () => {
     expect((await store.getWorkspace("abaya-shop")).niche).toBe("fashion");
   });
 
-  it("deletes an account and its data, but never the last one", async () => {
+  it("deletes accounts and their data, including the last one", async () => {
     const a = await store.createWorkspace("Travel", "macro");
     await store.saveDrafts(a.id, [draft]);
     await store.deleteWorkspace(a.id);
-    expect((await store.listWorkspaces()).map((w) => w.kind)).toEqual(["fashion", "macro"]);
+    expect(await store.listWorkspaces()).toEqual([]);
     await expect(store.getWorkspace("travel")).rejects.toThrow(/Unknown workspace/);
     // Same name again starts empty.
     const again = await store.createWorkspace("Travel", "macro");
     expect(await store.listDrafts(again.id)).toHaveLength(0);
     await store.deleteWorkspace(again.id);
-    await store.deleteWorkspace((await store.getWorkspace("fashion")).id);
-    await expect(store.deleteWorkspace((await store.getWorkspace("macro")).id)).rejects.toThrow(/at least one/);
+    expect(await store.listWorkspaces()).toEqual([]);
   });
 
   it("keeps renamed names in the account list", async () => {
-    const f = await store.getWorkspace("fashion");
+    const f = await store.createWorkspace("Style", "fashion");
     await store.renameWorkspace(f.id, "Style Diary");
     expect((await store.listWorkspaces())[0].name).toBe("Style Diary");
   });

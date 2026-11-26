@@ -42,7 +42,7 @@ export function Analytics({ kind }: { kind: WorkspaceKind }) {
   const [preview, setPreview] = useState(false);
   const [region, setRegion] = useState("US");
   const [trendType, setTrendType] = useState("growing");
-  const [interest, setInterest] = useState(kind === "fashion" ? "womens_fashion" : "");
+  const [interest, setInterest] = useState("");
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/analytics?workspace=${kind}`);

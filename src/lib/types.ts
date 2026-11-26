@@ -14,8 +14,8 @@ export function isWorkspaceNiche(value: unknown): value is WorkspaceNiche {
 }
 
 /**
- * URL slug of one of the user's accounts (a workspace), e.g. "fashion" or
- * "my-recipes-2". Each user can have any number; slugs are unique per user.
+ * URL slug of one of the user's accounts (a workspace), e.g. "my-recipes-2".
+ * Users start with none and add as many as they like; slugs are unique per user.
  */
 export type WorkspaceKind = string;
 export const WORKSPACE_SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
@@ -24,12 +24,6 @@ export const MAX_WORKSPACE_NAME = 60;
 export function isWorkspaceKind(value: string): value is WorkspaceKind {
   return WORKSPACE_SLUG_PATTERN.test(value);
 }
-
-/** The two accounts every new user starts with. More can be added any time. */
-export const DEFAULT_WORKSPACES: { kind: WorkspaceKind; niche: WorkspaceNiche; name: string }[] = [
-  { kind: "fashion", niche: "fashion", name: "Fashion" },
-  { kind: "macro", niche: "macro", name: "Macro" },
-];
 
 /** Turns an account name into a URL slug ("My Recipes!" → "my-recipes"). */
 export function slugify(name: string): string {
@@ -67,8 +61,6 @@ export function rememberWorkspaceNames(list: Pick<Workspace, "kind" | "name">[])
 export function labelFromSlug(kind: string): string {
   const known = knownNames.get(kind);
   if (known) return known;
-  const d = DEFAULT_WORKSPACES.find((w) => w.kind === kind);
-  if (d) return d.name;
   return kind.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 

@@ -4,12 +4,12 @@ import type { BoardPlan, BoardSettings } from "@/lib/boards/automation";
 // store doesn't pull that module's zod schemas into the page.
 const DEFAULT_BOARD_SETTINGS: BoardSettings = { mode: "auto", manual_board_id: null, manual_board_name: null, rules: [], keyword_plan: [], board_categories: {} };
 import { defaultCategories } from "@/lib/categories/taxonomy";
-import { DEFAULT_WORKSPACES, EMPTY_BRAND, MAX_WORKSPACE_NAME, isWorkspaceKind, isWorkspaceNiche, rememberWorkspaceNames, uniqueSlug, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
+import { EMPTY_BRAND, MAX_WORKSPACE_NAME, isWorkspaceKind, isWorkspaceNiche, rememberWorkspaceNames, uniqueSlug, type AuditEvent, type BrandSettings, type Category, type DraftVersion, type PinDraft, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 import type { DraftPatch, NewDraft, Store, TransitionOptions } from "./types";
 import type { ImageCache } from "@/lib/client/imageCache";
 
-/** Starter taxonomy from the spec: Macro gets all 40 categories, Fashion the first ten. */
+/** Starter categories per template: "All topics" gets all 40, "Fashion" the first ten. */
 export const DEFAULT_CATEGORIES: Record<WorkspaceNiche, string[]> = {
   fashion: defaultCategories("fashion"),
   macro: defaultCategories("macro"),
@@ -53,21 +53,30 @@ export class LocalStore implements Store {
     return `pin-ai-studio:v1:workspace:${kind}`;
   }
 
-  /** The browser's account list. Until one is added it's the two starter accounts. */
+  /** The browser's account list. Empty until the user adds an account. */
   private entries(): WorkspaceEntry[] {
     const raw = this.kv.getItem(LIST_KEY);
     if (raw) {
       try {
-        const list = (JSON.parse(raw) as WorkspaceEntry[]).filter((e) => e && isWorkspaceKind(e.kind) && isWorkspaceNiche(e.niche));
-        if (list.length) return list;
+        return (JSON.parse(raw) as WorkspaceEntry[]).filter((e) => e && isWorkspaceKind(e.kind) && isWorkspaceNiche(e.niche));
       } catch {
-        /* fall back to the starter accounts */
+        /* unreadable list: start empty */
       }
     }
-    return DEFAULT_WORKSPACES.map((w) => ({ ...w }));
+    return [];
   }
   private saveEntries(list: WorkspaceEntry[]) {
-    this.kv.setItem(LIST_KEY, JSON.stringify(list));
+    this.set(LIST_KEY, JSON.stringify(list));
+  }
+  /** setItem with a clear message when browser storage is full. */
+  private set(key: string, value: string) {
+    try {
+      this.kv.setItem(key, value);
+    } catch (e) {
+      if ((e as Error).name === "QuotaExceededError" || /quota/i.test((e as Error).message))
+        throw new Error("This browser's storage is full. Delete or archive old pins, or connect Supabase to keep everything online.");
+      throw e;
+    }
   }
 
   private load(kind: WorkspaceKind): WorkspaceData {
@@ -91,13 +100,7 @@ export class LocalStore implements Store {
   }
 
   private write(data: WorkspaceData) {
-    try {
-      this.kv.setItem(this.key(data.workspace.kind), JSON.stringify(data));
-    } catch (e) {
-      if ((e as Error).name === "QuotaExceededError" || /quota/i.test((e as Error).message))
-        throw new Error("This browser's storage is full. Delete or archive old pins, or connect Supabase to keep everything online.");
-      throw e;
-    }
+    this.set(this.key(data.workspace.kind), JSON.stringify(data));
   }
 
   private byId(workspaceId: string): WorkspaceData {
@@ -130,7 +133,6 @@ export class LocalStore implements Store {
     const kind = workspaceId.replace(/^demo-/, "");
     const list = this.entries();
     if (!list.some((e) => e.kind === kind)) throw new Error("Account not found");
-    if (list.length <= 1) throw new Error("You need at least one account");
     const d = this.load(kind);
     if (this.images) for (const p of d.drafts) if (p.image_path?.startsWith("idb:")) await this.images.remove(p.image_path).catch(() => {});
     this.saveEntries(list.filter((e) => e.kind !== kind));

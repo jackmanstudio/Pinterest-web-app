@@ -33,7 +33,7 @@ export interface Store {
   getWorkspace(kind: WorkspaceKind): Promise<Workspace>;
   /** Adds an account (its own brand, categories, boards and Pinterest connection). */
   createWorkspace(name: string, niche: WorkspaceNiche): Promise<Workspace>;
-  /** Deletes an account and everything in it. The last account can't be deleted. */
+  /** Deletes an account and everything in it. */
   deleteWorkspace(workspaceId: string): Promise<void>;
   getBrand(workspaceId: string): Promise<BrandSettings>;
   saveBrand(workspaceId: string, brand: BrandSettings): Promise<void>;
@@ -58,7 +58,7 @@ export interface Store {
   uploadLogo(workspaceId: string, file: File): Promise<string>;
   /** A URL the browser can display for a stored logo value. */
   logoUrl(logo: string | null): Promise<string | null>;
-  /** Renames the workspace's display name (e.g. "Macro" → "Home & Life"). */
+  /** Renames the workspace's display name (e.g. "Recipes" → "Home & Life"). */
   renameWorkspace(workspaceId: string, name: string): Promise<Workspace>;
   /** Copies a draft (text, link, category) as a new draft linked to the original. */
   duplicateDraft(workspaceId: string, id: string): Promise<PinDraft>;

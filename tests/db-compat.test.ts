@@ -54,12 +54,13 @@ describe("works on a database that hasn't run the newest migration", () => {
 
 import { LocalStore, type KeyValue } from "@/lib/store/local";
 import { memoryImageCache } from "@/lib/client/imageCache";
+import { seededStore } from "./seed";
 
 describe("demo storage keeps images out of localStorage", () => {
   it("stores the picture in the image cache and only a short key in localStorage", async () => {
     const m = new Map<string, string>();
     const kv: KeyValue = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
-    const store = new LocalStore(kv, memoryImageCache());
+    const store = seededStore(kv, memoryImageCache());
     const ws = await store.getWorkspace("fashion");
     const [d] = await store.saveDrafts(ws.id, [{ angle: "a", concept: "c", title: "t", description: "d", tags: ["x"], alt_text: "a", image_prompt: "p", idea: "idea", batch_id: "b", category_id: null, source: "ai" }]);
     const big = `data:image/jpeg;base64,${"A".repeat(200_000)}`;
@@ -70,6 +71,6 @@ describe("demo storage keeps images out of localStorage", () => {
   });
   it("turns a full browser storage into a clear message", async () => {
     const kv: KeyValue = { getItem: () => null, setItem: () => { const e = new Error("quota"); e.name = "QuotaExceededError"; throw e; } };
-    await expect(new LocalStore(kv).getWorkspace("fashion")).rejects.toThrow(/storage is full/);
+    await expect(new LocalStore(kv).createWorkspace("Shop", "macro")).rejects.toThrow(/storage is full/);
   });
 });

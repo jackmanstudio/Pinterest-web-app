@@ -4,7 +4,7 @@ import Link from "./NavLink";
 import { useRouter } from "next/navigation";
 import { demoDisplayName, getDemoUser } from "@/lib/auth/demo";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { DEFAULT_WORKSPACES, type PinDraft, type WorkspaceKind } from "@/lib/types";
+import type { PinDraft, WorkspaceKind } from "@/lib/types";
 
 interface Pin { draft: PinDraft; kind: WorkspaceKind }
 interface WsInfo { kind: WorkspaceKind; name: string; brand: boolean; connected: boolean | null }
@@ -54,7 +54,7 @@ export function Dashboard() {
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [idea, setIdea] = useState("");
-  const [target, setTarget] = useState<WorkspaceKind>("fashion");
+  const [target, setTarget] = useState<WorkspaceKind>("");
   const cmd = useRef<HTMLInputElement>(null);
 
   // ⌘K / Ctrl+K jumps to the create bar.
@@ -127,7 +127,11 @@ export function Dashboard() {
   const days = useMemo(() => (today ? lastDays(DAYS, today) : []), [today]);
   const made = useMemo(() => series(view, (d) => d.created_at, days), [view, days]);
   const ws = filter === "all" ? target : filter;
-  const accounts = spaces.length ? spaces.map((w) => ({ kind: w.kind, name: w.name })) : DEFAULT_WORKSPACES;
+  const accounts = spaces.map((w) => ({ kind: w.kind, name: w.name }));
+  /** No accounts yet: every account link goes to "add your first account". */
+  const ADD = "/overview?add=1";
+  const at = (sub = "") => (ws ? `/w/${ws}${sub ? `/${sub}` : ""}` : ADD);
+  const noAccounts = pins !== null && spaces.length === 0;
   const nameOf = (k: WorkspaceKind) => accounts.find((a) => a.kind === k)?.name ?? k;
   /** More accounts than fit as buttons: show a dropdown instead. */
   const many = accounts.length > 3;
@@ -135,6 +139,7 @@ export function Dashboard() {
   function create(e: React.FormEvent) {
     e.preventDefault();
     const q = idea.trim();
+    if (!target) return router.push(ADD);
     router.push(q ? `/w/${target}?idea=${encodeURIComponent(q)}` : `/w/${target}`);
   }
 
@@ -162,7 +167,7 @@ export function Dashboard() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <span className="au-glass inline-block min-w-[11rem] rounded-full px-3 py-1 text-center font-medium text-white/75">{dateLabel || "\u00a0"}</span>
           {!isSupabaseConfigured && <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-3 py-1 font-semibold text-amber-200">Demo mode · this browser</span>}
-          {many ? (
+          {accounts.length < 2 ? null : many ? (
             <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Show account" className="au-glass ml-auto max-w-[12rem] truncate rounded-full !border-0 px-3 py-1.5 text-[13px] font-semibold text-white outline-none">
               <option value="all" className="bg-[#1a1426]">All accounts</option>
               {accounts.map((a) => (
@@ -200,7 +205,7 @@ export function Dashboard() {
         </h1>
         <p className="mt-3 max-w-lg text-[15px] text-white/60">One idea in, finished pins out: title, description, tags and a designed image.</p>
         <form onSubmit={create} className={`${glass} mt-6 flex flex-col gap-2 p-2 shadow-[0_20px_60px_-20px_rgba(230,0,35,0.5)] sm:flex-row sm:items-center`}>
-          {many ? (
+          {accounts.length === 0 ? null : many ? (
             <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Account for new pins" className="max-w-full shrink-0 truncate rounded-xl !border-0 bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3.5 py-2 text-[13px] font-semibold text-white outline-none sm:max-w-[12rem]">
               {accounts.map((a) => (
                 <option key={a.kind} value={a.kind} className="bg-[#1a1426]">{a.name}</option>
@@ -226,7 +231,7 @@ export function Dashboard() {
             ref={cmd}
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
-            placeholder={target === "fashion" ? "summer linen outfits…" : "budget meal prep…"}
+            placeholder={noAccounts ? "Add an account first, then type a pin idea…" : "Type a pin idea, e.g. summer linen outfits…"}
             aria-label="Pin idea"
             className="min-w-0 flex-1 !border-0 !bg-transparent px-3 py-2.5 text-base text-white !shadow-none outline-none placeholder:text-white/40"
           />
@@ -239,7 +244,7 @@ export function Dashboard() {
       {/* Glass stats */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Key numbers">
         {stats.map((st) => (
-          <Link key={st.label} href={`/w/${ws}/${st.href}`} className={`${glass} group relative overflow-hidden p-4 transition hover:bg-white/[0.1] sm:p-5`}>
+          <Link key={st.label} href={at(st.href)} className={`${glass} group relative overflow-hidden p-4 transition hover:bg-white/[0.1] sm:p-5`}>
             <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full blur-2xl transition-opacity group-hover:opacity-100" style={{ background: st.glow, opacity: 0.6 }} />
             <p className="relative flex items-center gap-2 text-[13px] font-medium text-white/65">
               <span className={`h-2 w-2 rounded-full ${st.dot}`} aria-hidden />
@@ -254,14 +259,14 @@ export function Dashboard() {
       <section className={`${glass} p-4 sm:p-5`}>
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-semibold">Recent pins</h2>
-          <Link href={`/w/${ws}/drafts`} className="text-xs font-medium text-white/60 hover:text-white">Open library →</Link>
+          <Link href={at("drafts")} className="text-xs font-medium text-white/60 hover:text-white">Open library →</Link>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
           {Array.from({ length: 5 }, (_, i) => {
             const p = view[i];
             const url = p ? urls[p.draft.id] : null;
             return (
-              <Link key={i} href={p ? `/w/${p.kind}/drafts` : `/w/${ws}`} className={`group rounded-2xl border border-white/10 bg-white/[0.05] p-1.5 transition hover:-translate-y-1 hover:bg-white/[0.1] ${i >= 3 ? "hidden sm:block" : ""}`}>
+              <Link key={i} href={p ? `/w/${p.kind}/drafts` : at()} className={`group rounded-2xl border border-white/10 bg-white/[0.05] p-1.5 transition hover:-translate-y-1 hover:bg-white/[0.1] ${i >= 3 ? "hidden sm:block" : ""}`}>
                 <div className={`aspect-[2/3] overflow-hidden rounded-xl bg-gradient-to-br ${FRAME[i]} ${p ? "" : "opacity-40"}`}>
                   {url && (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -291,7 +296,7 @@ export function Dashboard() {
           <div>
             <div className="flex items-center justify-between">
               <h2 className="text-[15px] font-semibold">AI budget</h2>
-              <Link href={`/w/${ws}/usage`} className="text-xs text-white/50 hover:text-white">Details</Link>
+              <Link href={at("usage")} className="text-xs text-white/50 hover:text-white">Details</Link>
             </div>
             <p className="mt-2 font-[family-name:var(--font-display)] text-3xl font-bold tabular-nums">
               ${spent.toFixed(2)} <span className="text-sm font-medium text-white/70">/ ${budget.toFixed(2)}</span>
@@ -334,6 +339,14 @@ export function Dashboard() {
             </section>
           );
         })}
+        {noAccounts && (
+          <Link href={ADD} className={`${glass} relative flex flex-col items-center justify-center gap-2 overflow-hidden p-8 text-center sm:col-span-2`}>
+            <div aria-hidden className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-[#ff7a45]/25 blur-3xl" />
+            <span className="relative grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[#e60023] to-[#ff7a45] text-2xl font-bold text-white" aria-hidden>+</span>
+            <span className="relative text-lg font-semibold text-white">Add your first Pinterest account</span>
+            <span className="relative max-w-sm text-sm text-white/60">Give it a name, connect Pinterest, and start making pins. Add as many accounts as you run.</span>
+          </Link>
+        )}
         {spaces.length > 0 && (
           <Link href="/overview?add=1" className={`${glass} flex min-h-[8.5rem] flex-col items-center justify-center gap-1.5 border border-dashed border-white/20 p-5 text-center text-white/70 transition hover:bg-white/[0.08] hover:text-white`}>
             <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/[0.08] text-xl font-bold" aria-hidden>+</span>

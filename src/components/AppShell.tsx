@@ -4,7 +4,7 @@ import Link from "./NavLink";
 import { usePathname, useRouter } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { demoSignOut } from "@/lib/auth/demo";
-import { DEFAULT_WORKSPACES, isWorkspaceKind, labelFromSlug } from "@/lib/types";
+import { isWorkspaceKind, labelFromSlug } from "@/lib/types";
 import { useWorkspaces } from "./useWorkspaces";
 import { StatusSummary } from "./StatusBar";
 
@@ -78,8 +78,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       /* storage blocked: fall back to the first account */
     }
   }, [inWorkspace, seg[2]]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fallback = workspaces?.find((w) => w.kind === lastKind)?.kind ?? workspaces?.[0]?.kind ?? DEFAULT_WORKSPACES[0].kind;
-  const kind = inWorkspace ? seg[2] : fallback;
+  // Outside an account page: the last account used, else the first. Null = no accounts (yet).
+  const fallback = workspaces ? (workspaces.find((w) => w.kind === lastKind)?.kind ?? workspaces[0]?.kind ?? null) : lastKind;
+  const kind: string | null = inWorkspace ? seg[2] : fallback;
+  /** Where account pages point when the user has no account yet. */
+  const ADD = "/overview?add=1";
+  const at = (sub: string) => (kind ? `/w/${kind}${sub ? `/${sub}` : ""}` : ADD);
   const section = inWorkspace ? (seg[3] ?? "") : null;
 
   const signOut = async () => {
@@ -109,19 +113,27 @@ export function AppShell({ children }: { children: ReactNode }) {
     </Link>
   );
 
-  const options = workspaces ?? DEFAULT_WORKSPACES.map((w) => ({ ...w, id: w.kind }));
-  const switcher = (
+  const options = workspaces ?? [];
+  const noAccounts = workspaces !== null && workspaces.length === 0 && !inWorkspace;
+  const switcher = noAccounts ? (
+    <Link
+      href={ADD}
+      className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#e60023] to-[#ff7a45] py-2 text-[13px] font-bold text-white shadow-[0_6px_20px_-6px_rgba(255,90,60,0.7)] ring-1 ring-white/10"
+    >
+      + Add your first account
+    </Link>
+  ) : (
     <label className="relative block">
       <span className="sr-only">Account</span>
       <select
-        value={options.some((w) => w.kind === kind) ? kind : ""}
+        value={kind && options.some((w) => w.kind === kind) ? kind : ""}
         onChange={(e) => {
           const v = e.target.value;
           router.push(v === "__add" ? "/overview?add=1" : `/w/${v}${section ? `/${section}` : ""}`);
         }}
         className="w-full appearance-none truncate rounded-xl bg-gradient-to-r from-[#e60023] to-[#ff7a45] py-2 pl-3 pr-8 text-[13px] font-bold text-white shadow-[0_6px_20px_-6px_rgba(255,90,60,0.7)] outline-none ring-1 ring-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
       >
-        {!options.some((w) => w.kind === kind) && <option value="">{labelFromSlug(kind)}</option>}
+        {!options.some((w) => w.kind === kind) && <option value="">{kind ? labelFromSlug(kind) : "Choose account"}</option>}
         {options.map((w) => (
           <option key={w.kind} value={w.kind} className="bg-[#1a1426] text-white">
             {w.name}
@@ -143,10 +155,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           {navLink("/dashboard", "Dashboard", "home", path === "/dashboard")}
           {navLink("/overview", "All accounts", "grid", path === "/overview")}
         </div>
-        {GROUPS.map((g) => (
+        {!noAccounts && GROUPS.map((g) => (
           <div key={g.title} className="flex flex-col gap-0.5">
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/55">{g.title}</p>
-            {g.items.map((it) => navLink(`/w/${kind}${it.section ? `/${it.section}` : ""}`, it.label, it.icon, section === it.section))}
+            {g.items.map((it) => navLink(at(it.section), it.label, it.icon, section === it.section))}
           </div>
         ))}
       </nav>
@@ -179,14 +191,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const current = GROUPS.flatMap((g) => g.items).find((it) => it.section === section);
-  const kindName = workspaces?.find((w) => w.kind === kind)?.name ?? labelFromSlug(kind);
+  const kindName = (kind && workspaces?.find((w) => w.kind === kind)?.name) || (kind ? labelFromSlug(kind) : "");
   const crumb: [string, string] | null = inWorkspace && current ? [kindName, current.label] : null;
 
   const bottom: { href: string; label: string; icon: IconName; active: boolean }[] = [
     { href: "/dashboard", label: "Home", icon: "home", active: path === "/dashboard" },
-    { href: `/w/${kind}`, label: "Studio", icon: "spark", active: section === "" },
-    { href: `/w/${kind}/drafts`, label: "Library", icon: "library", active: section === "drafts" },
-    { href: `/w/${kind}/publish`, label: "Review", icon: "check", active: section === "publish" },
+    { href: at(""), label: "Studio", icon: "spark", active: section === "" },
+    { href: at("drafts"), label: "Library", icon: "library", active: section === "drafts" },
+    { href: at("publish"), label: "Review", icon: "check", active: section === "publish" },
   ];
 
   return (

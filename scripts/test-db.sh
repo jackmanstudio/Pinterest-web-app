@@ -15,6 +15,8 @@ for f in supabase/migrations/*.sql; do
   echo "migrate: $f"
   psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f"
 done
+# Test-only fixture: seeds two accounts per test user (real sign-ups get none).
+psql "$URL" -v ON_ERROR_STOP=1 -q -f supabase/tests/fixtures.sql
 for f in supabase/tests/[1-9]*.sql; do
   echo "test: $f"
   psql "$URL" -v ON_ERROR_STOP=1 -q -f "$f"

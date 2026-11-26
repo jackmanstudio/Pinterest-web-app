@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MAX_WORKSPACE_NAME, WORKSPACE_NICHES, WORKSPACE_SLUG_PATTERN } from "@/lib/types";
 
-/** An account slug in a request body or query ("fashion", "my-recipes"). */
+/** An account slug in a request body or query (e.g. "my-recipes"). */
 export const WorkspaceSlug = z.string().regex(WORKSPACE_SLUG_PATTERN, "Unknown workspace");
 
 export const NewWorkspaceSchema = z.object({

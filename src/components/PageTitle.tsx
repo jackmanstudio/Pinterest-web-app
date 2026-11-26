@@ -12,7 +12,7 @@ export function PageTitle({ title, accent, sub, kind, chips }: { title: string; 
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {kind && (
           <span className="au-glass inline-flex items-center gap-1.5 rounded-full px-3 py-1 font-semibold text-white/80">
-            <span aria-hidden className={`h-2 w-2 rounded-full ${kind === "fashion" ? "bg-[#ff5a4a]" : "bg-violet-400"}`} />
+            <span aria-hidden className={`h-2 w-2 rounded-full bg-[#ff5a4a]`} />
             {labelFromSlug(kind)}
           </span>
         )}

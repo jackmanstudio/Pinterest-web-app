@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "./NavLink";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { workspaceHealth, type WorkspaceHealth } from "@/lib/account/health";
-import { DEFAULT_WORKSPACES, MAX_WORKSPACE_NAME, NICHE_LABELS, WORKSPACE_NICHES, labelFromSlug, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
+import { MAX_WORKSPACE_NAME, NICHE_LABELS, WORKSPACE_NICHES, labelFromSlug, type Workspace, type WorkspaceKind, type WorkspaceNiche } from "@/lib/types";
 import type { Store } from "@/lib/store/types";
 import { announceWorkspacesChanged } from "./useWorkspaces";
 import { AccountHealth } from "./AccountHealth";
@@ -180,7 +180,13 @@ export function Overview() {
       </section>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {(rows ?? (err ? [] : DEFAULT_WORKSPACES.map((d) => ({ kind: d.kind, workspace: null, health: null, autopilot: "unavailable" as const })))).map(({ kind, workspace, health: h, autopilot }, i) => (
+        {rows && rows.length === 0 && (
+          <section className={`${glass} flex flex-col justify-center gap-2 p-6`}>
+            <h2 className="text-lg font-semibold">No accounts yet</h2>
+            <p className="text-sm text-white/60">Add your first Pinterest account to start. Each account keeps its own brand, boards, pins and Pinterest connection.</p>
+          </section>
+        )}
+        {(rows ?? []).map(({ kind, workspace, health: h, autopilot }, i) => (
           <section key={kind} className={`${glass} relative flex flex-col gap-4 overflow-hidden p-5`} aria-busy={!h}>
             <div aria-hidden className={`pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full blur-3xl ${accent(i).glow}`} />
             <div className="relative flex items-center gap-3">
@@ -200,7 +206,7 @@ export function Overview() {
               <Link href={`/w/${kind}`} className="rounded-xl bg-[#fff] px-4 py-2 text-sm font-bold text-[#0b0912]">Open studio</Link>
               <Link href={`/w/${kind}/analytics`} className="rounded-xl bg-white/[0.07] px-4 py-2 text-sm font-semibold text-white/85 ring-1 ring-white/10 hover:bg-white/[0.12]">Analytics</Link>
               <Link href={`/w/${kind}/autopilot`} className="rounded-xl bg-white/[0.07] px-4 py-2 text-sm font-semibold text-white/85 ring-1 ring-white/10 hover:bg-white/[0.12]">Autopilot</Link>
-              {workspace && rows && rows.length > 1 && confirmDelete !== kind && (
+              {workspace && confirmDelete !== kind && (
                 <button onClick={() => setConfirmDelete(kind)} className="ml-auto rounded-xl px-3 py-2 text-sm font-medium text-white/50 hover:bg-red-500/10 hover:text-red-200">
                   Delete
                 </button>

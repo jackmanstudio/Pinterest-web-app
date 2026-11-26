@@ -2,7 +2,7 @@ import type { Category, WorkspaceNiche } from "@/lib/types";
 
 /**
  * The 40-category taxonomy from the product spec (section 6).
- * Macro starts with all 40; Fashion starts with the first ten.
+ * The "All topics" template starts with all 40; "Fashion" with the first ten.
  * Keep this list in sync with public.default_category_names() in migration 0008.
  */
 export const TAXONOMY_40 = [

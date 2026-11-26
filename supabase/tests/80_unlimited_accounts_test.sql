@@ -27,14 +27,17 @@ exception when others then
 end $$;
 
 select pg_temp.as_admin();
-insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000b7', 'ua@test'), ('00000000-0000-0000-0000-0000000000b8', 'ua2@test');
+insert into auth.users (id, email) values ('00000000-0000-0000-0000-0000000000b7', 'ua@noseed'), ('00000000-0000-0000-0000-0000000000b8', 'ua2@noseed');
 select pg_temp.act_as('00000000-0000-0000-0000-0000000000b7');
-select pg_temp.check((select array_agg(slug order by slug) = '{fashion,macro}' from workspaces), 'new users start with the fashion and macro accounts');
+select pg_temp.check((select count(*) from workspaces) = 0, 'new users start with no accounts');
+select pg_temp.check(not exists (select 1 from pg_trigger where tgname = 'on_auth_user_created'), 'no built-in accounts are created on sign-up');
 
 select public.create_workspace('Kitchen Recipes', 'macro');
 select public.create_workspace('Kitchen Recipes!', 'macro');
 select public.create_workspace('Abaya Shop', 'fashion');
-select pg_temp.check((select count(*) from workspaces) = 5, 'a user can add more than two accounts');
+select public.create_workspace('Travel Spots', 'macro');
+select public.create_workspace('Home Decor', 'macro');
+select pg_temp.check((select count(*) from workspaces) = 5, 'a user can add any number of accounts');
 select pg_temp.check((select array_agg(slug order by slug) from workspaces where name like 'Kitchen%') = '{kitchen-recipes,kitchen-recipes-2}', 'slugs are unique per user');
 select pg_temp.check((select count(*) from categories c join workspaces w on w.id = c.workspace_id where w.slug = 'abaya-shop') = 10, 'a fashion account gets the fashion starter categories');
 select pg_temp.check((select count(*) from brand_settings b join workspaces w on w.id = b.workspace_id where w.slug = 'kitchen-recipes') = 1, 'a new account gets its own brand settings');
@@ -44,7 +47,7 @@ select pg_temp.check(pg_temp.fails($$insert into workspaces (owner_id, kind, slu
 
 select pg_temp.act_as('00000000-0000-0000-0000-0000000000b8');
 select public.create_workspace('Kitchen Recipes', 'macro');
-select pg_temp.check((select count(*) from workspaces) = 3 and (select count(*) from workspaces where slug = 'kitchen-recipes') = 1, 'two users can use the same slug and only see their own accounts');
+select pg_temp.check((select count(*) from workspaces) = 1 and (select count(*) from workspaces where slug = 'kitchen-recipes') = 1, 'two users can use the same slug and only see their own accounts');
 select pg_temp.check(pg_temp.fails($$select public.delete_workspace((select id from workspaces where false))$$), 'deleting an unknown account fails');
 create temp table other_ws as select id from workspaces where slug = 'kitchen-recipes';
 grant select on other_ws to authenticated;
@@ -53,12 +56,15 @@ select pg_temp.act_as('00000000-0000-0000-0000-0000000000b7');
 select pg_temp.check(pg_temp.fails($$select public.delete_workspace((select id from other_ws))$$), 'users cannot delete someone else''s account');
 select public.delete_workspace((select id from workspaces where slug = 'kitchen-recipes-2'));
 select pg_temp.check((select count(*) from workspaces) = 4, 'a user can delete one of their accounts');
-select public.delete_workspace(id) from workspaces where slug in ('kitchen-recipes', 'abaya-shop', 'fashion');
-select pg_temp.check(pg_temp.fails($$select public.delete_workspace((select id from workspaces where slug = 'macro'))$$), 'the last account cannot be deleted');
+select public.delete_workspace(id) from workspaces where slug in ('kitchen-recipes', 'abaya-shop', 'travel-spots');
+select pg_temp.check((select count(*) from workspaces) = 1, 'deleting several accounts works');
 
-insert into board_settings (workspace_id, board_categories) select id, '{"123": "Recipes & Food"}' from workspaces where slug = 'macro';
+insert into board_settings (workspace_id, board_categories) select id, '{"123": "Recipes & Food"}' from workspaces where slug = 'home-decor';
 select pg_temp.check((select board_categories->>'123' = 'Recipes & Food' from board_settings), 'board categories can be saved');
 select pg_temp.check(pg_temp.fails($$update board_settings set board_categories = '[]'$$), 'board categories must be an object');
+
+select public.delete_workspace((select id from workspaces where slug = 'home-decor'));
+select pg_temp.check((select count(*) from workspaces) = 0, 'the last account can be deleted too');
 
 reset role;
 \echo UNLIMITED ACCOUNTS TESTS PASSED
