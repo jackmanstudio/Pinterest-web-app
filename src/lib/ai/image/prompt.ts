@@ -60,8 +60,8 @@ const AESTHETIC: Record<WorkspaceNiche, string> = {
 
 /** Where the headline goes for each Designer-mix layout, so the subject stays clear of it. */
 const LAYOUT_SPACE: Record<Layout, string> = {
-  paper: "Place the main subject in the lower two thirds of the frame; the top third will be covered by a paper headline band, so keep only soft background there.",
-  framed: "Centre the main subject in the upper three quarters of the frame; the bottom quarter will be covered by a caption, so keep it simple.",
+  paper: "Place the main subject in the lower two thirds of the frame; a bold headline will be written straight over the top third, so keep only soft, simple background there.",
+  framed: "Centre the main subject in the upper three quarters of the frame; a big number and headline will be written over the bottom third, so keep it simple.",
   caption: "Keep the bottom third of the frame calm and simple (floor, table, soft shadow) because an elegant headline will sit there.",
   editorial: "Keep the top third of the frame calm and simple (sky, wall or soft background) because a magazine-style headline will sit there.",
   centered: "Keep the lower-middle of the frame soft and uncluttered (no faces there) because a centred headline will sit across it.",
@@ -69,9 +69,9 @@ const LAYOUT_SPACE: Record<Layout, string> = {
 
 const SPACE: Record<Exclude<TemplateStyle, Layout | "auto">, string> = {
   subtle: "Keep the bottom edge of the frame simple, because a small caption will sit there.",
-  bold: "Keep the lower third of the frame calm and softly blurred (simple background, no important details) because a title band will be placed there.",
+  bold: "Keep the lower third of the frame calm and softly blurred (simple background, no important details) because a big headline will be written over it.",
   minimal: "Keep the lower third of the frame darker and uncluttered because a white title will be placed there.",
-  elegant: "Keep the upper third of the frame calm and uncluttered (sky, wall or soft background) because a title card will be placed there.",
+  elegant: "Keep the upper third of the frame calm and uncluttered (sky, wall or soft background) because a headline will be written over it.",
   none: "Use the full frame.",
 };
 

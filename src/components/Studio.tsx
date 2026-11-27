@@ -253,7 +253,8 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       await runPool(
         saved,
         // Store sites often refuse several photo downloads at once: fetch page photos one at a time.
-        pagePhotos.length ? 1 : 2,
+        // AI images all start together (the image API handles parallel calls), so a batch takes about as long as one pin.
+        pagePhotos.length ? 1 : 5,
         (d, i) => generateDraftImage(kind, store, d, pagePhotos.length ? { sourceImage: pagePhotos[i % pagePhotos.length], sourcePage: page?.url } : {}),
         (r) =>
           update({

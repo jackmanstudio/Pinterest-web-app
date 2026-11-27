@@ -27,14 +27,16 @@ export interface Palette {
   accent: string;
   /** Accent used on dark photo areas (must read on dark). */
   glow: string;
+  /** Bright, saturated highlight for one headline line and the kicker on a dark fade (the scroll-stopper). */
+  pop: string;
 }
 
 export const PALETTE_COLORS: Record<Exclude<PaletteName, "auto" | "brand">, Palette> = {
-  ivory: { paper: "#F7F1E8", ink: "#2B2622", accent: "#A07F52", glow: "#EAD9BC" },
-  sage: { paper: "#EEF0E7", ink: "#27322A", accent: "#6F8467", glow: "#D6E0CC" },
-  noir: { paper: "#151413", ink: "#F7F3EC", accent: "#C9A96E", glow: "#E3CB97" },
-  blush: { paper: "#F7EAE7", ink: "#4A2E35", accent: "#B97C84", glow: "#F2CFCF" },
-  navy: { paper: "#F4EEE3", ink: "#1D2945", accent: "#1D2945", glow: "#E9DEC8" },
+  ivory: { paper: "#F7F1E8", ink: "#2B2622", accent: "#A07F52", glow: "#EAD9BC", pop: "#F6C76B" },
+  sage: { paper: "#EEF0E7", ink: "#27322A", accent: "#6F8467", glow: "#D6E0CC", pop: "#C9E8A2" },
+  noir: { paper: "#151413", ink: "#F7F3EC", accent: "#C9A96E", glow: "#E3CB97", pop: "#F2C46D" },
+  blush: { paper: "#F7EAE7", ink: "#4A2E35", accent: "#B97C84", glow: "#F2CFCF", pop: "#FFB4C4" },
+  navy: { paper: "#F4EEE3", ink: "#1D2945", accent: "#1D2945", glow: "#E9DEC8", pop: "#F6C76B" },
 };
 
 const hexRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255) as [number, number, number];
@@ -63,13 +65,13 @@ export function paletteForColor(rgb: [number, number, number]): Exclude<PaletteN
 
 /** Resolves the palette for one pin. `photoColor` is the photo's dominant colour, when known. */
 export function resolvePalette(name: PaletteName, brandColor: string, photoColor?: [number, number, number] | null, fallback: Exclude<PaletteName, "auto" | "brand"> = "ivory"): Palette {
-  if (name === "brand") return { ...PALETTE_COLORS.ivory, accent: brandColor, glow: lighten(brandColor) };
+  if (name === "brand") return { ...PALETTE_COLORS.ivory, accent: brandColor, glow: lighten(brandColor), pop: lighten(brandColor, 0.3) };
   if (name === "auto") return PALETTE_COLORS[photoColor ? paletteForColor(photoColor) : fallback];
   return PALETTE_COLORS[name];
 }
 
-function lighten(hex: string): string {
-  const [r, g, b] = hexRgb(hex).map((v) => Math.round((v + (1 - v) * 0.55) * 255));
+function lighten(hex: string, by = 0.55): string {
+  const [r, g, b] = hexRgb(hex).map((v) => Math.round((v + (1 - v) * by) * 255));
   return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
