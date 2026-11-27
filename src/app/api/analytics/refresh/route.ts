@@ -5,7 +5,7 @@ import { dateRange, parseAccountAnalytics, parsePinSummary, parseTopPins } from 
 import { analyticsCalls, saveSnapshot } from "@/lib/analytics/server";
 import type { PublishedPinStats } from "@/lib/analytics/types";
 import { pinterestContext } from "@/lib/pinterest/server";
-import { describePinterestError, ensureAccessToken, ReconnectRequired } from "@/lib/pinterest/sync";
+import { describePinterestError, ReconnectRequired } from "@/lib/pinterest/sync";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
   let token: string;
   try {
-    token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(workspaceId, t, conn.refresh_token));
+    token = await repo.accessToken(api, conn);
   } catch (err) {
     if (err instanceof ReconnectRequired) await repo.markNeedsReconnect(workspaceId, err.message);
     return NextResponse.json({ error: describePinterestError(err) }, { status: 401 });

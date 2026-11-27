@@ -27,7 +27,6 @@ import { pickTrend, pickWinner, trendIdea, winnerIdea, type WinnerCandidate } fr
 import { analyticsCalls, saveSnapshot } from "@/lib/analytics/server";
 import { parseTopPins, parseTrends } from "@/lib/analytics/parse";
 import type { PublishedPinStats, TopPin, TrendKeyword } from "@/lib/analytics/types";
-import { ensureAccessToken } from "@/lib/pinterest/sync";
 import { createHash } from "node:crypto";
 import { extractPage, pageContext } from "@/lib/tools/pageExtract";
 import { listSource } from "@/lib/tools/sourceList";
@@ -162,7 +161,7 @@ async function trendsFor(admin: SupabaseClient, ws: AutopilotWorkspace): Promise
     const repo = new ConnectionRepo(admin, cfg.encryptionKey);
     const conn = await repo.get(ws.workspace_id);
     if (!conn) return snap?.data ?? [];
-    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(ws.workspace_id, t, conn.refresh_token));
+    const token = await repo.accessToken(api, conn);
     const trends = parseTrends(await analyticsCalls(api).trends(token, "US", "growing", ws.trend_interest ?? undefined));
     await saveSnapshot(admin, {
       workspaceId: ws.workspace_id, kind: "trends", source: "Pinterest API v5 · GET /trends/keywords/{region}/top/{trend_type}", environment: cfg.env,
@@ -184,7 +183,7 @@ async function refreshTopPins(admin: SupabaseClient, ws: AutopilotWorkspace) {
     const repo = new ConnectionRepo(admin, cfg.encryptionKey);
     const conn = await repo.get(ws.workspace_id);
     if (!conn) return;
-    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(ws.workspace_id, t, conn.refresh_token));
+    const token = await repo.accessToken(api, conn);
     const end = new Date().toISOString().slice(0, 10);
     const start = new Date(Date.now() - 89 * DAY).toISOString().slice(0, 10);
     const raw = await analyticsCalls(api).topPins(token, start, end);

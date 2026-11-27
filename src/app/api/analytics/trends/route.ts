@@ -5,7 +5,7 @@ import { parseTrends } from "@/lib/analytics/parse";
 import { analyticsCalls, saveSnapshot } from "@/lib/analytics/server";
 import { PinterestApiError } from "@/lib/pinterest/api";
 import { pinterestContext } from "@/lib/pinterest/server";
-import { describePinterestError, ensureAccessToken } from "@/lib/pinterest/sync";
+import { describePinterestError } from "@/lib/pinterest/sync";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     const { api, repo, cfg, workspaceId } = await pinterestContext(parsed.data.workspace);
     const conn = await repo.get(workspaceId);
     if (!conn) throw new HttpError(409, "Connect a Pinterest account to this workspace first.");
-    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(workspaceId, t, conn.refresh_token));
+    const token = await repo.accessToken(api, conn);
     const raw = await analyticsCalls(api).trends(token, parsed.data.region, parsed.data.type, parsed.data.interest);
     const trends = parseTrends(raw);
     const today = new Date().toISOString().slice(0, 10);

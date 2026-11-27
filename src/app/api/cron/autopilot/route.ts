@@ -3,6 +3,7 @@ import { runAutopilotStep } from "@/lib/autopilot/engine";
 import { enabledWorkspaces, supabaseAutopilotDeps } from "@/lib/autopilot/server";
 import { cronAuthorized } from "@/lib/server/cron";
 import { log } from "@/lib/server/log";
+import { recordWorkerRun } from "@/lib/server/workerRuns";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 
@@ -28,6 +29,7 @@ async function handle(request: Request) {
       results.push({ workspace_id: ws.workspace_id, action: "failed", detail: (err as Error).message });
     }
   }
+  await recordWorkerRun(admin, "autopilot", true, { processed: results.length, failed: results.filter((r) => r.action === "failed").length });
   return NextResponse.json({ processed: results.length, results });
 }
 

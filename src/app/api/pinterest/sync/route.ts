@@ -2,7 +2,7 @@ import { rateLimited } from "@/lib/server/rateLimit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { pinterestContext } from "@/lib/pinterest/server";
-import { describePinterestError, ensureAccessToken, fetchBoardsAndPins, ReconnectRequired } from "@/lib/pinterest/sync";
+import { describePinterestError, fetchBoardsAndPins, ReconnectRequired } from "@/lib/pinterest/sync";
 import { PinterestApiError } from "@/lib/pinterest/api";
 import { HttpError } from "@/lib/server/context";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   if (!(await repo.beginSync(workspaceId))) return NextResponse.json({ error: "A sync is already running." }, { status: 409 });
 
   try {
-    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(workspaceId, t, conn.refresh_token));
+    const token = await repo.accessToken(api, conn);
     const result = await fetchBoardsAndPins(api, token);
     await repo.replaceSyncedData(workspaceId, result.boards, result.pins, !result.truncated);
     await repo.finishSync(workspaceId, { ok: true });

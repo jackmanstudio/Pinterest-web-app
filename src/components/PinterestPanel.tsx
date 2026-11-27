@@ -1,11 +1,12 @@
 "use client";
 import { PageTitle } from "./PageTitle";
+import { PinterestHealth } from "./PinterestHealth";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import type { ConnectionInfo } from "@/lib/pinterest/connections";
 import { labelFromSlug, type WorkspaceKind } from "@/lib/types";
 
-interface Board { board_id: string; name: string; privacy: string | null; pin_count: number | null }
+interface Board { board_id: string; name: string; description?: string | null; privacy: string | null; pin_count: number | null }
 interface Pin { pin_id: string; title: string | null; description: string | null; link: string | null; alt_text: string | null; image_url: string | null; pin_created_at: string | null }
 interface StatusData {
   config: { ready: boolean; missing: string[]; env: "sandbox" | "production" };
@@ -21,6 +22,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : "never");
 export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
   const params = useSearchParams();
   const [data, setData] = useState<StatusData | null>(null);
+  const [boardQuery, setBoardQuery] = useState("");
   const [error, setError] = useState<string | null>(params.get("error"));
   const [notice, setNotice] = useState<string | null>(params.get("connected") ? "Pinterest connected. Run a sync to load your boards and pins." : null);
   const [busy, setBusy] = useState<"idle" | "sync" | "disconnect">("idle");
@@ -175,18 +177,26 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
         )}
       </section>
 
+      {data && data.config.ready && <PinterestHealth kind={kind} />}
+
       {conn && data && (
         <>
           <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Boards ({data.boards.length})</h2>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-lg font-semibold">Boards ({data.boards.length})</h2>
+              {data.boards.length > 6 && (
+                <input aria-label="Search boards" placeholder="Search boards…" value={boardQuery} onChange={(e) => setBoardQuery(e.target.value)} className="ml-auto rounded-md border border-zinc-300 px-2 py-1 text-sm" />
+              )}
+            </div>
             {data.boards.length === 0 ? (
               <p className="mt-2 text-sm text-zinc-600">No boards synced yet.</p>
             ) : (
               <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {data.boards.map((b) => (
+                {data.boards.filter((b) => !boardQuery.trim() || `${b.name} ${b.description ?? ""}`.toLowerCase().includes(boardQuery.trim().toLowerCase())).map((b) => (
                   <li key={b.board_id} className="rounded-md border border-zinc-200 p-3 text-sm">
                     <p className="font-medium">{b.name}</p>
-                    <p className="text-xs text-zinc-500">{b.privacy ?? ""}{b.pin_count != null ? ` · ${b.pin_count} pins` : ""}</p>
+                    {b.description && <p className="line-clamp-2 text-xs text-zinc-600">{b.description}</p>}
+                    <p className="text-xs text-zinc-500">{b.privacy ?? ""}{b.pin_count != null ? ` · ${b.pin_count} pins` : ""} · ID {b.board_id}</p>
                   </li>
                 ))}
               </ul>

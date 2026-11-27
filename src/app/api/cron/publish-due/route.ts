@@ -7,6 +7,7 @@ import { runPublishJob } from "@/lib/workflow/runner";
 import { supabaseRunnerDeps } from "@/lib/workflow/server";
 import { cronAuthorized } from "@/lib/server/cron";
 import { log } from "@/lib/server/log";
+import { recordWorkerRun } from "@/lib/server/workerRuns";
 
 /**
  * Publishes approved, scheduled pins whose time has come. Call every few
@@ -24,18 +25,29 @@ async function handle(request: Request) {
   const recovered = await admin.rpc("recover_stale_publish_jobs");
   if (recovered.error && !/recover_stale_publish_jobs/.test(recovered.error.message)) log("warn", "job_recovery_failed", { error: recovered.error.message });
 
-  const { data, error } = await admin
-    .from("publish_jobs")
-    .select("id")
-    .eq("status", "queued")
-    .lte("run_at", new Date().toISOString())
-    .order("run_at")
-    .limit(20);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Paused accounts keep their jobs queued; they publish after Resume (migration 0016).
+  const paused = await admin.from("workspaces").select("id").eq("publishing_paused", true);
+  const pausedIds = paused.error ? [] : (paused.data ?? []).map((w) => w.id as string);
 
-  const results = [];
+  let q = admin.from("publish_jobs").select("id").eq("status", "queued").lte("run_at", new Date().toISOString());
+  if (pausedIds.length) q = q.not("workspace_id", "in", `(${pausedIds.join(",")})`);
+  const { data, error } = await q.order("run_at").limit(20);
+  if (error) {
+    await recordWorkerRun(admin, "publish-due", false, { error: error.message });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const results: ({ id: string } & Awaited<ReturnType<typeof runPublishJob>>)[] = [];
   for (const { id } of data ?? []) results.push({ id, ...(await runPublishJob(id, deps)) });
-  return NextResponse.json({ processed: results.length, results });
+  const tally = (s: string) => results.filter((r) => r.status === s).length;
+  await recordWorkerRun(admin, "publish-due", true, {
+    processed: results.length,
+    succeeded: tally("succeeded"),
+    retrying: tally("retrying"),
+    failed: tally("failed"),
+    paused_accounts: pausedIds.length,
+  });
+  return NextResponse.json({ processed: results.length, paused_accounts: pausedIds.length, results });
 }
 
 export const GET = handle;

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { findBoardByName, type Board } from "@/lib/boards/automation";
 import { pinterestContext } from "@/lib/pinterest/server";
-import { describePinterestError, ensureAccessToken, ReconnectRequired } from "@/lib/pinterest/sync";
+import { describePinterestError, ReconnectRequired } from "@/lib/pinterest/sync";
 import { PinterestApiError, type PinterestBoard } from "@/lib/pinterest/api";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const token = await ensureAccessToken(api, conn, (t) => repo.updateTokens(workspaceId, t, conn.refresh_token));
+    const token = await repo.accessToken(api, conn);
     const live = await api.paginate<PinterestBoard>(token, "/boards", 10, 250);
     const existing: Board[] = live.items.map((b) => ({ board_id: b.id, name: b.name }));
     const dup = findBoardByName(existing, name);
