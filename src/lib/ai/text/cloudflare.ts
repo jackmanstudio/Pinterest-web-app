@@ -1,12 +1,23 @@
 import { z } from "zod";
 import { PIN_ANGLES, anglesFor } from "@/lib/drafts/angles";
-import { DraftSetSchema, LIMITS } from "@/lib/drafts/validation";
+import { DraftContentSchema, LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
-import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFTS_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
+import { BRAND_SYSTEM, BrandAnalysisSchema, brandUserPrompt, BOARDS_SYSTEM, DRAFT_ONE_SYSTEM, INSIGHTS_SYSTEM, InsightsSchema, boardsUserPrompt, draftsUserPrompt, insightsUserPrompt, type BoardsPromptInput } from "./prompt";
 import { AiAssignmentSetSchema } from "@/lib/boards/automation";
 import { ProviderError, type BoardsOutput, type BrandOutput, type InsightsInput, type InsightsOutput, type TextProvider } from "./types";
 
 export const CLOUDFLARE_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+/** What one parallel call returns: a drafts array with a single pin. */
+const OneDraftSchema = z.object({ drafts: z.array(DraftContentSchema).length(1) });
+
+/** The first draft in a reply, whatever wrapper the model used ({drafts:[…]}, {draft:{…}} or the bare object). */
+function firstDraft(out: unknown): unknown {
+  const o = (out ?? {}) as { drafts?: unknown[]; draft?: unknown };
+  if (Array.isArray(o.drafts)) return o.drafts[0];
+  if (o.draft && typeof o.draft === "object") return o.draft;
+  return out;
+}
 
 interface Options {
   accountId: string;
@@ -101,13 +112,31 @@ export class CloudflareTextProvider implements TextProvider {
     return { out, usage: { input_tokens: body?.result?.usage?.prompt_tokens ?? 0, output_tokens: body?.result?.usage?.completion_tokens ?? 0 } };
   }
 
+  /**
+   * One call per pin, all at once: each writes a single draft for its own angle. The model writes
+   * ~1/N of the text per call, so a set takes about as long as one pin instead of all of them in a row.
+   * Only `req.count` pins are written (the old single call always wrote five).
+   */
   async generateDrafts(req: GenerateRequest): Promise<GenerateResponse> {
     // Urdu, Arabic, Hindi etc. use several tokens per word: give them room so the JSON isn't cut off.
     const nonEnglish = Boolean(req.language && !/^english$/i.test(req.language) && !/^roman/i.test(req.language));
-    const { out, usage } = await this.run(DRAFTS_SYSTEM, draftsUserPrompt(req), DraftSetSchema, nonEnglish ? 6500 : 4000, 100_000);
-    const parsed = DraftSetSchema.safeParse(normalizeDrafts(out, anglesFor(req.style)));
-    if (!parsed.success) throw new ProviderError("The AI returned incomplete drafts. Please retry.", 502, true);
-    return { source: "ai", provider: this.name, model: this.model, drafts: parsed.data.drafts, usage };
+    const angles = anglesFor(req.style);
+    const n = Math.min(Math.max(req.count ?? angles.length, 1), angles.length);
+    const one = async (i: number) => {
+      const { out, usage } = await this.run(DRAFT_ONE_SYSTEM, draftsUserPrompt(req, i), OneDraftSchema, nonEnglish ? 1800 : 1100, 60_000);
+      const parsed = OneDraftSchema.safeParse(normalizeDrafts({ drafts: [firstDraft(out)] }, [angles[i]]));
+      if (!parsed.success) throw new ProviderError("The AI returned incomplete drafts. Please retry.", 502, true);
+      return { draft: parsed.data.drafts[0], usage };
+    };
+    // One quick retry per pin, so a single bad reply doesn't fail the whole set.
+    const withOneRetry = (i: number) =>
+      one(i).catch((e) => {
+        if (e instanceof ProviderError && e.retryable) return one(i);
+        throw e;
+      });
+    const results = await Promise.all(Array.from({ length: n }, (_, i) => withOneRetry(i)));
+    const usage = results.reduce((u, r) => ({ input_tokens: u.input_tokens + r.usage.input_tokens, output_tokens: u.output_tokens + r.usage.output_tokens }), { input_tokens: 0, output_tokens: 0 });
+    return { source: "ai", provider: this.name, model: this.model, drafts: results.map((r) => r.draft), usage };
   }
 
   async generateInsights(input: InsightsInput): Promise<InsightsOutput> {

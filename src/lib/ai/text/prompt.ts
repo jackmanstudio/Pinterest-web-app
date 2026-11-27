@@ -93,8 +93,24 @@ export function photoUserPrompt(input: PhotoPinsInput): string {
   return `${lines.join("\n")}\n\nReturn ${input.photos.length} pins, one per photo, in order.`;
 }
 
-export function draftsUserPrompt(req: GenerateRequest): string {
-  const angles = anglesFor(req.style).map((a, i) => `${i + 1}. ${a.label}: ${a.brief}`).join("\n");
+/**
+ * The same rules for writing ONE draft. Pins of a set are written in parallel (one call per angle),
+ * which is several times faster than one long call; each call knows the set's other angles.
+ */
+export const DRAFT_ONE_SYSTEM = DRAFTS_SYSTEM.replace(
+  /For each request you produce exactly five pin drafts, one per creative angle, in the order given\.\nThe five drafts must be meaningfully different: different hook, different promise, different visual\. Never reuse a title structure\./,
+  "For each request you produce exactly one pin draft (a drafts array with one item), for the one creative angle you are given.\nThe other pins of the set are written at the same time for the other listed angles, so yours must be clearly different from them: its own hook, promise, title structure and visual, true to its angle.",
+).replace(/across the five|the five drafts|the five image prompts/g, (m) => (m === "the five image prompts" ? "the image prompts of the set" : m === "the five drafts" ? "the drafts of the set" : "across the set"));
+
+export function draftsUserPrompt(req: GenerateRequest, only?: number): string {
+  const all = anglesFor(req.style);
+  const angles =
+    only === undefined
+      ? all.map((a, i) => `${i + 1}. ${a.label}: ${a.brief}`).join("\n")
+      : `Write ONE draft for this angle (set "angle" to its label):\n${all[only].label}: ${all[only].brief}\nOther pins in this set (written separately; do not repeat their hook or visual): ${all
+          .filter((_, i) => i !== only && i < (req.count ?? all.length))
+          .map((a) => a.label)
+          .join("; ") || "none"}`;
   const b = req.brand;
   const brand = [
     b.brand_name && `Brand: ${b.brand_name}`,
@@ -121,8 +137,7 @@ Pin idea: ${req.idea}
 
 ${keywords}
 ${req.context ? `\nThe pins promote this page. Use only facts from it; never invent prices, features, numbers or claims:\n${req.context}\n` : ""}
-Angles (one draft each, set "angle" to the angle label):
-${angles}`;
+${only === undefined ? `Angles (one draft each, set "angle" to the angle label):\n` : ""}${angles}`;
 }
 
 export function insightsUserPrompt(input: InsightsInput): string {

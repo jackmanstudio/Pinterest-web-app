@@ -183,7 +183,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined, style, trend_keywords: trendKeywords.length ? trendKeywords : undefined }),
+        body: JSON.stringify({ workspace: kind, idea, category, language: language || undefined, brand, context: source === "link" && page ? pageContext(page) : undefined, style, trend_keywords: trendKeywords.length ? trendKeywords : undefined, count }),
         // Never leave the user on "Writing pins…" forever.
         signal: AbortSignal.timeout(150_000),
       });
