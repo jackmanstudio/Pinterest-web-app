@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { LIMITS, parseList } from "@/lib/drafts/validation";
-import type { QualityContext } from "@/lib/drafts/quality";
+import { reviewDraft, type QualityContext } from "@/lib/drafts/quality";
+import { autoFixDraft } from "@/lib/drafts/autofix";
 import type { ContentSource, DraftContent, ImageStatus } from "@/lib/types";
 import { CopyButton, pinAsText } from "./CopyButton";
 import { QualityPanel, QualityScoreCard, type ScoreFix } from "./QualityPanel";
@@ -66,6 +67,11 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
   const id = (f: string) => `d${index}-${f}`;
   const input = "w-full rounded-md border border-zinc-300 px-2 py-1.5 text-sm focus:border-red-600 focus:outline-none";
   const errors = draftErrors(draft);
+  const [fixNote, setFixNote] = useState<string | null>(null);
+  // Studio (form layout): fix this pin's text in place and show the new score.
+  const studioFix = layout === "form" && reviewDraft(draft, quality).checks.some((c) => c.severity === "warning" || c.severity === "error" || c.severity === "info")
+    ? autoFixDraft(draft, quality?.link ?? null, quality)
+    : null;
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -104,6 +110,7 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
       </div>
       <input
         id={id("tags")}
+        key={draft.tags.join("|")}
         className={input}
         defaultValue={draft.tags.join(", ")}
         onBlur={(e) => set("tags", parseList(e.target.value))}
@@ -132,6 +139,19 @@ export function DraftEditor({ index, draft, source, imageStatus = "not_generated
   const tail = (
     <>
       <QualityPanel draft={draft} ctx={quality} />
+      {studioFix && studioFix.changes.some((c) => c.field !== "Link") && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange(studioFix.content);
+            setFixNote(`Fixed · score ${studioFix.before} → ${studioFix.after} (${studioFix.changes.filter((c) => c.field !== "Link").map((c) => c.field).join(", ")})`);
+          }}
+          className="rounded-md bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3 py-1.5 text-xs font-bold text-white hover:brightness-110"
+        >
+          Auto-fix &amp; re-score
+        </button>
+      )}
+      {fixNote && <p className="text-xs font-medium text-emerald-700" role="status">{fixNote}</p>}
       {errors.length > 0 && (
         <ul className="rounded-md bg-red-50 p-2 text-xs text-red-700" role="alert">
           {errors.map((e) => (
