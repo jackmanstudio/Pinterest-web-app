@@ -4,9 +4,10 @@ import { z } from "zod";
 import { PinterestApi } from "@/lib/pinterest/api";
 import { checkPinterestConfig, getPinterestConfig } from "@/lib/pinterest/config";
 import { ConnectionRepo } from "@/lib/pinterest/connections";
-import { describePinterestError } from "@/lib/pinterest/sync";
+import { PinterestApiError } from "@/lib/pinterest/api";
+import { describePinterestError, ReconnectRequired } from "@/lib/pinterest/sync";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
-import { getAdminSupabase } from "@/lib/supabase/admin";
+import { ADMIN_KEY_MISSING_MESSAGE, getAdminSupabase, hasAdminSupabase } from "@/lib/supabase/admin";
 import { type PinDraft } from "@/lib/types";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { publishBlockers, validateRunAt } from "@/lib/workflow/checks";
@@ -52,18 +53,32 @@ export async function POST(request: Request) {
     }
     if (LIVE_ACTIONS.includes(action) && b.confirm !== true) throw new HttpError(400, "Please confirm this action.");
 
-    const admin = getAdminSupabase();
     const actor = ctx.user.id;
     const now = new Date().toISOString();
+
+    // Submit / send back to draft are internal review steps: the database lets the
+    // owner make them through their own session, so they work without the
+    // service-role key and never touch Pinterest.
+    if (action === "submit" || action === "request_changes") {
+      const patch: Record<string, unknown> = { status: to, review_note: action === "request_changes" ? b.note ?? null : null };
+      const res = await ctx.db.from("pin_drafts").update(patch).eq("id", d.id).eq("workspace_id", workspaceId).eq("status", d.status).select("id");
+      if (res.error) throw new Error(res.error.message);
+      if (!res.data?.length) throw new HttpError(409, "The pin changed in the meantime. Refresh and try again.");
+      if (hasAdminSupabase()) {
+        await audit(getAdminSupabase(), { workspaceId, actorId: actor, action, draftId: d.id, details: { from: d.status, to, ...(b.note ? { note: b.note } : {}) } });
+      }
+      return NextResponse.json({ ok: true, status: to });
+    }
+
+    if (!hasAdminSupabase()) throw new HttpError(503, ADMIN_KEY_MISSING_MESSAGE);
+    const admin = getAdminSupabase();
     const guarded = (patch: Record<string, unknown>) =>
       admin.from("pin_drafts").update(patch).eq("id", d.id).eq("workspace_id", workspaceId).eq("status", d.status).select("id");
 
-    if (action === "submit" || action === "request_changes" || action === "approve" || action === "unapprove") {
+    if (action === "approve" || action === "unapprove") {
       const patch: Record<string, unknown> = { status: to };
       if (action === "approve") Object.assign(patch, { approved_at: now, approved_by: actor, review_note: null });
-      if (action === "unapprove" || action === "request_changes") Object.assign(patch, { approved_at: null, approved_by: null });
-      if (action === "request_changes") patch.review_note = b.note ?? null;
-      if (action === "submit") patch.review_note = null;
+      if (action === "unapprove") Object.assign(patch, { approved_at: null, approved_by: null });
       const res = await guarded(patch);
       if (res.error) throw new Error(res.error.message);
       if (!res.data?.length) throw new HttpError(409, "The pin changed in the meantime. Refresh and try again.");
@@ -135,6 +150,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: outcome.status === "failed" ? `Publishing failed: ${outcome.error}` : "Publishing is already in progress." }, { status: 502 });
   } catch (err) {
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    return errorResponse(err, request, describePinterestError(err));
+    const talkingToPinterest = err instanceof PinterestApiError || err instanceof ReconnectRequired;
+    return errorResponse(err, request, talkingToPinterest ? describePinterestError(err) : "Something went wrong on the server while updating this pin.");
   }
 }
