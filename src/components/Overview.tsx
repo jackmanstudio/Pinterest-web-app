@@ -57,6 +57,12 @@ async function mapLimit<T, R>(items: T[], n: number, fn: (t: T) => Promise<R>): 
 const glass = "au-glass rounded-2xl";
 
 /** AI Account Manager overview: health of every workspace in one place. */
+/** Account pages the menu can send a new user to (menu section -> label). */
+const NEXT_PAGES: Record<string, string> = {
+  studio: "Studio", drafts: "Pin library", tools: "Tools", publish: "Review & publish", calendar: "Calendar", boards: "Boards",
+  autopilot: "Autopilot", analytics: "Analytics", usage: "Usage & cost", settings: "Brand & categories", pinterest: "Pinterest",
+};
+
 export function Overview() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -72,6 +78,9 @@ export function Overview() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const wantsAdd = params.get("add") === "1";
+  /** Page the user picked from the menu before having an account; opened after adding one. */
+  const nextRaw = params.get("next");
+  const next = nextRaw && NEXT_PAGES[nextRaw] !== undefined ? nextRaw : null;
 
   useEffect(() => {
     (async () => {
@@ -99,8 +108,8 @@ export function Overview() {
       const store = await loadStore();
       const w = await store.createWorkspace(name, newNiche);
       announceWorkspacesChanged();
-      // New account: set up the brand first, then connect Pinterest.
-      router.push(`/w/${w.kind}/pinterest`);
+      // New account: open the page they picked from the menu, else connect Pinterest first.
+      router.push(next ? `/w/${w.kind}${next === "studio" ? "" : `/${next}`}` : `/w/${w.kind}/pinterest`);
     } catch (e) {
       setAddErr((e as Error).message);
       setAdding(false);
@@ -229,6 +238,11 @@ export function Overview() {
           <div className="relative">
             <h2 id="add-account" className="text-lg font-semibold">Add a Pinterest account</h2>
             <p className="mt-1 text-sm text-white/60">No limit: add as many accounts as you run. Each one has its own brand, categories, boards, pins, Autopilot and Pinterest connection.</p>
+            {next && (
+              <p className="mt-2 rounded-lg bg-[#ff7a45]/15 px-3 py-2 text-sm font-medium text-[#ffb38f] ring-1 ring-[#ff7a45]/30">
+                {NEXT_PAGES[next]} belongs to an account. Add one below and {NEXT_PAGES[next]} opens next.
+              </p>
+            )}
           </div>
           <form onSubmit={addAccount} className="relative flex flex-col gap-3">
             <label className="flex flex-col gap-1.5 text-sm">

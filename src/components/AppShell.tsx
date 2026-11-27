@@ -83,7 +83,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const kind: string | null = inWorkspace ? seg[2] : fallback;
   /** Where account pages point when the user has no account yet. */
   const ADD = "/overview?add=1";
-  const at = (sub: string) => (kind ? `/w/${kind}${sub ? `/${sub}` : ""}` : ADD);
+  // No account yet: still show every page, and remember which one was picked so the
+  // add-account form can open it right after the account is made.
+  const at = (sub: string) => (kind ? `/w/${kind}${sub ? `/${sub}` : ""}` : `${ADD}&next=${sub || "studio"}`);
   const section = inWorkspace ? (seg[3] ?? "") : null;
 
   const signOut = async () => {
@@ -155,7 +157,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           {navLink("/dashboard", "Dashboard", "home", path === "/dashboard")}
           {navLink("/overview", "All accounts", "grid", path === "/overview")}
         </div>
-        {!noAccounts && GROUPS.map((g) => (
+        {noAccounts && (
+          <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] leading-snug text-white/60">
+            Add an account to open these pages. Each page opens right after.
+          </p>
+        )}
+        {GROUPS.map((g) => (
           <div key={g.title} className="flex flex-col gap-0.5">
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/55">{g.title}</p>
             {g.items.map((it) => navLink(at(it.section), it.label, it.icon, section === it.section))}
