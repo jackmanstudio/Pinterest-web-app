@@ -101,16 +101,13 @@ export async function POST(request: Request) {
     }
     if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
-    let attempts = source ? 0 : 1;
-    const raw = pagePhotoRaw ?? (await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)));
+    const attempts = source ? 0 : 1;
+    // Quick retries only (pins are made in parallel, so long waits here hold the whole batch).
+    const raw = pagePhotoRaw ?? (await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE), 2, 400));
     // Real images are always full size (1000×1500); only labelled placeholders are kept small.
-    let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
-    if (!source && image.source === "ai" && image.design.retryPhoto) {
-      // The photo itself was weak (blurry or badly exposed): make one more and keep the better pin.
-      attempts = 2;
-      const second = await brandPinImage(await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE)), title, art, { angle }).catch(() => null);
-      if (second && second.design.score > image.design.score) image = second;
-    }
+    // A weak photo is no longer remade automatically (that doubled the wait); the design check
+    // flags it and "Retry image" makes a new one.
+    const image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
 
     let imagePath: string;
     let imageUrl: string;

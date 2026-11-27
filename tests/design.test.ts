@@ -32,14 +32,15 @@ describe("premium pin design", () => {
     expect(resolvePalette("brand", "#b91c1c").accent).toBe("#b91c1c");
   });
 
-  it("keeps headline text readable: large serif, high contrast", () => {
+  it("keeps headline text readable: large bold or serif type on the photo, high contrast", () => {
     const t = readTemplate({});
     for (const layout of LAYOUTS) {
       const { svg, meta } = designerSvg({ width: 1000, height: 1500, title: "Layering a Trench Coat for Autumn: A Simple Guide", template: t, tone: { top: 0.8, middle: 0.8, bottom: 0.8 } }, layout);
       expect(meta.headlineSize).toBeGreaterThanOrEqual(44);
       expect(meta.lines).toBeLessThanOrEqual(3);
       expect(meta.contrast).toBeGreaterThanOrEqual(4.5);
-      expect(svg).toMatch(/Playfair Display|Cormorant Garamond|DM Serif Display/);
+      expect(svg).toMatch(/Playfair Display|DM Serif Display|font-family="Poppins" font-size="[\d.]+" fill="#[0-9A-F]{6}" font-weight="700"/);
+      expect(svg).not.toMatch(/fill="#F7F1E8"|fill="#EEF0E7"/); // no paper band or mat behind the text
       expect(svg).toContain('font-family="Poppins"'); // serif + sans pairing
       expect(svg).not.toMatch(/AI generated/i);
     }
@@ -49,7 +50,7 @@ describe("premium pin design", () => {
   it("escapes titles and uses unique gradient ids per layout", () => {
     const svg = overlaySvg({ width: 1000, height: 1500, title: `<b>"x"</b> & y`, template: readTemplate({}), angle: "Inspiration / mood" });
     expect(svg).not.toContain("<b>");
-    expect(svg).toMatch(/id="fade-caption"/);
+    expect(svg).toMatch(/id="scrim-caption"/);
   });
 
   it("self-checks the design and flags weak photos for a retry", () => {
@@ -76,7 +77,7 @@ describe("premium pin design", () => {
     const p = buildImagePrompt({ title: "Layering a trench coat", scene: "a woman in a trench coat", kind: "fashion", angle: "How-to / tutorial" });
     expect(p).toMatch(/premium creative agency/);
     expect(p).toMatch(/cream, beige and warm ivory/);
-    expect(p).toMatch(/top third will be covered by a paper headline band/);
+    expect(p).toMatch(/bold headline will be written straight over the top third/);
     expect(p).toMatch(/no text/);
     expect(buildImagePrompt({ title: "x", scene: "y", kind: "macro", angle: "Seasonal", palette: "sage" })).toMatch(/sage green/i);
   });

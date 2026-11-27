@@ -6,7 +6,7 @@ import { NextResponse } from "next/server";
  */
 export const LIMITS = {
   generate: { limit: 20, windowMs: 60_000 },
-  images: { limit: 10, windowMs: 60_000 },
+  images: { limit: 30, windowMs: 60_000 },
   insights: { limit: 5, windowMs: 60_000 },
   pinterest: { limit: 10, windowMs: 60_000 },
   publish: { limit: 30, windowMs: 60_000 },

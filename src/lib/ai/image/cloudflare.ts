@@ -47,7 +47,7 @@ export class CloudflareImageProvider implements ImageProvider {
         method: "POST",
         headers: { Authorization: `Bearer ${this.opts.apiToken}` },
         body: form,
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(60_000),
       });
     } catch (e) {
       throw new ProviderError(`Image provider unreachable: ${(e as Error).message}`, 502, true);

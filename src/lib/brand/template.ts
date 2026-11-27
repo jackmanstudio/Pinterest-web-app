@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contrastRatio, LAYOUT_PALETTE, layoutForAngle, luminance, PALETTES, resolvePalette, splitHeadline, type Layout, type Palette } from "./design";
+import { contrastRatio, LAYOUT_PALETTE, layoutForAngle, PALETTES, resolvePalette, splitHeadline, type Layout, type Palette } from "./design";
 
 /**
  * Brand pin template: how the title, handle and logo are laid over each pin
@@ -12,14 +12,14 @@ export type TemplateFont = (typeof TEMPLATE_FONTS)[number];
 
 export const STYLE_LABELS: Record<TemplateStyle, string> = {
   auto: "Designer mix: a different layout for each pin (recommended)",
-  paper: "Paper band headline",
-  framed: "Framed magazine page",
-  caption: "Elegant caption",
+  paper: "Bold top headline",
+  framed: "Big number list",
+  caption: "Serif headline at the bottom",
   centered: "Centered serif",
   subtle: "Small caption",
-  bold: "Bold band",
+  bold: "Bold headline at the bottom",
   minimal: "Minimal fade",
-  elegant: "Elegant card",
+  elegant: "Elegant headline at the top",
   editorial: "Magazine cover headline",
   none: "No text on image",
 };
@@ -147,20 +147,20 @@ function classicSvg({ width: W, height: H, title, template: t, logoHref }: Overl
     lines.forEach((l, i) => parts.push(`<text x="${x}" y="${first + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`));
     if (t.handle) parts.push(`<text x="${x}" y="${H - 52 * s}" font-family="Poppins" font-weight="500" font-size="${20 * s}" letter-spacing="${4 * s}" fill="${t.text_color}" fill-opacity="0.8">${esc(t.handle.toUpperCase())}</text>`);
   } else if (t.style === "bold") {
-    const pad = 48 * s;
-    const { size, lines } = fitTitle(title, W - 80 * s - pad * 2, t.font, s);
-    const lh = size * (t.font === "display" ? 1.0 : 1.18);
-    const handleH = t.handle ? 52 * s : 0;
-    const blockH = pad * 2 + lines.length * lh + handleH;
-    const top = H - 40 * s - blockH;
+    // Big bold headline straight on the photo's lower half, over a deep fade; brand-colour bar above it.
+    const x = 64 * s;
+    const { size, lines } = fitTitle(title, W - x * 2, t.font, s * 1.12, 3, { max: t.font === "display" ? 140 : 96, min: 52 });
+    const lh = size * (t.font === "display" ? 0.98 : 1.1);
+    const bottom = H - (t.handle ? 120 : 80) * s;
+    const first = bottom - (lines.length - 1) * lh;
+    const fadeTop = first - size - 360 * s;
     parts.push(
-      `<rect x="${40 * s}" y="${top}" width="${W - 80 * s}" height="${blockH}" rx="${28 * s}" fill="${t.primary_color}" fill-opacity="0.95" filter="url(#lift)"/>`,
-      `<rect x="${W / 2 - 36 * s}" y="${top + 22 * s}" width="${72 * s}" height="${4 * s}" rx="${2 * s}" fill="${t.text_color}" fill-opacity="0.55"/>`,
+      `<defs><linearGradient id="deep" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.45" stop-color="#000" stop-opacity="0.5"/><stop offset="1" stop-color="#000" stop-opacity="0.88"/></linearGradient></defs>`,
+      `<rect x="0" y="${fadeTop}" width="${W}" height="${H - fadeTop}" fill="url(#deep)"/>`,
+      `<rect x="${x}" y="${first - size * 0.95 - 30 * s}" width="${110 * s}" height="${12 * s}" rx="${6 * s}" fill="${t.primary_color}"/>`,
     );
-    lines.forEach((l, i) =>
-      parts.push(`<text x="${W / 2}" y="${top + pad + size * 0.85 + i * lh}" text-anchor="middle" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}">${esc(l)}</text>`),
-    );
-    if (t.handle) parts.push(`<text x="${W / 2}" y="${top + blockH - pad + 4 * s}" text-anchor="middle" ${handleFont} fill="${t.text_color}" fill-opacity="0.85">${esc(t.handle)}</text>`);
+    lines.forEach((l, i) => parts.push(`<text x="${x}" y="${first + i * lh}" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`));
+    if (t.handle) parts.push(`<text x="${x}" y="${H - 64 * s}" ${handleFont} fill="${t.text_color}" fill-opacity="0.85">${esc(t.handle)}</text>`);
   } else if (t.style === "minimal") {
     const x = 64 * s;
     const { size, lines } = fitTitle(title, W - x * 2, t.font, s);
@@ -192,24 +192,21 @@ function classicSvg({ width: W, height: H, title, template: t, logoHref }: Overl
     );
     parts.push(`<rect x="${x}" y="${top + size * 0.85 + (lines.length - 1) * lh + 34 * s}" width="${120 * s}" height="${8 * s}" rx="${4 * s}" fill="${t.primary_color}"/>`);
   } else {
-    // elegant: light card near the top, dark text, thin brand-colour rule.
-    const pad = 52 * s;
-    const cardX = 72 * s;
-    const { size, lines } = fitTitle(title, W - cardX * 2 - pad * 2, t.font, s);
-    const lh = size * (t.font === "display" ? 1.0 : 1.2);
-    const handleH = t.handle ? 54 * s : 0;
-    const cardH = pad * 2 + 22 * s + lines.length * lh + handleH;
-    const top = 96 * s;
-    const ink = t.text_color.toLowerCase() === "#ffffff" ? "#1c1917" : t.text_color;
+    // elegant: centred headline straight on the top of the photo, over a soft fade; thin brand-colour rule.
+    const pad = 72 * s;
+    const { size, lines } = fitTitle(title, W - pad * 2, t.font, s, 3);
+    const lh = size * (t.font === "display" ? 1.0 : 1.14);
+    const top = 110 * s;
+    const last = top + size * 0.9 + (lines.length - 1) * lh;
     parts.push(
-      `<rect x="${cardX}" y="${top}" width="${W - cardX * 2}" height="${cardH}" rx="${10 * s}" fill="#ffffff" fill-opacity="0.94" filter="url(#lift)"/>`,
-      `<rect x="${cardX + 14 * s}" y="${top + 14 * s}" width="${W - cardX * 2 - 28 * s}" height="${cardH - 28 * s}" rx="${6 * s}" fill="none" stroke="${t.primary_color}" stroke-opacity="0.35" stroke-width="${2 * s}"/>`,
-      `<rect x="${W / 2 - 60 * s}" y="${top + pad}" width="${120 * s}" height="${5 * s}" fill="${t.primary_color}"/>`,
+      `<defs><linearGradient id="top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.78"/><stop offset="0.55" stop-color="#000" stop-opacity="0.45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>`,
+      `<rect x="0" y="0" width="${W}" height="${last + 320 * s}" fill="url(#top)"/>`,
+      `<rect x="${W / 2 - 60 * s}" y="${top - 46 * s}" width="${120 * s}" height="${5 * s}" fill="${t.primary_color}"/>`,
     );
     lines.forEach((l, i) =>
-      parts.push(`<text x="${W / 2}" y="${top + pad + 22 * s + size * 0.9 + i * lh}" text-anchor="middle" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${ink}">${esc(l)}</text>`),
+      parts.push(`<text x="${W / 2}" y="${top + size * 0.9 + i * lh}" text-anchor="middle" font-family="${family}" font-weight="${weight}" font-size="${size}" fill="${t.text_color}" filter="url(#glow)">${esc(l)}</text>`),
     );
-    if (t.handle) parts.push(`<text x="${W / 2}" y="${top + cardH - pad + 8 * s}" text-anchor="middle" ${handleFont} fill="${t.primary_color}">${esc(t.handle)}</text>`);
+    if (t.handle) parts.push(`<text x="${W / 2}" y="${last + 64 * s}" text-anchor="middle" ${handleFont} fill="${t.text_color}" fill-opacity="0.9" filter="url(#glow)">${esc(t.handle)}</text>`);
   }
   if (logoHref) {
     const size = 120 * s;
@@ -229,9 +226,9 @@ function classicSvg({ width: W, height: H, title, template: t, logoHref }: Overl
 // Designer mix layouts: serif headline + sans kicker, premium palettes,
 // adaptive fades (only as dark as the photo needs), never a heavy box.
 
-const GLYPH: Record<string, number> = { playfair: 0.53, playfairItalic: 0.47, cormorant: 0.44, dmserif: 0.5, poppins: 0.62 };
+const GLYPH: Record<string, number> = { playfair: 0.53, playfairItalic: 0.47, cormorant: 0.44, dmserif: 0.5, poppins: 0.62, poppinsBold: 0.64 };
 const FAMILY: Record<string, string> = {
-  playfair: "Playfair Display", playfairItalic: "Playfair Display", cormorant: "Cormorant Garamond", dmserif: "DM Serif Display", poppins: "Poppins",
+  playfair: "Playfair Display", playfairItalic: "Playfair Display", cormorant: "Cormorant Garamond", dmserif: "DM Serif Display", poppins: "Poppins", poppinsBold: "Poppins",
 };
 
 function wrapBy(text: string, maxWidth: number, size: number, glyph: number): string[] {
@@ -290,134 +287,106 @@ export function designerSvg({ width: W, height: H, title, template: t, logoHref,
   const tn = { top: 0.5, middle: 0.5, bottom: 0.5, ...(tone ?? {}) };
   const parts: string[] = [];
   const text = (x: number, y: number, str: string, face: string, size: number, fill: string, extra = "") =>
-    `<text x="${x}" y="${y}" font-family="${FAMILY[face]}" font-size="${size}" fill="${fill}"${face === "playfairItalic" ? ' font-style="italic"' : ""}${face === "poppins" ? ' font-weight="500"' : face === "playfair" || face === "playfairItalic" ? ' font-weight="500"' : face === "cormorant" ? ' font-weight="600"' : ""} ${extra}>${esc(str)}</text>`;
+    `<text x="${x}" y="${y}" font-family="${FAMILY[face]}" font-size="${size}" fill="${fill}"${face === "playfairItalic" ? ' font-style="italic"' : ""}${face === "poppins" ? ' font-weight="500"' : face === "poppinsBold" ? ' font-weight="700"' : face === "playfair" || face === "playfairItalic" ? ' font-weight="500"' : face === "cormorant" ? ' font-weight="600"' : ""} ${extra}>${esc(str)}</text>`;
   const kick = (x: number, y: number, str: string, fill: string, anchor = "start", size = 24) =>
     text(x, y, kickerText(str), "poppins", size * s, fill, `letter-spacing="${5 * s}" text-anchor="${anchor}"`);
-  const shadow = `<filter id="soft" x="-10%" y="-30%" width="120%" height="160%"><feDropShadow dx="0" dy="${2 * s}" stdDeviation="${5 * s}" flood-color="#000" flood-opacity="0.35"/></filter>`;
+  // Two shadows: a tight one for crisp edges and a wide one that lifts the text off any photo.
+  const heavy = `<filter id="hs" x="-10%" y="-30%" width="120%" height="170%"><feDropShadow dx="0" dy="${2 * s}" stdDeviation="${3 * s}" flood-color="#000" flood-opacity="0.6"/><feDropShadow dx="0" dy="${6 * s}" stdDeviation="${16 * s}" flood-color="#000" flood-opacity="0.45"/></filter>`;
   let headSize = 0;
   let lineCount = 0;
   let contrast = 21;
   const white = "#FFFFFF";
 
-  if (layout === "paper") {
-    // Paper band across the top: kicker, serif headline, small accent rule. Photo below stays untouched.
-    const padX = 80 * s;
-    const fit = fitBy(headline, W - padX * 2, "playfair", 86 * s, 52 * s, 3);
-    const lh = fit.size * 1.14;
-    const top = 74 * s;
-    const kY = top + 22 * s;
-    const hY = kY + 34 * s + fit.size * 0.92;
-    const ruleY = hY + (fit.lines.length - 1) * lh + 40 * s;
-    const bandH = ruleY + 48 * s;
-    parts.push(
-      `<defs><linearGradient id="edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0.18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>`,
-      `<rect x="0" y="0" width="${W}" height="${bandH}" fill="${pal.paper}"/>`,
-      `<rect x="0" y="${bandH}" width="${W}" height="${14 * s}" fill="url(#edge)"/>`,
-    );
-    if (kicker) parts.push(kick(W / 2, kY, kicker, pal.accent, "middle"));
-    fit.lines.forEach((l, i) => parts.push(text(W / 2, hY + i * lh, l, "playfair", fit.size, pal.ink, 'text-anchor="middle"')));
-    parts.push(`<rect x="${W / 2 - 30 * s}" y="${ruleY}" width="${60 * s}" height="${3 * s}" fill="${pal.accent}"/>`);
-    if (t.handle) parts.push(`<defs>${shadow}</defs>`, kick(W / 2, H - 48 * s, t.handle, white, "middle", 20) .replace("<text", '<text filter="url(#soft)"'));
+  // Every layout puts the headline straight on the full-bleed photo (no paper band or box):
+  // bold type, a pop-colour line, a double drop shadow and a fade only as dark as the photo needs.
+  const scrim = (pos: "top" | "bottom" | "middle", y: number, h: number, a: number) => {
+    const stops =
+      pos === "top"
+        ? `<stop offset="0" stop-color="#000" stop-opacity="${a.toFixed(2)}"/><stop offset="0.55" stop-color="#000" stop-opacity="${(a * 0.62).toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/>`
+        : pos === "bottom"
+          ? `<stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.45" stop-color="#000" stop-opacity="${(a * 0.62).toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="${a.toFixed(2)}"/>`
+          : `<stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.5" stop-color="#000" stop-opacity="${a.toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/>`;
+    return `<defs>${heavy}<linearGradient id="scrim" x1="0" y1="0" x2="0" y2="1">${stops}</linearGradient></defs><rect x="0" y="${y}" width="${W}" height="${h}" fill="url(#scrim)"/>`;
+  };
+  /** Headline lines; on two or more lines the last one is in the pop colour (the hook that stops the scroll). */
+  const head = (x: number, y: number, lines: string[], lh: number, face: string, size: number, anchor = "start") =>
+    lines.map((l, i) => text(x, y + i * lh, l, face, size, lines.length > 1 && i === lines.length - 1 ? pal.pop : white, `text-anchor="${anchor}" filter="url(#hs)"`)).join("");
+  const darkness = (l: number, min: number) => clamp(0.55 + (l - 0.3) * 0.9, min, 0.9);
+  const handleText = (x: number, y: number, anchor: string) => (t.handle ? kick(x, y, t.handle, white, anchor, 19).replace("<text", '<text fill-opacity="0.9" filter="url(#hs)"') : "");
+
+  if (layout === "paper" || layout === "editorial") {
+    // Headline over the top of the photo. paper (how-to): big bold sans, centred. editorial: serif, left.
+    const centred = layout === "paper";
+    const face = centred ? "poppinsBold" : "dmserif";
+    const x = centred ? W / 2 : 68 * s;
+    const anchor = centred ? "middle" : "start";
+    const fit = fitBy(headline, W - 68 * s * 2, face, (centred ? 98 : 108) * s, (centred ? 58 : 62) * s, 3);
+    const lh = fit.size * (centred ? 1.1 : 1.06);
+    let y = 92 * s;
+    const kickLine = kicker ? kick(x, y, kicker, pal.pop, anchor, 28).replace("<text", '<text filter="url(#hs)"') : "";
+    if (kicker) y += 50 * s;
+    const first = y + fit.size * 0.9;
+    const last = first + (fit.lines.length - 1) * lh;
+    const a = darkness(tn.top, 0.62);
+    parts.push(scrim("top", 0, last + 330 * s, a), kickLine, head(x, first, fit.lines, lh, face, fit.size, anchor));
+    parts.push(`<rect x="${centred ? W / 2 - 42 * s : x}" y="${last + 34 * s}" width="${84 * s}" height="${6 * s}" rx="${3 * s}" fill="${pal.pop}"/>`);
+    parts.push(handleText(centred ? W / 2 : W - x, H - 52 * s, centred ? "middle" : "end"));
     headSize = fit.size;
     lineCount = fit.lines.length;
-    contrast = contrastRatio(luminance(pal.ink), luminance(pal.paper));
-  } else if (layout === "framed") {
-    // Passe-partout frame: the photo sits in a paper mat, caption on the mat below.
-    const m = 34 * s;
-    const padX = 76 * s;
-    const fit = fitBy(number ? headline.replace(/^\d+\s+/, "") : headline, W - padX * 2, "playfair", 64 * s, 44 * s, 3);
-    const lh = fit.size * 1.14;
-    const numSize = 132 * s;
-    const blockH = (number ? numSize * 0.78 + 18 * s : 0) + (kicker ? 44 * s : 0) + fit.size * 0.9 + (fit.lines.length - 1) * lh;
-    const capH = blockH + 96 * s;
-    const photoBottom = H - capH;
-    parts.push(
-      `<path fill-rule="evenodd" fill="${pal.paper}" d="M0 0H${W}V${H}H0Z M${m} ${m}V${photoBottom}H${W - m}V${m}Z"/>`,
-      `<rect x="${m + 10 * s}" y="${m + 10 * s}" width="${W - 2 * m - 20 * s}" height="${photoBottom - m - 20 * s}" fill="none" stroke="${pal.paper}" stroke-opacity="0.55" stroke-width="${1.5 * s}"/>`,
-    );
-    let y = photoBottom + 50 * s;
-    if (number) {
-      parts.push(text(W / 2, y + numSize * 0.72, number, "playfairItalic", numSize, pal.accent, 'text-anchor="middle"'));
-      y += numSize * 0.78 + 18 * s;
-    }
+    contrast = contrastRatio(1, tn.top * (1 - a) * 0.9);
+  } else if (layout === "framed" || layout === "caption") {
+    // Headline over the bottom of the photo. framed (lists): huge pop-colour number + bold sans. caption: big serif.
+    const list = layout === "framed";
+    const face = list ? "poppinsBold" : "dmserif";
+    const x = 68 * s;
+    const fit = fitBy(number && list ? headline.replace(/^\d+\s+/, "") : headline, W - x * 2, face, (list ? 92 : 104) * s, (list ? 56 : 60) * s, 3);
+    const lh = fit.size * (list ? 1.1 : 1.06);
+    const bottom = H - (t.handle ? 118 : 80) * s;
+    const first = bottom - (fit.lines.length - 1) * lh;
+    let top = first - fit.size * 0.9;
     if (kicker) {
-      parts.push(kick(W / 2, y + 20 * s, kicker, pal.accent, "middle", 22));
-      y += 44 * s;
+      parts.push(kick(x, top - 24 * s, kicker, pal.pop, "start", 28).replace("<text", '<text filter="url(#hs)"'));
+      top -= 64 * s;
     }
-    fit.lines.forEach((l, i) => parts.push(text(W / 2, y + fit.size * 0.9 + i * lh, l, "playfair", fit.size, pal.ink, 'text-anchor="middle"')));
+    if (number && list) {
+      const numSize = 230 * s;
+      parts.push(text(x - 6 * s, top - 18 * s, number, "poppinsBold", numSize, pal.pop, 'filter="url(#hs)"'));
+      top -= numSize * 0.78;
+    }
+    const a = darkness(tn.bottom, 0.62);
+    const fadeTop = Math.max(0, top - 260 * s);
+    parts.splice(0, 0, scrim("bottom", fadeTop, H - fadeTop, a));
+    parts.push(head(x, first, fit.lines, lh, face, fit.size));
+    parts.push(handleText(x, H - 62 * s, "start"));
     headSize = fit.size;
     lineCount = fit.lines.length;
-    contrast = contrastRatio(luminance(pal.ink), luminance(pal.paper));
-  } else if (layout === "caption" || layout === "editorial") {
-    // Caption: soft fade at the bottom. Editorial: magazine-cover fade at the top.
-    const bottom = layout === "caption";
-    const x = 64 * s;
-    const face = bottom ? "cormorant" : "dmserif";
-    const fit = fitBy(headline, W - x * 2 - (bottom ? 60 * s : 0), face, (bottom ? 92 : 90) * s, (bottom ? 58 : 54) * s, 3);
-    const lh = fit.size * (bottom ? 1.04 : 1.1);
-    const regionL = bottom ? tn.bottom : tn.top;
-    // Only as dark as needed: bright photos get a deeper fade, dark ones barely any.
-    const a = clamp(0.5 + (regionL - 0.3) * 0.9, 0.52, 0.86);
-    const textH = (kicker ? 48 * s : 0) + fit.size * 0.9 + (fit.lines.length - 1) * lh + (t.handle && bottom ? 56 * s : 0);
-    const fadeH = textH + 360 * s;
-    if (bottom) {
-      parts.push(
-        `<defs>${shadow}<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.55" stop-color="#000" stop-opacity="${(a * 0.7).toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="${a.toFixed(2)}"/></linearGradient></defs>`,
-        `<rect x="0" y="${H - fadeH}" width="${W}" height="${fadeH}" fill="url(#fade)"/>`,
-      );
-      let y = H - 70 * s - (t.handle ? 56 * s : 0) - (fit.lines.length - 1) * lh;
-      if (kicker) parts.push(kick(x, y - fit.size * 0.9 - 26 * s, kicker, pal.glow));
-      fit.lines.forEach((l, i) => parts.push(text(x, y + i * lh, l, face, fit.size, white, 'filter="url(#soft)"')));
-      y += (fit.lines.length - 1) * lh;
-      if (t.handle) parts.push(kick(x, H - 64 * s, t.handle, white, "start", 19).replace("<text", '<text fill-opacity="0.85"'));
-    } else {
-      parts.push(
-        `<defs>${shadow}<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="${a.toFixed(2)}"/><stop offset="0.5" stop-color="#000" stop-opacity="${(a * 0.6).toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>`,
-        `<rect x="0" y="0" width="${W}" height="${fadeH}" fill="url(#fade)"/>`,
-      );
-      let y = 96 * s;
-      if (kicker) {
-        parts.push(kick(x, y, kicker, pal.glow));
-        y += 48 * s;
-      }
-      fit.lines.forEach((l, i) => parts.push(text(x, y + fit.size * 0.9 + i * lh, l, face, fit.size, white, 'filter="url(#soft)"')));
-      parts.push(`<rect x="${x}" y="${y + fit.size * 0.9 + (fit.lines.length - 1) * lh + 34 * s}" width="${84 * s}" height="${4 * s}" fill="${pal.glow}"/>`);
-      if (t.handle) parts.push(kick(W - x, H - 52 * s, t.handle, white, "end", 19).replace("<text", '<text filter="url(#soft)"'));
-    }
-    headSize = fit.size;
-    lineCount = fit.lines.length;
-    contrast = contrastRatio(1, regionL * (1 - a) * 0.9);
+    contrast = contrastRatio(1, tn.bottom * (1 - a) * 0.9);
   } else {
     // centered: a soft horizontal veil across the lower middle; hairlines around the kicker; italic serif headline.
-    const padX = 90 * s;
-    const fit = fitBy(headline, W - padX * 2, "playfairItalic", 80 * s, 50 * s, 3);
-    const lh = fit.size * 1.12;
-    const blockH = (kicker ? 56 * s : 0) + fit.size * 0.9 + (fit.lines.length - 1) * lh + (t.handle ? 64 * s : 0);
-    const cy = H * 0.64;
+    const padX = 76 * s;
+    const fit = fitBy(headline, W - padX * 2, "playfairItalic", 96 * s, 58 * s, 3);
+    const lh = fit.size * 1.1;
+    const blockH = (kicker ? 60 * s : 0) + fit.size * 0.9 + (fit.lines.length - 1) * lh + (t.handle ? 64 * s : 0);
+    const cy = H * 0.62;
     const top = cy - blockH / 2;
-    const a = clamp(0.5 + (tn.middle - 0.3) * 0.9, 0.5, 0.8);
-    const veilH = blockH + 380 * s;
-    parts.push(
-      `<defs>${shadow}<linearGradient id="veil" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity="0"/><stop offset="0.5" stop-color="#000" stop-opacity="${a.toFixed(2)}"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>`,
-      `<rect x="0" y="${cy - veilH / 2}" width="${W}" height="${veilH}" fill="url(#veil)"/>`,
-    );
+    const a = darkness(tn.middle, 0.6);
+    parts.push(scrim("middle", cy - (blockH + 460 * s) / 2, blockH + 460 * s, a));
     let y = top;
     if (kicker) {
-      const kw = kickerText(kicker).length * 24 * s * 0.62 + kickerText(kicker).length * 5 * s;
+      const kw = kickerText(kicker).length * 26 * s * 0.62 + kickerText(kicker).length * 5 * s;
       parts.push(
-        kick(W / 2, y + 22 * s, kicker, pal.glow, "middle"),
-        `<rect x="${W / 2 - kw / 2 - 70 * s}" y="${y + 13 * s}" width="${50 * s}" height="${1.5 * s}" fill="${pal.glow}"/>`,
-        `<rect x="${W / 2 + kw / 2 + 20 * s}" y="${y + 13 * s}" width="${50 * s}" height="${1.5 * s}" fill="${pal.glow}"/>`,
+        kick(W / 2, y + 22 * s, kicker, pal.pop, "middle", 28).replace("<text", '<text filter="url(#hs)"'),
+        `<rect x="${W / 2 - kw / 2 - 70 * s}" y="${y + 13 * s}" width="${50 * s}" height="${2 * s}" fill="${pal.pop}"/>`,
+        `<rect x="${W / 2 + kw / 2 + 20 * s}" y="${y + 13 * s}" width="${50 * s}" height="${2 * s}" fill="${pal.pop}"/>`,
       );
-      y += 56 * s;
+      y += 60 * s;
     }
-    fit.lines.forEach((l, i) => parts.push(text(W / 2, y + fit.size * 0.9 + i * lh, l, "playfairItalic", fit.size, white, 'text-anchor="middle" filter="url(#soft)"')));
-    if (t.handle) parts.push(kick(W / 2, y + fit.size * 0.9 + (fit.lines.length - 1) * lh + 60 * s, t.handle, white, "middle", 19).replace("<text", '<text fill-opacity="0.85"'));
+    parts.push(head(W / 2, y + fit.size * 0.9, fit.lines, lh, "playfairItalic", fit.size, "middle"));
+    parts.push(handleText(W / 2, y + fit.size * 0.9 + (fit.lines.length - 1) * lh + 60 * s, "middle"));
     headSize = fit.size;
     lineCount = fit.lines.length;
     contrast = contrastRatio(1, tn.middle * (1 - a) * 0.9);
   }
-
   if (logoHref) {
     const size = 96 * s;
     const atTop = layout === "caption" || layout === "centered" || layout === "framed";
