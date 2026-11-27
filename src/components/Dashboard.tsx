@@ -130,7 +130,7 @@ export function Dashboard() {
   const accounts = spaces.map((w) => ({ kind: w.kind, name: w.name }));
   /** No accounts yet: every account link goes to "add your first account". */
   const ADD = "/overview?add=1";
-  const at = (sub = "") => (ws ? `/w/${ws}${sub ? `/${sub}` : ""}` : ADD);
+  const at = (sub = "") => (ws ? `/w/${ws}${sub ? `/${sub}` : ""}` : `${ADD}&next=${sub || "studio"}`);
   const noAccounts = pins !== null && spaces.length === 0;
   const nameOf = (k: WorkspaceKind) => accounts.find((a) => a.kind === k)?.name ?? k;
   /** More accounts than fit as buttons: show a dropdown instead. */
