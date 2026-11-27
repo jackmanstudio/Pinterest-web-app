@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
 import { PinterestApi, type PinterestPin } from "@/lib/pinterest/api";
 import { ConnectionRepo } from "@/lib/pinterest/connections";
-import { ensureAccessToken, ReconnectRequired } from "@/lib/pinterest/sync";
+import { ReconnectRequired } from "@/lib/pinterest/sync";
 import type { DraftForPublish, PublishJob, RunnerDeps } from "./runner";
 
 export async function audit(admin: SupabaseClient, e: { workspaceId: string; actorId: string | null; action: string; draftId: string; details?: Record<string, unknown> }) {
@@ -40,7 +40,7 @@ export function supabaseRunnerDeps(admin: SupabaseClient, api: PinterestApi, rep
     async getAccessToken(job) {
       const conn = await repo.get(job.workspace_id);
       if (!conn) throw new ReconnectRequired("This workspace is no longer connected to Pinterest.");
-      return ensureAccessToken(api, conn, (t) => repo.updateTokens(job.workspace_id, t, conn.refresh_token));
+      return repo.accessToken(api, conn);
     },
     async loadImage(path) {
       const { data, error } = await admin.storage.from(IMAGE_BUCKET).download(path);

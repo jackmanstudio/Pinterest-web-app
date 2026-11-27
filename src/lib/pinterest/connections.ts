@@ -1,7 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { decryptToken, encryptToken, needsReencrypt } from "@/lib/crypto/tokens";
 import type { PinterestAccount, PinterestBoard, PinterestPin, TokenResponse } from "./api";
-import { pinImageUrl } from "./api";
+import { pinImageUrl, type PinterestApi } from "./api";
+import { ensureAccessTokenLocked } from "./sync";
 import type { PinterestEnv } from "./config";
 
 /** Connection details that are safe to send to the browser (no tokens). */
@@ -139,6 +140,50 @@ export class ConnectionRepo {
     if (error) throw new Error(error.message);
   }
 
+  /** A usable access token, refreshed under a lock when it's close to expiry. */
+  async accessToken(api: Pick<PinterestApi, "refresh">, conn: StoredConnection): Promise<string> {
+    const ws = conn.workspace_id;
+    return ensureAccessTokenLocked(api, conn, {
+      tryLock: async () => {
+        const { data, error } = await this.admin.rpc("claim_token_refresh", { p_ws: ws });
+        // Older database without the lock (migration 0016): refresh without it.
+        if (error) return null;
+        return Boolean(data);
+      },
+      unlock: async () => {
+        await this.admin.rpc("release_token_refresh", { p_ws: ws });
+      },
+      reload: () => this.get(ws),
+      onRefreshed: (t, prev) => this.updateTokens(ws, t, prev),
+    });
+  }
+
+  /**
+   * Disconnect side effects: pins waiting to publish go back to Approved and
+   * their queued jobs are cancelled, so nothing is posted after a disconnect.
+   */
+  async stopPendingPublishing(workspaceId: string): Promise<number> {
+    const now = new Date().toISOString();
+    const jobs = await this.admin
+      .from("publish_jobs")
+      .update({ status: "cancelled", finished_at: now, last_error: "Pinterest was disconnected." })
+      .eq("workspace_id", workspaceId)
+      .eq("status", "queued")
+      .select("draft_id");
+    if (jobs.error) throw new Error(jobs.error.message);
+    const ids = (jobs.data ?? []).map((j) => j.draft_id as string);
+    if (ids.length) {
+      const d = await this.admin
+        .from("pin_drafts")
+        .update({ status: "approved", scheduled_for: null, review_note: "Schedule cancelled because Pinterest was disconnected. Schedule it again after reconnecting." })
+        .eq("workspace_id", workspaceId)
+        .eq("status", "scheduled")
+        .in("id", ids);
+      if (d.error) throw new Error(d.error.message);
+    }
+    return ids.length;
+  }
+
   async markNeedsReconnect(workspaceId: string, reason: string) {
     await this.admin.from("pinterest_connections").update({ status: "needs_reconnect", sync_status: "error", sync_error: reason }).eq("workspace_id", workspaceId);
   }
@@ -190,6 +235,7 @@ export class ConnectionRepo {
   }
 
   async disconnect(workspaceId: string) {
+    await this.stopPendingPublishing(workspaceId);
     for (const table of ["pinterest_pins", "pinterest_boards", "pinterest_connections"]) {
       const { error } = await this.admin.from(table).delete().eq("workspace_id", workspaceId);
       if (error) throw new Error(error.message);

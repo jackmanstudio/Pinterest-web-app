@@ -40,6 +40,49 @@ export async function ensureAccessToken(
   }
 }
 
+export interface RefreshLock {
+  /** true = this caller may refresh; false = another request is refreshing; null = locking not available (older database). */
+  tryLock(): Promise<boolean | null>;
+  unlock(): Promise<void>;
+  /** Reads the connection again (another request may have refreshed it). */
+  reload(): Promise<TokenStore | null>;
+  onRefreshed(t: TokenResponse, previousRefresh: string | null): Promise<void>;
+}
+
+/**
+ * ensureAccessToken with a lock, so two requests never refresh at once.
+ * Pinterest rotates refresh tokens: a second refresh with the old token
+ * could fail and log the account out.
+ */
+export async function ensureAccessTokenLocked(
+  api: Pick<PinterestApi, "refresh">,
+  conn: TokenStore,
+  lock: RefreshLock,
+  opts: { now?: number; waitMs?: number; tries?: number } = {},
+): Promise<string> {
+  const now = opts.now ?? Date.now();
+  if (!needsRefresh(conn.access_expires_at, now)) return conn.access_token;
+  const got = await lock.tryLock();
+  if (got === null) return ensureAccessToken(api, conn, (t) => lock.onRefreshed(t, conn.refresh_token), now);
+  if (got) {
+    try {
+      const fresh = (await lock.reload()) ?? conn;
+      if (!needsRefresh(fresh.access_expires_at, now)) return fresh.access_token;
+      return await ensureAccessToken(api, fresh, (t) => lock.onRefreshed(t, fresh.refresh_token), now);
+    } finally {
+      await lock.unlock();
+    }
+  }
+  // Someone else is refreshing: wait for their result.
+  for (let i = 0; i < (opts.tries ?? 5); i++) {
+    await new Promise((r) => setTimeout(r, opts.waitMs ?? 1000));
+    const fresh = await lock.reload();
+    if (fresh && !needsRefresh(fresh.access_expires_at, now)) return fresh.access_token;
+  }
+  if (new Date(conn.access_expires_at).getTime() > now) return conn.access_token;
+  throw new Error("The Pinterest login is being renewed. Try again in a minute.");
+}
+
 export interface SyncResult {
   boards: PinterestBoard[];
   pins: PinterestPin[];

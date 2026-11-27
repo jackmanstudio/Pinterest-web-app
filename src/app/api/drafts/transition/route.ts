@@ -15,6 +15,8 @@ import { runPublishJob } from "@/lib/workflow/runner";
 import { audit, supabaseRunnerDeps } from "@/lib/workflow/server";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
 import { errorResponse } from "@/lib/server/errors";
+import { isMissingColumn } from "@/lib/supabase/compat";
+import { cleanTimeZone } from "@/lib/workflow/timezone";
 
 const Body = z.object({
   workspace: WorkspaceSlug,
@@ -24,6 +26,8 @@ const Body = z.object({
   boardName: z.string().max(200).optional(),
   runAt: z.string().max(40).optional(),
   note: z.string().max(500).optional(),
+  /** The browser's IANA timezone, saved with the schedule (run_at is UTC). */
+  timezone: z.string().max(64).optional(),
   /** Live actions must be explicitly confirmed by the user in the UI. */
   confirm: z.boolean().optional(),
 });
@@ -121,11 +125,11 @@ export async function POST(request: Request) {
       runAt = new Date(b.runAt!).toISOString();
     }
 
-    const job = await admin
-      .from("publish_jobs")
-      .insert({ workspace_id: workspaceId, draft_id: d.id, board_id: b.boardId, board_name: b.boardName ?? null, run_at: runAt, created_by: actor })
-      .select("id")
-      .single();
+    const jobRow: Record<string, unknown> = { workspace_id: workspaceId, draft_id: d.id, board_id: b.boardId, board_name: b.boardName ?? null, run_at: runAt, created_by: actor };
+    const timezone = cleanTimeZone(b.timezone);
+    let job = await admin.from("publish_jobs").insert(timezone ? { ...jobRow, timezone } : jobRow).select("id").single();
+    // Database without migration 0016: save the job without the timezone.
+    if (timezone && isMissingColumn(job.error)) job = await admin.from("publish_jobs").insert(jobRow).select("id").single();
     if (job.error) {
       if (job.error.code === "23505") throw new HttpError(409, "This pin already has a publish job; it won't be published twice.");
       throw new Error(job.error.message);
@@ -137,7 +141,7 @@ export async function POST(request: Request) {
     }
     await audit(admin, {
       workspaceId, actorId: actor, action: action === "schedule" ? "scheduled" : "publish_requested", draftId: d.id,
-      details: { job_id: job.data.id, board_id: b.boardId, board_name: b.boardName, run_at: runAt, environment: cfg.env },
+      details: { job_id: job.data.id, board_id: b.boardId, board_name: b.boardName, run_at: runAt, timezone, environment: cfg.env },
     });
 
     if (action === "schedule") return NextResponse.json({ ok: true, status: "scheduled", run_at: runAt });

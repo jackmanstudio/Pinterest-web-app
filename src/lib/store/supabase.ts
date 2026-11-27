@@ -160,7 +160,8 @@ export class SupabaseStore implements Store {
     const res = await fetch("/api/drafts/transition", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspace: kind, draftId: id, action, ...opts, confirm: true }),
+      // The browser's timezone is saved with a schedule; the time itself is sent in UTC.
+      body: JSON.stringify({ workspace: kind, draftId: id, action, ...opts, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, confirm: true }),
     });
     const body = await res.json();
     if (!res.ok) throw new Error(body.error ?? "Could not update the pin");
