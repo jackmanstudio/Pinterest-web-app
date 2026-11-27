@@ -1,4 +1,5 @@
 import "server-only";
+import { log } from "@/lib/server/log";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { IMAGE_BUCKET } from "@/lib/ai/image/types";
 import { PinterestApi, type PinterestPin } from "@/lib/pinterest/api";
@@ -15,7 +16,7 @@ export async function audit(admin: SupabaseClient, e: { workspaceId: string; act
     target_id: e.draftId,
     details: e.details ?? {},
   });
-  if (error) console.error("audit insert failed", error.message);
+  if (error) log("error", "audit_insert_failed", { message: error.message, action: e.action, draftId: e.draftId });
 }
 
 /** Supabase-backed implementation of the runner's dependencies. */

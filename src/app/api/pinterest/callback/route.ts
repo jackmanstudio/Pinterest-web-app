@@ -5,6 +5,7 @@ import { STATE_COOKIE, verifyState } from "@/lib/pinterest/state";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { getRequestContext, HttpError } from "@/lib/server/context";
 import { isWorkspaceKind } from "@/lib/types";
+import { reportError } from "@/lib/server/errors";
 
 /** Pinterest redirects here with ?code&state (or ?error). */
 export async function GET(request: Request) {
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     return back(st.workspace, "connected=1");
   } catch (err) {
     const msg = err instanceof HttpError ? err.message : describePinterestError(err);
-    console.error("pinterest callback failed", err instanceof Error ? err.message : err);
+    if (!(err instanceof HttpError)) await reportError(err, { source: "api", route: "/api/pinterest/callback", method: "GET", status: 302 });
     return back(kind, "error=" + encodeURIComponent(msg));
   }
 }

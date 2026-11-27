@@ -135,6 +135,16 @@ Run `supabase/migrations/0009_board_automation.sql` once on the live database. U
 - **Bulk:** up to 50 keywords, each categorised and grouped by board. Rows are editable, the plan can be saved and downloaded as CSV, and pins later made from a planned keyword use its board.
 - **Pre-schedule checks** on Review & publish confirm that a board is chosen, is valid, belongs to the connected account, is available, and is related to the pin. The server also refuses to schedule to a board that isn't in the account's synced boards, and it takes the board name from the sync.
 
+## Automatic error log
+
+Every unexpected error is recorded automatically so a bug can be found fast:
+
+- **Server:** API routes and page renders report errors through `reportError` (`src/lib/server/errors.ts`) and `onRequestError` (`src/instrumentation.ts`). Each error gets an **error ID** (e.g. `ERR-MIA3KD-7Q3M`), and the 500 response shows it to the user (`errorId` field and `x-error-id` header).
+- **Browser:** `ErrorReporter` (in the root layout) sends uncaught errors, unhandled promise rejections, page crashes (`error.tsx` / `global-error.tsx`) and failed API calls (5xx or network failure) to `POST /api/errors`.
+- **Where to look:** each error is one JSON log line (`"event":"app_error"`) in Vercel logs with the route, status, message and `where` (first stack frame in the app's own code). With migration `0015_error_events.sql` run, errors are also saved to the `error_events` table and listed on **Account → Error log**, with a *Copy bug report* button. Secrets in messages and context are redacted.
+
+Run `supabase/migrations/0015_error_events.sql` once in the Supabase SQL editor. Until then the error log still works through Vercel logs, and the Account page says the table is missing.
+
 ## Accounts (no limit)
 
 Run `supabase/migrations/0013_unlimited_accounts.sql` and then `0014_no_starter_accounts.sql` once on the live database. 0013 adds a URL slug to each account, removes the one-per-kind limit, and adds `create_workspace` / `delete_workspace`. 0014 stops creating built-in accounts on sign-up: **new users start with no accounts** and add their own. The old Fashion / Macro starter accounts are deleted where they were never used (no pins, brand, Pinterest connection or Autopilot ideas); any that hold data are kept as ordinary accounts the user can rename or delete.

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getRequestContext, HttpError } from "@/lib/server/context";
 import { rateLimited } from "@/lib/server/rateLimit";
 import { checkUrl } from "@/lib/tools/urlCheck";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({ url: z.string().trim().min(1).max(2000), title: z.string().max(200).optional() });
 
@@ -17,7 +18,6 @@ export async function POST(request: Request) {
     return NextResponse.json(await checkUrl(parsed.data.url, parsed.data.title ?? ""));
   } catch (err) {
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error("url check failed", err);
-    return NextResponse.json({ error: "Could not check the link" }, { status: 500 });
+    return errorResponse(err, request, "Could not check the link");
   }
 }

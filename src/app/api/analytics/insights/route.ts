@@ -10,6 +10,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { estimateTextCost } from "@/lib/usage/pricing";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({ workspace: WorkspaceSlug });
 
@@ -57,7 +58,6 @@ export async function POST(request: Request) {
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
     if (err instanceof BudgetExceededError) return NextResponse.json({ error: err.message }, { status: 402 });
     if (err instanceof ProviderError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error("insights failed", err);
-    return NextResponse.json({ error: "Could not generate insights." }, { status: 500 });
+    return errorResponse(err, request, "Could not generate insights.");
   }
 }

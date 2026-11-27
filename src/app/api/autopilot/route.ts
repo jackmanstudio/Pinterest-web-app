@@ -12,13 +12,13 @@ import { isWorkspaceKind } from "@/lib/types";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { audit } from "@/lib/workflow/server";
 import { isMissingColumn, isMissingTable } from "@/lib/supabase/compat";
+import { errorResponse } from "@/lib/server/errors";
 
 const NEEDS_SOURCES = "Content sources need a database update. Run supabase/migrations/0012_content_sources.sql in the Supabase SQL editor.";
 
-function fail(err: unknown) {
+function fail(err: unknown, request: Request | null = null) {
   if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-  console.error("autopilot route failed", err);
-  return NextResponse.json({ error: (err as Error).message ?? "Something went wrong" }, { status: 500 });
+  return errorResponse(err, request, (err as Error).message || "Something went wrong", { area: "autopilot" });
 }
 
 export const maxDuration = 300;
@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       readiness,
     });
   } catch (err) {
-    return fail(err);
+    return fail(err, request);
   }
 }
 
@@ -195,6 +195,6 @@ export async function POST(request: Request) {
     const outcome = await runAutopilotStep(ws, supabaseAutopilotDeps(admin));
     return NextResponse.json({ ok: true, outcome });
   } catch (err) {
-    return fail(err);
+    return fail(err, request);
   }
 }

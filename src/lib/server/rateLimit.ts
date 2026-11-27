@@ -14,6 +14,7 @@ export const LIMITS = {
   autopilot: { limit: 20, windowMs: 60_000 },
   autopilotRun: { limit: 3, windowMs: 60_000 },
   urlCheck: { limit: 15, windowMs: 60_000 },
+  errors: { limit: 10, windowMs: 60_000 },
   // Auth (spec 12): per IP, plus per email below, against brute force and email bombing.
   authLogin: { limit: 10, windowMs: 10 * 60_000 },
   authLoginEmail: { limit: 5, windowMs: 15 * 60_000 },
