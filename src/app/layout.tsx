@@ -7,8 +7,8 @@ import "./globals.css";
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], preload: false, display: "optional" });
 
 export const metadata: Metadata = {
-  title: "Pinterest AI Studio",
-  description: "Plan, draft and optimise Pinterest pins across any number of Pinterest accounts.",
+  title: "Pin AI Studio",
+  description: "Pin AI Studio is an independent tool for planning and drafting pins. Not affiliated with Pinterest.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

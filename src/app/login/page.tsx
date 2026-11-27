@@ -59,7 +59,7 @@ export default function LoginPage() {
       subtitle="Sign in to continue to your studio."
       footer={
         <>
-          New to Pinterest AI Studio?{" "}
+          New to Pin AI Studio?{" "}
           <Link href="/signup" className="font-medium text-[#2a1416] underline underline-offset-2">Create an account</Link>
         </>
       }

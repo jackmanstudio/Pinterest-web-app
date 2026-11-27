@@ -28,7 +28,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
         <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#b3262e]/30 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-24 h-[26rem] w-[26rem] rounded-full bg-[#d8b48a]/20 blur-3xl" />
         <Link href="/" className="relative text-lg font-semibold tracking-tight">
-          Pinterest <span className="text-[#e7b77c]">AI</span> Studio
+          Pin <span className="text-[#e7b77c]">AI</span> Studio
         </Link>
         <div className="relative max-w-md">
           <p className="text-4xl leading-tight" style={serif}>
@@ -51,7 +51,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
       <section className="flex min-h-full items-center justify-center px-5 py-12">
         <div className="w-full max-w-[26rem]">
           <Link href="/" className="mb-8 block text-center text-lg font-semibold tracking-tight text-[#2a1416] lg:hidden">
-            Pinterest <span className="text-[#b3262e]">AI</span> Studio
+            Pin <span className="text-[#b3262e]">AI</span> Studio
           </Link>
           <div className="rounded-2xl border border-[#eadfd2] bg-white p-7 shadow-[0_20px_60px_-30px_rgba(42,20,22,0.35)] sm:p-8">
             <h1 className="text-[1.75rem] leading-tight text-[#2a1416]" style={serif}>{title}</h1>
@@ -66,6 +66,10 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
             )}
           </div>
           {footer && <div className="mt-5 text-center text-sm text-zinc-600">{footer}</div>}
+          <p className="mt-6 text-center text-xs leading-relaxed text-zinc-500">
+            Pin AI Studio is an independent tool and is not affiliated with or endorsed by Pinterest.
+            This is not a Pinterest sign-in: use your Pin AI Studio email and password, never your Pinterest password.
+          </p>
         </div>
       </section>
       </Suspense>

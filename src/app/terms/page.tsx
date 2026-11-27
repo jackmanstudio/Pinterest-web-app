@@ -1,12 +1,12 @@
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata = { title: "Terms of Service · Pinterest AI Studio" };
+export const metadata = { title: "Terms of Service · Pin AI Studio" };
 
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Service">
       <h2>Using the service</h2>
-      <p>Pinterest AI Studio helps you write, design, organise and schedule Pinterest pins. You must be old enough to form a binding contract and keep your login details private.</p>
+      <p>Pin AI Studio helps you write, design, organise and schedule Pinterest pins. You must be old enough to form a binding contract and keep your login details private.</p>
       <h2>Your content and your Pinterest account</h2>
       <ul>
         <li>You own the pins, text and images you create here. You are responsible for checking them before they are published.</li>

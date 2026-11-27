@@ -1,6 +1,6 @@
 import { LegalPage } from "@/components/LegalPage";
 
-export const metadata = { title: "Privacy Policy · Pinterest AI Studio" };
+export const metadata = { title: "Privacy Policy · Pin AI Studio" };
 
 export default function PrivacyPage() {
   return (

@@ -179,21 +179,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const logo = (size: string) => (
-    <span className={`grid ${size} shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#e60023] via-[#ff5a4a] to-[#ff9a5a] text-white shadow-[0_0_24px_-4px_rgba(255,90,60,0.8)]`}>
+    <span className={`grid ${size} shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#7c3aed] via-[#a855f7] to-[#f59e0b] text-white shadow-[0_0_24px_-4px_rgba(168,85,247,0.7)]`}>
       <Icon name="pin" className="h-4 w-4" />
     </span>
   );
   const brand = (
     <Link href="/dashboard" className="flex items-center gap-2.5 font-[family-name:var(--font-display)] text-[16px] font-extrabold tracking-tight text-white">
       {logo("h-9 w-9")}
-      <span>Pinterest AI Studio</span>
+      <span>Pin AI Studio</span>
     </Link>
   );
 
   const current = GROUPS.flatMap((g) => g.items).find((it) => it.section === section);
   const kindName = (kind && workspaces?.find((w) => w.kind === kind)?.name) || (kind ? (workspaces === null ? labelFromSlug(kind) : "Account not found") : "");
   const crumb: [string, string] | null = inWorkspace && current ? [kindName, current.label] : null;
-  const tabTitle = crumb ? `${crumb[1]} · ${crumb[0]} · Pinterest AI Studio` : null;
+  const tabTitle = crumb ? `${crumb[1]} · ${crumb[0]} · Pin AI Studio` : null;
   // Account pages share one layout, so name the browser tab after the section and account.
   useEffect(() => {
     if (tabTitle) document.title = tabTitle;
@@ -218,7 +218,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Phone / tablet top bar */}
         <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/[0.07] bg-[#0b0912]/90 px-4 py-2.5 lg:hidden">
-          <Link href="/dashboard" aria-label="Pinterest AI Studio home">{logo("h-8 w-8")}</Link>
+          <Link href="/dashboard" aria-label="Pin AI Studio home">{logo("h-8 w-8")}</Link>
           <div className="w-44">{switcher}</div>
           <button onClick={() => setOpen(true)} className="ml-auto rounded-xl p-2.5 text-white hover:bg-white/10" aria-label="Open menu" aria-expanded={open}>
             <Icon name="menu" className="h-5 w-5" />
