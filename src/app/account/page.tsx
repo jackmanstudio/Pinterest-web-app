@@ -2,7 +2,7 @@ import { AccountData } from "@/components/AccountData";
 import { AccountSettings } from "@/components/AccountSettings";
 import { ErrorLog } from "@/components/ErrorLog";
 
-export const metadata = { title: "Account · Pinterest AI Studio" };
+export const metadata = { title: "Account · Pin AI Studio" };
 
 export default function AccountPage() {
   return (

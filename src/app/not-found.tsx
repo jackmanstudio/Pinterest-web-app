@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Page not found · Pinterest AI Studio" };
+export const metadata = { title: "Page not found · Pin AI Studio" };
 
 export default function NotFound() {
   return (

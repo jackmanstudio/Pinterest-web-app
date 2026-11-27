@@ -4,11 +4,19 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "@/lib/sup
 import { readRemember, rememberOptions } from "@/lib/supabase/remember";
 import { DEMO_COOKIE } from "@/lib/auth/demo";
 
+const OLD_HOST = "pinterest-web-app.vercel.app";
+const NEW_ORIGIN = "https://pin-ai-studio.vercel.app";
+
 /** Pages and routes that work without an account. Everything else needs sign-in. */
 const PUBLIC = [/^\/robots\.txt$/, /^\/login/, /^\/signup/, /^\/forgot-password/, /^\/reset-password/, /^\/terms/, /^\/privacy/, /^\/auth\//, /^\/api\/auth\/(login|signup|forgot)$/, /^\/api\/cron\//];
 
 /** Refreshes the Supabase session and sends signed-out users to /login. */
 export async function proxy(request: NextRequest) {
+  // The old "pinterest-…" address got flagged as phishing; send page visits to the new address.
+  const host = request.headers.get("host") ?? "";
+  if (host === OLD_HOST && !request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.redirect(`${NEW_ORIGIN}${request.nextUrl.pathname}${request.nextUrl.search}`, 308);
+  }
   if (!isSupabaseConfigured) return demoGate(request);
   // No Supabase auth cookie means nobody is signed in: skip the network call to Supabase entirely.
   const hasSession = request.cookies.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));

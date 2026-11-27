@@ -1,4 +1,4 @@
-# Pinterest AI Studio
+# Pin AI Studio
 
 Multi-workspace Pinterest content studio: enter a pin idea, get five distinct pin drafts, edit, and save. Built in phases from the development brief.
 

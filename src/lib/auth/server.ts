@@ -22,11 +22,18 @@ export function notConfigured(): NextResponse | null {
   return isSupabaseConfigured ? null : NextResponse.json({ error: "Accounts are off in Demo mode (Supabase isn't configured)." }, { status: 503 });
 }
 
+/**
+ * Old address that browsers flagged (a "pinterest" vercel.app domain with a sign-in form looked like a
+ * Pinterest imitation). Email links always point at the new address, even if the env var still names the old one.
+ */
+const RETIRED_HOSTS = new Set(["pinterest-web-app.vercel.app"]);
+export const PRIMARY_ORIGIN = "https://pin-ai-studio.vercel.app";
+
 /** The site's own origin for email links (Supabase also checks it against its allow-list). */
 export function siteOrigin(request: Request): string {
   const env = process.env.NEXT_PUBLIC_SITE_URL;
-  if (env && /^https?:\/\//.test(env)) return env.replace(/\/$/, "");
-  return new URL(request.url).origin;
+  const origin = env && /^https?:\/\//.test(env) ? env.replace(/\/$/, "") : new URL(request.url).origin;
+  return RETIRED_HOSTS.has(new URL(origin).host) ? PRIMARY_ORIGIN : origin;
 }
 
 /** Rate-limit key for an email without keeping the address itself in memory. */
