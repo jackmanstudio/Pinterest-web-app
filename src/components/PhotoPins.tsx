@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { WorkspaceKind } from "@/lib/types";
 import { blobToBase64, decodePhoto, toJpeg } from "@/lib/photos/client";
+import { useTrendKeywords } from "@/lib/client/useTrendKeywords";
 import { duplicateNotice, fileProblem, PHOTO_LIMITS, sizeCheck, topicFromFileName } from "@/lib/photos/validate";
 
 /** Hex SHA-256 of a file's bytes, or null when the browser can't hash it. */
@@ -39,6 +40,7 @@ const card = "rounded-xl border border-zinc-200 bg-white p-5 shadow-sm";
  */
 export function PhotoPins({ kind, store, workspaceId, onSaved }: { kind: WorkspaceKind; store: Store; workspaceId: string; onSaved: () => void }) {
   const [photos, setPhotos] = useState<Picked[]>([]);
+  const trendKeywords = useTrendKeywords(kind);
   const [topic, setTopic] = useState("");
   const [link, setLink] = useState("");
   const [running, setRunning] = useState(false);
@@ -103,7 +105,7 @@ export function PhotoPins({ kind, store, workspaceId, onSaved }: { kind: Workspa
         const res = await fetch("/api/photo-pins", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ workspace: kind, brand, topic: topic.trim(), language: brand.language || undefined, photos: group.map((p, j) => ({ topic: p.topic.trim(), jpeg: jpegs[j] })) }),
+          body: JSON.stringify({ workspace: kind, brand, topic: topic.trim(), language: brand.language || undefined, trend_keywords: trendKeywords.length ? trendKeywords : undefined, photos: group.map((p, j) => ({ topic: p.topic.trim(), jpeg: jpegs[j] })) }),
         });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error ?? `Writing the pin text failed (${res.status}).`);

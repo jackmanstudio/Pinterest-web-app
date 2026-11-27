@@ -12,6 +12,7 @@ import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import type { UsageEntry } from "@/lib/usage/ledger";
 import { estimateTextCost } from "@/lib/usage/pricing";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
+import { polishSeo } from "@/lib/seo/polish";
 
 export const maxDuration = 120;
 
@@ -21,6 +22,7 @@ const Body = z.object({
   brand: BrandSchema,
   topic: z.string().trim().max(200).default(""),
   language: z.string().max(40).optional(),
+  trend_keywords: z.array(z.string().trim().max(80)).max(50).optional(),
   photos: z
     .array(
       z.object({
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
     let basedOn: "photo" | "topic";
     if (provider.describePhotos) {
       const r = await provider.describePhotos(
-        { photos: b.photos.map((p) => ({ topic: p.topic })), topic: b.topic, language: b.language, brand: b.brand },
+        { photos: b.photos.map((p) => ({ topic: p.topic })), topic: b.topic, language: b.language, brand: b.brand, trendKeywords: b.trend_keywords },
         b.photos.map((p) => ({ base64: p.jpeg, mediaType: "image/jpeg" as const })),
       );
       ({ pins, model, usage } = r);
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
       topics.forEach((t, i) => byTopic.set(t!, [...(byTopic.get(t!) ?? []), i]));
       pins = new Array(b.photos.length);
       // One request per distinct topic, side by side (a batch has at most 5 photos).
-      const results = await Promise.all([...byTopic].map(async ([idea, idx]) => ({ idx, r: await provider.generateDrafts({ workspace: b.workspace, idea, brand: b.brand, language: b.language }) })));
+      const results = await Promise.all([...byTopic].map(async ([idea, idx]) => ({ idx, r: await provider.generateDrafts({ workspace: b.workspace, idea, brand: b.brand, language: b.language, trend_keywords: b.trend_keywords }) })));
       for (const { idx, r } of results) {
         model = r.model;
         usage = { input_tokens: usage.input_tokens + (r.usage?.input_tokens ?? 0), output_tokens: usage.output_tokens + (r.usage?.output_tokens ?? 0) };
@@ -82,6 +84,12 @@ export async function POST(request: Request) {
       }
       basedOn = "topic";
     }
+
+    // Photo topics vary per photo: polish each pin with its own topic's keywords (English only adds tags).
+    pins = pins.map((p, i) => {
+      const topic = photoTopic(b.photos[i].topic, b.topic);
+      return topic ? polishSeo([p], { idea: topic, trendKeywords: b.trend_keywords, focusKeywords: b.brand.focus_keywords, language: b.language })[0] : p;
+    });
 
     const cost = estimateTextCost(model, usage.input_tokens, usage.output_tokens);
     await ctx.ledger.record({ ...usageBase, model, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, est_cost_usd: cost, status: "ok", error: null });

@@ -40,6 +40,8 @@ export const GenerateRequestSchema = z.object({
   brand: BrandSchema,
   context: z.string().max(2000).optional(),
   style: z.enum(PIN_STYLE_KEYS as [PinStyle, ...PinStyle[]]).optional(),
+  /** Rising searches from the account's live Pinterest Trends snapshot. */
+  trend_keywords: z.array(z.string().trim().max(80)).max(50).optional(),
 });
 
 /** Turn "a, b,  c" into ["a","b","c"] (trimmed, deduped, no empties). */

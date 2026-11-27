@@ -34,6 +34,7 @@ describe("SEO title padding", () => {
     const { ensureSeoTitle } = await import("@/lib/drafts/tidyTitle");
     const t = ensureSeoTitle("7 Fresh Eid Outfit Ideas for Women", "Eid outfit ideas for women");
     expect(t.match(/ideas/gi)?.length).toBe(1);
-    expect(t.length).toBeGreaterThanOrEqual(40);
+    // Already carries the full keyword: it stays as is rather than getting generic filler ("to Save and Try").
+    expect(t).toBe("7 Fresh Eid Outfit Ideas for Women");
   });
 });

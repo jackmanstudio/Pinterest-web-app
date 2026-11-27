@@ -1,7 +1,7 @@
 import type { DraftContent } from "@/lib/types";
 import { LIMITS } from "./validation";
 import { reviewDraft, type QualityCheck, type QualityContext } from "./quality";
-import { ensureSeoTitle, mainKeyword, tidyTitle } from "./tidyTitle";
+import { ensureSeoTitle, mainKeyword, specificTail, tidyTitle } from "./tidyTitle";
 
 /**
  * One-click fixes for the Pin score checks. Rule-based and predictable:
@@ -113,7 +113,7 @@ export function autoFixDraft(d: DraftContent, link: string | null | undefined, c
         const k = mainKeyword(idea);
         if (title.length < 40 && k) {
           const hasK = plain.toLowerCase().includes(k.toLowerCase());
-          const options = [hasK ? "" : `${k}: ${plain}`, `${k} Ideas: ${plain}`, `${plain}: ${k} Ideas Worth Saving`, `${k}: Easy Ideas Worth Saving`];
+          const options = [hasK ? "" : `${k}: ${plain}`, `${plain}${specificTail(plain, idea)}`, `${k} Ideas: ${plain}`];
           title = options.find((o) => o.length >= 40 && o.length <= 80 && !/\bideas?\b.*\bideas?\b/i.test(o)) ?? title;
         }
       }

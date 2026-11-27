@@ -102,10 +102,31 @@ export function ensureSeoTitle(title: string, idea: string, max = 100): string {
     if (k.length > head.trim().length && `${k}: ${hook}`.length <= max) t = `${k}: ${hook}`;
   }
   if (t.length < MIN_TITLE) {
-    const extra = t.includes(":") ? " to Save and Try" : /\bideas?\b/i.test(t) ? ": Worth Saving and Trying" : ": Ideas Worth Saving";
-    if ((t + extra).length <= max) t = t + extra;
+    // Lengthen with the idea's own words (never generic filler like "to Save and Try").
+    const extra = specificTail(t, idea);
+    if (extra && (t + extra).length <= max) t = t + extra;
   }
   return t;
+}
+
+const LEAD_IN = /^(?:\d+\s+|the\s+|best\s+|top\s+|how\s+to\s+)+/i;
+const MOD = /\s+(?=(?:on a|for|with|without|under|in|at|from)\s)/i;
+
+/**
+ * Specific words from the idea that a short title is missing: its modifier
+ * ("on a Budget", "for Busy Weeknights"), else the full main keyword as the hook.
+ */
+export function specificTail(title: string, idea: string): string {
+  const t = title.toLowerCase();
+  const clean = idea.trim().replace(/[.!?]+$/, "").replace(LEAD_IN, "");
+  const [, ...mods] = clean.split(MOD);
+  const mod = mods.join(" ").trim();
+  // Mid-title phrase: joining words stay lower-case ("on a Budget").
+  const cap = (s: string) => s.split(" ").map((w) => (SMALL.has(w.toLowerCase()) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1))).join(" ");
+  if (mod && !t.includes(mod.toLowerCase())) return ` ${cap(mod)}`;
+  const k = mainKeyword(idea);
+  if (k && !t.includes(k.toLowerCase())) return t.includes(":") ? ` with ${k}` : `: ${k}`;
+  return "";
 }
 
 /** ", Save this pin for later." → ". Save this pin for later." */
