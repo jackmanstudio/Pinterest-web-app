@@ -5,6 +5,7 @@ import { ADMIN_KEY_MISSING_MESSAGE, getAdminSupabase, hasAdminSupabase } from "@
 import { isMissingColumn } from "@/lib/supabase/compat";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { rateLimited } from "@/lib/server/rateLimit";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({ workspace: WorkspaceSlug, paused: z.boolean() });
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, paused: parsed.data.paused });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: err instanceof HttpError ? err.message : "Could not change the publishing queue." }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not change the publishing queue.");
   }
 }

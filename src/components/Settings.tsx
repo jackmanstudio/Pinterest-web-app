@@ -244,14 +244,14 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
             if (newCat.trim()) addCategory();
           }}
         >
-          <input className={input} placeholder={newParent ? "New sub-category" : "New category"} value={newCat} maxLength={80} onChange={(e) => setNewCat(e.target.value)} />
-          <select aria-label="Parent category" className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 text-sm sm:flex-none" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
+          <input className={`${input} min-w-0 sm:flex-1`} placeholder={newParent ? "New sub-category" : "New category"} value={newCat} maxLength={80} onChange={(e) => setNewCat(e.target.value)} />
+          <select aria-label="Parent category" className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 text-sm sm:w-40 sm:flex-none" value={newParent} onChange={(e) => setNewParent(e.target.value)}>
             <option value="">Top level</option>
             {categories.filter((c) => !c.parent_id).map((c) => (
               <option key={c.id} value={c.id}>Under {c.name}</option>
             ))}
           </select>
-          <button className="rounded-md bg-zinc-900 px-3 py-2 text-sm text-white">Add</button>
+          <button className="shrink-0 rounded-md bg-zinc-900 px-3 py-2 text-sm text-white">Add</button>
         </form>
       </section>
 

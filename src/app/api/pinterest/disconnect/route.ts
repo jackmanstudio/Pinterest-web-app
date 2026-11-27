@@ -3,6 +3,7 @@ import { z } from "zod";
 import { pinterestContext } from "@/lib/pinterest/server";
 import { HttpError } from "@/lib/server/context";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({ workspace: WorkspaceSlug });
 
@@ -15,7 +16,7 @@ export async function POST(request: Request) {
     await repo.disconnect(workspaceId);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not disconnect Pinterest.");
   }
 }

@@ -4,7 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import type { Store } from "@/lib/store";
 import type { WorkspaceKind } from "@/lib/types";
 import { blobToBase64, decodePhoto, toJpeg } from "@/lib/photos/client";
-import { fileProblem, PHOTO_LIMITS, sizeCheck, topicFromFileName } from "@/lib/photos/validate";
+import { duplicateNotice, fileProblem, PHOTO_LIMITS, sizeCheck, topicFromFileName } from "@/lib/photos/validate";
+
+/** Hex SHA-256 of a file's bytes, or null when the browser can't hash it. */
+async function fileHash(f: File): Promise<string | null> {
+  try {
+    const d = await crypto.subtle.digest("SHA-256", await f.arrayBuffer());
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+}
 
 interface Picked {
   key: string;
@@ -12,6 +22,8 @@ interface Picked {
   preview: string;
   img: ImageBitmap | null;
   topic: string;
+  /** SHA-256 of the file, so the same photo is not made into two pins. */
+  hash: string | null;
   problem: string | null;
   tip: string | null;
   state: "ready" | "writing" | "saved" | "failed";
@@ -43,10 +55,18 @@ export function PhotoPins({ kind, store, workspaceId, onSaved }: { kind: Workspa
     const list = [...files].slice(0, Math.max(0, room));
     const skipped = files.length - list.length;
     const added: Picked[] = [];
+    const seen = new Set(photos.map((p) => p.hash).filter(Boolean) as string[]);
+    const dupes: string[] = [];
     for (const f of list) {
+      const hash = await fileHash(f);
+      if (hash && seen.has(hash)) {
+        dupes.push(f.name);
+        continue;
+      }
+      if (hash) seen.add(hash);
       const preview = URL.createObjectURL(f);
       urls.current.push(preview);
-      const base: Picked = { key: `${f.name}-${f.size}-${Math.random()}`, name: f.name, preview, img: null, topic: topicFromFileName(f.name), problem: fileProblem(f), tip: null, state: "ready" };
+      const base: Picked = { key: `${f.name}-${f.size}-${Math.random()}`, name: f.name, preview, img: null, topic: topicFromFileName(f.name), hash, problem: fileProblem(f), tip: null, state: "ready" };
       if (!base.problem) {
         try {
           base.img = await decodePhoto(f);
@@ -60,7 +80,8 @@ export function PhotoPins({ kind, store, workspaceId, onSaved }: { kind: Workspa
       added.push(base);
     }
     setPhotos((p) => [...p, ...added]);
-    if (skipped > 0) setNotice(`Only ${PHOTO_LIMITS.maxFiles} photos at a time; ${skipped} were left out.`);
+    const notes = [duplicateNotice(dupes), skipped > 0 ? `Only ${PHOTO_LIMITS.maxFiles} photos at a time; ${skipped} were left out.` : null].filter(Boolean);
+    if (notes.length) setNotice(notes.join(" "));
     if (input.current) input.current.value = "";
   }
 
@@ -184,7 +205,7 @@ export function PhotoPins({ kind, store, workspaceId, onSaved }: { kind: Workspa
               {running ? "Making pins…" : `Make ${usable.length} pin${usable.length === 1 ? "" : "s"}`}
             </button>
             <span className="text-zinc-600" role="status">
-              {photos.length} photos · {photos.filter((p) => p.problem).length} can&apos;t be used · {done} saved · {count("failed")} failed
+              {photos.length} photo{photos.length === 1 ? "" : "s"} · {photos.filter((p) => p.problem).length} can&apos;t be used · {done} saved · {count("failed")} failed
             </span>
             {done > 0 && !running && (
               <Link href={`/w/${kind}/publish`} className="font-medium text-red-700 underline">Review the new pins</Link>
