@@ -9,6 +9,8 @@ import { boardChecks, METHOD_LABELS, type BoardPlan } from "@/lib/boards/automat
 import { draftFacts, loadBoardSource } from "@/lib/client/boards";
 import { ACTION_LABELS, type WorkflowAction } from "@/lib/workflow/transitions";
 import { spreadTimes } from "@/lib/planning/spread";
+import { checkNewBoardName, isLocalBoard, loadLocalBoards, localBoard, mergeBoards, saveLocalBoards } from "@/lib/boards/custom";
+import Link from "next/link";
 import { SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
 import { WorkspaceError } from "./WorkspaceError";
@@ -47,6 +49,44 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
   const [pin, setPin] = useState<PinterestInfo>({ sample: true, ready: false, env: "sandbox", username: null, active: false, scopes: [], boards: [] });
   const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<Map<string, BoardPlan>>(new Map());
+  const [localBoards, setLocalBoards] = useState<Board[]>([]);
+  const canCreateOnPinterest = pin.ready && pin.active && pin.scopes.includes("boards:write");
+
+  /**
+   * A board typed in the picker. Connected with board permission: created on
+   * Pinterest (the click is the user's approval). Otherwise kept in this
+   * browser until Pinterest is connected.
+   */
+  const addBoard = useCallback(
+    async (name: string): Promise<Board> => {
+      if (canCreateOnPinterest) {
+        const res = await fetch("/api/pinterest/boards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ workspace: kind, name, confirm: true }),
+        });
+        const body = await res.json().catch(() => ({}));
+        const made: Board | undefined = body.board ?? (res.status === 409 ? body.existing : undefined);
+        if (!made) throw new Error(body.error ?? `Board creation failed (${res.status})`);
+        setPin((p) => ({ ...p, sample: false, boards: [...(p.sample ? [] : p.boards.filter((b) => b.board_id !== made.board_id)), made] }));
+        setLocalBoards((prev) => {
+          const next = prev.filter((b) => b.name.toLowerCase() !== made.name.toLowerCase());
+          saveLocalBoards(kind, next);
+          return next;
+        });
+        return made;
+      }
+      const b = localBoard(name);
+      setLocalBoards((prev) => {
+        const next = mergeBoards(prev, [b]);
+        saveLocalBoards(kind, next);
+        return next;
+      });
+      return b;
+    },
+    [canCreateOnPinterest, kind],
+  );
+  const pickerPin: PinterestInfo = { ...pin, boards: mergeBoards(pin.boards, localBoards) };
 
   const reload = useCallback(async () => {
     if (!store || !workspace) return;
@@ -63,6 +103,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
     loadBoardSource(kind).then((b) => {
       if (cancelled) return;
       setPin({ sample: b.sample, ready: b.ready, env: b.env, username: b.username, active: b.active, scopes: b.scopes, boards: b.boards });
+      setLocalBoards(loadLocalBoards(kind));
     });
     store
       .listBoardPlans(workspace.id)
@@ -170,13 +211,15 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {visible.map((d) => (
-            <PinCard key={d.id} kind={kind} store={store} draft={d} pin={pin} plan={plans.get(d.id) ?? null} onChanged={reload} />
+            <PinCard key={d.id} kind={kind} store={store} draft={d} pin={pickerPin} plan={plans.get(d.id) ?? null} onChanged={reload} addBoard={addBoard} canCreateOnPinterest={canCreateOnPinterest} />
           ))}
         </div>
       )}
     </div>
   );
 }
+
+const NEW_BOARD = "__new_board__";
 
 const STATUS_DOT: Record<DraftStatus, string> = {
   draft: "bg-white/60",
@@ -186,7 +229,13 @@ const STATUS_DOT: Record<DraftStatus, string> = {
   published: "bg-emerald-400",
 };
 
-function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: WorkspaceKind; store: Store; draft: PinDraft; pin: PinterestInfo; plan: BoardPlan | null; onChanged: () => Promise<void> }) {
+function PinCard({ kind, store, draft, pin, plan, onChanged, addBoard, canCreateOnPinterest }: {
+  kind: WorkspaceKind; store: Store; draft: PinDraft; pin: PinterestInfo; plan: BoardPlan | null; onChanged: () => Promise<void>;
+  addBoard: (name: string) => Promise<Board>; canCreateOnPinterest: boolean;
+}) {
+  const [newBoard, setNewBoard] = useState<string | null>(null);
+  const [newBoardMsg, setNewBoardMsg] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -210,13 +259,43 @@ function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: Workspace
   const board = pin.boards.find((b) => b.board_id === boardId);
   const suggested = recommendBoard(pin.boards, { title: draft.title, tags: draft.tags, category: draft.idea });
   const checks = boardChecks(boardId || null, pin.boards, { connectedUsername: pin.username, demo: pin.sample, facts: draftFacts(draft), plan: plan && plan.board_id === boardId ? plan : chosenBoard ? { board_id: chosenBoard, method: "custom", confidence: null } : null });
-  const boardProblems = checks.filter((c) => !c.ok && (c.id === "valid" || c.id === "owned")).map((c) => c.label);
+  const local = isLocalBoard(boardId);
+  const boardProblems = [
+    ...checks.filter((c) => !c.ok && (c.id === "valid" || c.id === "owned")).map((c) => c.label),
+    ...(local && board ? [`“${board.name}” is saved in this app only. Create it on Pinterest to publish to it.`] : []),
+  ];
+
+  async function createBoard(name: string) {
+    const check = checkNewBoardName(name, pin.boards);
+    // A board already in the list is picked, unless it's a local one we can now make on Pinterest.
+    const pushLocal = !check.ok && check.existing && isLocalBoard(check.existing.board_id) && canCreateOnPinterest;
+    if (!check.ok && !pushLocal) {
+      setNewBoardMsg(check.error);
+      if (check.existing) {
+        setBoardId(check.existing.board_id);
+        setNewBoard(null);
+      }
+      return;
+    }
+    setCreating(true);
+    setNewBoardMsg(null);
+    try {
+      const b = await addBoard(check.ok ? check.name : check.existing!.name);
+      setBoardId(b.board_id);
+      setNewBoard(null);
+      setNewBoardMsg(isLocalBoard(b.board_id) ? `“${b.name}” added. It's saved in this app until Pinterest is connected.` : `“${b.name}” created on Pinterest.`);
+    } catch (e) {
+      setNewBoardMsg((e as Error).message);
+    } finally {
+      setCreating(false);
+    }
+  }
   const blockers =
     draft.status === "approved"
       ? store.mode === "demo"
         ? ["Publishing needs Supabase and a connected Pinterest account."]
         : !pin.ready
-          ? ["Pinterest isn't configured on the server."]
+          ? ["Pinterest isn't connected yet. Open the Pinterest page to connect it."]
           : [...publishBlockers({ ...draft, link: link || null }, { connected: Boolean(pin.username), connectionActive: pin.active, grantedScopes: pin.scopes, boardId: boardId || null }), ...boardProblems]
       : [];
 
@@ -326,13 +405,64 @@ function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: Workspace
           </div>
           {link !== (draft.link ?? "") && <p className="text-xs text-zinc-500">Saving an edit withdraws approval, so it goes back to Draft.</p>}
           <label className="text-xs font-medium" htmlFor={`board-${draft.id}`}>Board</label>
-          <select id={`board-${draft.id}`} className="rounded-md border border-zinc-300 px-2 py-1" value={boardId} onChange={(e) => setBoardId(e.target.value)} disabled={pin.boards.length === 0}>
-            <option value="">{pin.boards.length ? "Choose a board…" : "No boards synced"}</option>
+          <select
+            id={`board-${draft.id}`}
+            className="rounded-md border border-zinc-300 px-2 py-1"
+            value={newBoard !== null ? NEW_BOARD : boardId}
+            onChange={(e) => {
+              setNewBoardMsg(null);
+              if (e.target.value === NEW_BOARD) return setNewBoard("");
+              setNewBoard(null);
+              setBoardId(e.target.value);
+            }}
+          >
+            <option value="">{pin.boards.length ? "Choose a board…" : "No boards yet"}</option>
             {pin.boards.map((b) => (
-              <option key={b.board_id} value={b.board_id}>{b.name}{suggested?.board.board_id === b.board_id ? " (suggested)" : ""}</option>
+              <option key={b.board_id} value={b.board_id}>
+                {b.name}
+                {isLocalBoard(b.board_id) ? " (my board)" : ""}
+                {suggested?.board.board_id === b.board_id ? " (suggested)" : ""}
+              </option>
             ))}
+            <option value={NEW_BOARD}>+ Add my own board…</option>
           </select>
-          {pin.sample && <p className="text-xs text-amber-800">Demo sample boards. Connect Pinterest and sync to see your real boards.</p>}
+          {newBoard !== null && (
+            <form
+              className="flex flex-wrap gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createBoard(newBoard);
+              }}
+            >
+              <input
+                autoFocus
+                aria-label="New board name"
+                maxLength={50}
+                className="min-w-0 flex-1 rounded-md border border-zinc-300 px-2 py-1"
+                placeholder="Board name, e.g. Winter Outfits"
+                value={newBoard}
+                onChange={(e) => setNewBoard(e.target.value)}
+              />
+              <button type="submit" disabled={creating || !newBoard.trim()} className={`${btn} bg-zinc-900 text-white`}>
+                {creating ? "Adding…" : canCreateOnPinterest ? "Create on Pinterest" : "Add board"}
+              </button>
+              <button type="button" onClick={() => { setNewBoard(null); setNewBoardMsg(null); }} className="text-sm underline">Cancel</button>
+              <p className="basis-full text-xs text-zinc-500">
+                {canCreateOnPinterest ? "A new public board is made on your Pinterest account." : "Saved in this app now. When Pinterest is connected, create it there with one click."}
+              </p>
+            </form>
+          )}
+          {newBoardMsg && <p className="text-xs text-zinc-600" role="status">{newBoardMsg}</p>}
+          {local && board && canCreateOnPinterest && (
+            <button disabled={creating} onClick={() => createBoard(board.name)} className={`${btn} self-start border border-zinc-300`}>
+              {creating ? "Creating…" : `Create “${board.name}” on Pinterest`}
+            </button>
+          )}
+          {pin.sample && (
+            <p className="text-xs text-amber-800">
+              Demo sample boards. <Link href={`/w/${kind}/pinterest`} className="underline">Connect Pinterest</Link> and sync to see your real boards, or add your own board above.
+            </p>
+          )}
           {plan && plan.board_id === boardId && (
             <p className="text-xs text-zinc-600">
               {METHOD_LABELS[plan.method]}
