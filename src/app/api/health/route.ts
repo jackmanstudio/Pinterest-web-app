@@ -26,6 +26,7 @@ export async function GET() {
     checks.image_ai = "error";
   }
   checks.pinterest = checkPinterestConfig().ready ? "ok" : "missing";
+  // "missing" is fine when the Supabase scheduler (migration 0017) runs the jobs with its own secret.
   checks.cron_secret = process.env.CRON_SECRET ? "ok" : "missing";
   const ok = checks.database !== "error";
   return NextResponse.json({ ok, checks, time: new Date().toISOString() }, { status: ok ? 200 : 503 });

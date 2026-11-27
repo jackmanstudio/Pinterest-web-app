@@ -15,7 +15,7 @@ import { recordWorkerRun } from "@/lib/server/workerRuns";
  * Pinterest has no organic scheduling API, so the app runs the schedule itself.
  */
 async function handle(request: Request) {
-  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await cronAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!checkPinterestConfig().ready) return NextResponse.json({ error: "Pinterest not configured" }, { status: 503 });
   const cfg = getPinterestConfig();
   const admin = getAdminSupabase();

@@ -11,7 +11,7 @@ import { getAdminSupabase } from "@/lib/supabase/admin";
  * Never returns or logs tokens.
  */
 export async function POST(request: Request) {
-  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await cronAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!checkPinterestConfig().ready) return NextResponse.json({ error: "Pinterest not configured" }, { status: 503 });
   const cfg = getPinterestConfig();
   const result = await new ConnectionRepo(getAdminSupabase(), cfg.encryptionKey).rotateAll();

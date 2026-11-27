@@ -265,21 +265,12 @@ function SetupHelper({ missing }: { missing: string[] }) {
           </li>
         ))}
       </ul>
-      {keys.length === 0 && (
-        <button
-          onClick={() =>
-            setKeys([
-              // Never offer a new token key when one is set: that would lock out connected accounts.
-              ...(missing.includes("TOKEN_ENCRYPTION_KEY") ? [{ name: "TOKEN_ENCRYPTION_KEY", value: randomKey() }] : []),
-              { name: "CRON_SECRET", value: randomKey().replace(/[^A-Za-z0-9]/g, "") },
-            ])
-          }
-          className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
-        >
-          {missing.includes("TOKEN_ENCRYPTION_KEY") ? "Make TOKEN_ENCRYPTION_KEY and CRON_SECRET" : "Make a CRON_SECRET"}
+      {keys.length === 0 && missing.includes("TOKEN_ENCRYPTION_KEY") && (
+        <button onClick={() => setKeys([{ name: "TOKEN_ENCRYPTION_KEY", value: randomKey() }])} className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm">
+          Make TOKEN_ENCRYPTION_KEY
         </button>
       )}
-      {keys.length > 0 && <p className="text-xs text-zinc-500">Made in your browser only. Copy each into Vercel now; a new one is made if you reload.</p>}
+      {keys.length > 0 && <p className="text-xs text-zinc-500">Made in your browser only. Copy it into Vercel now; a new one is made if you reload. Scheduling needs no secret: Supabase runs it (database update 0017).</p>}
     </div>
   );
 }

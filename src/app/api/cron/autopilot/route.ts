@@ -14,7 +14,7 @@ export const maxDuration = 300;
  * Each enabled workspace publishes at most one pin per tick, within its daily limit.
  */
 async function handle(request: Request) {
-  if (!cronAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await cronAuthorized(request))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSupabaseConfigured) return NextResponse.json({ error: "Autopilot needs Supabase" }, { status: 503 });
   const admin = getAdminSupabase();
   const deps = supabaseAutopilotDeps(admin);
