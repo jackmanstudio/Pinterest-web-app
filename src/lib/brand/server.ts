@@ -40,6 +40,27 @@ export async function brandPinImage(
   opts: { demo?: boolean; angle?: string } = {},
 ): Promise<GeneratedImage & { design: DesignReport }> {
   const size = opts.demo ? { width: 600, height: 900 } : PIN_IMAGE_SIZE;
-  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 90, angle: opts.angle, pagePhoto: img.source === "manual" });
+  const out = await composePin({ base: img.bytes, title, template: art.template, logo: art.logo, size, quality: opts.demo ? 72 : 92, angle: opts.angle, pagePhoto: img.source === "manual" });
   return { ...img, ...out };
+}
+
+/**
+ * Makes a branded pin and inspects it (sharpness, light, resolution, headline contrast).
+ * If the photo fails, one new image is made and the better-scoring pin is kept, so a weak
+ * pin is never delivered without a second try. Returns how many images were generated.
+ */
+export async function bestPinImage(
+  generate: () => Promise<GeneratedImage>,
+  title: string,
+  art: BrandArt,
+  opts: { angle?: string } = {},
+): Promise<{ image: GeneratedImage & { design: DesignReport }; attempts: number }> {
+  const raw = await generate();
+  let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle: opts.angle });
+  if (raw.source !== "ai" || !image.design.retryPhoto) return { image, attempts: 1 };
+  const second = await generate()
+    .then((r) => brandPinImage(r, title, art, { angle: opts.angle }))
+    .catch(() => null);
+  if (second && second.design.score > image.design.score) image = second;
+  return { image, attempts: second ? 2 : 1 };
 }

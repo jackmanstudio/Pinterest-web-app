@@ -59,14 +59,22 @@ export async function measurePhoto(img: Buffer): Promise<{ stats: PhotoStats; co
 }
 
 /** Crops the base image to the pin size, draws the design on top and self-checks it. Returns a JPEG. */
-export async function composePin({ base, title, template, logo, size, quality = 88, angle, pagePhoto }: ComposeInput): Promise<{
+export async function composePin({ base, title, template, logo, size, quality = 92, angle, pagePhoto }: ComposeInput): Promise<{
   bytes: Uint8Array;
   contentType: "image/jpeg";
   extension: "jpg";
   design: DesignReport;
 }> {
   const { width: W, height: H } = size;
-  const resized = await sharp(Buffer.from(base), { density: 144 }).resize(W, H, { fit: "cover", position: pagePhoto ? "north" : "attention" }).toBuffer();
+  const src = sharp(Buffer.from(base), { density: 144 });
+  const meta = await src.metadata().catch(() => null);
+  // High-quality Lanczos resize, then a gentle unsharp mask so the photo stays crisp on phones.
+  const resized = await src
+    .resize(W, H, { fit: "cover", position: pagePhoto ? "north" : "attention", kernel: "lanczos3" })
+    .sharpen({ sigma: 0.6, m1: 0.5, m2: 1.5 })
+    .toBuffer();
+  // Source pixels that end up in the pin (after the 2:3 crop), to flag images that had to be enlarged.
+  const sourceWidth = meta?.width && meta?.height ? Math.min(meta.width, (meta.height * W) / H) : null;
   const logoHref = logo ? `data:${logo.contentType};base64,${Buffer.from(logo.bytes).toString("base64")}` : null;
   const measured = await measurePhoto(resized).catch(() => null);
   const picked = title.trim() ? layoutFor(template, angle, title) : null;
@@ -83,6 +91,9 @@ export async function composePin({ base, title, template, logo, size, quality = 
   const out = await sharp(resized).composite([{ input: overlay }]).jpeg({ quality, mozjpeg: true }).toBuffer();
   const paletteName =
     template.palette === "auto" && measured ? paletteForColor(measured.color) : template.palette === "auto" ? "auto" : template.palette;
-  const design = designReport(measured?.stats ?? null, drawn?.meta ?? null, { paletteName: paletteName in PALETTE_COLORS || paletteName === "brand" ? paletteName : undefined });
+  const design = designReport(measured?.stats ?? null, drawn?.meta ?? null, {
+    paletteName: paletteName in PALETTE_COLORS || paletteName === "brand" ? paletteName : undefined,
+    resolution: sourceWidth ? sourceWidth / W : undefined,
+  });
   return { bytes: new Uint8Array(out), contentType: "image/jpeg", extension: "jpg", design };
 }

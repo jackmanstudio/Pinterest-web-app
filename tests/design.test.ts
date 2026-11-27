@@ -101,3 +101,30 @@ describe("pin sets", async () => {
     expect(r.drafts[0].title).toMatch(/Which One Wins/);
   });
 });
+
+describe("HD quality check", async () => {
+  const { designReport } = await import("@/lib/brand/check");
+  const { bestPinImage } = await import("@/lib/brand/server");
+  const { readTemplate } = await import("@/lib/brand/template");
+  const sharp = (await import("sharp")).default;
+  it("flags an enlarged (low-res) image and asks for a new one", () => {
+    const ok = { sharpness: 20, brightness: 0.5, saturation: 0.3, clipped: 0 };
+    expect(designReport(ok, null, { resolution: 1 }).checks.find((c) => c.id === "resolution")?.status).toBe("pass");
+    const small = designReport(ok, null, { resolution: 0.4 });
+    expect(small.checks.find((c) => c.id === "resolution")?.status).toBe("fail");
+    expect(small.retryPhoto).toBe(true);
+  });
+  it("remakes a weak AI photo once and keeps the better pin", async () => {
+    const flat = await sharp({ create: { width: 1024, height: 1536, channels: 3, background: "#000000" } }).png().toBuffer();
+    let calls = 0;
+    const gen = async () => {
+      calls++;
+      return { bytes: new Uint8Array(flat), contentType: "image/png", extension: "png", source: "ai" as const, provider: "t", model: "t", est_cost_usd: 0 };
+    };
+    const { image, attempts } = await bestPinImage(gen, "A Simple Test Title For Pins", { template: readTemplate({}), logo: null });
+    expect(calls).toBe(2);
+    expect(attempts).toBe(2);
+    const m = await sharp(Buffer.from(image.bytes)).metadata();
+    expect([m.width, m.height]).toEqual([1000, 1500]);
+  });
+});

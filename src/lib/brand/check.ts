@@ -12,7 +12,7 @@ export interface PhotoStats {
 }
 
 export interface DesignCheck {
-  id: "sharp" | "exposure" | "colour" | "readable" | "contrast" | "variety" | "eye";
+  id: "sharp" | "exposure" | "colour" | "resolution" | "readable" | "contrast" | "variety" | "eye";
   question: string;
   status: "pass" | "warn" | "fail" | "manual";
   detail: string;
@@ -23,7 +23,7 @@ export interface DesignReport {
   layout: string;
   palette: string;
   checks: DesignCheck[];
-  /** True when the photo itself is weak (blurry or badly exposed), so a new image is worth making. */
+  /** True when the photo itself is weak (blurry, badly exposed, low-res or too busy for the headline), so a new image is worth making. */
   retryPhoto: boolean;
 }
 
@@ -31,8 +31,18 @@ export interface DesignReport {
  * The pin self-check from the design guide ("Professional finishing").
  * Measurable items are scored; taste questions are listed for a human look.
  */
-export function designReport(photo: PhotoStats | null, meta: DesignMeta | null, opts: { paletteName?: string } = {}): DesignReport {
+export function designReport(photo: PhotoStats | null, meta: DesignMeta | null, opts: { paletteName?: string; resolution?: number } = {}): DesignReport {
   const checks: DesignCheck[] = [];
+  if (opts.resolution !== undefined) {
+    // Share of the pin's width covered by real source pixels (1 = HD, no upscaling).
+    const r = opts.resolution;
+    checks.push({
+      id: "resolution",
+      question: "Is the image HD (no upscaling)?",
+      status: r >= 0.95 ? "pass" : r >= 0.6 ? "warn" : "fail",
+      detail: r >= 0.95 ? "Full HD source image." : `The source image was enlarged ${(1 / r).toFixed(1)}× to fit the pin; it may look soft.`,
+    });
+  }
   if (photo) {
     checks.push(
       photo.sharpness >= 7
@@ -82,6 +92,7 @@ export function designReport(photo: PhotoStats | null, meta: DesignMeta | null, 
     layout: meta?.layout ?? "classic",
     palette: opts.paletteName ?? "",
     checks,
-    retryPhoto: checks.some((c) => (c.id === "sharp" || c.id === "exposure") && c.status === "fail"),
+    // Worth a new photo: blurry, badly lit, too small, or so busy that the headline can't be read on it.
+    retryPhoto: checks.some((c) => (c.id === "sharp" || c.id === "exposure" || c.id === "resolution" || c.id === "contrast") && c.status === "fail"),
   };
 }
