@@ -54,10 +54,10 @@ export async function POST(request: Request) {
     let result: GenerateResponse = await run();
     // One bounded retry if the model returned near-duplicates, only when the first call was quick
     // (a second slow call would keep the user waiting minutes).
-    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0 && Date.now() - started < 25_000) result = await run();
+    if (result.source === "ai" && findNearDuplicates(result.drafts).length > 0 && Date.now() - started < 12_000) result = await run();
     // Stray letters from another script (e.g. Chinese inside Urdu): retry once if there is time, then strip them.
     const lang = parsed.data.language || parsed.data.brand.language;
-    if (result.source === "ai" && draftsHaveStray(result.drafts, lang) && Date.now() - started < 60_000) {
+    if (result.source === "ai" && draftsHaveStray(result.drafts, lang) && Date.now() - started < 20_000) {
       const again = await run().catch(() => null);
       if (again && !draftsHaveStray(again.drafts, lang)) result = again;
     }

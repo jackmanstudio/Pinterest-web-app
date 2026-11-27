@@ -7,6 +7,7 @@ import { CopyButton, pinAsText } from "./CopyButton";
 import { downloadImage } from "@/lib/client/download";
 import type { DesignReport } from "@/lib/brand/check";
 import { toHashtag } from "@/lib/drafts/hashtag";
+import { overlaySvg, readTemplate } from "@/lib/brand/template";
 
 interface Props {
   store: Store;
@@ -16,10 +17,34 @@ interface Props {
   /** Design self-check for the image just made. */
   design?: DesignReport;
   onRetry: () => void;
+  /** The brand's pin template, so the card can show the finished design while the photo is made. */
+  template?: unknown;
+  /** When this card started waiting for its image (ms), for the live seconds counter. */
+  startedAt?: number;
+}
+
+/** Shows the pin's real headline and layout at once, over a soft moving gradient, until the photo lands. */
+function PendingPin({ draft, template, startedAt }: { draft: PinDraft; template?: unknown; startedAt?: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const svg = overlaySvg({ width: 400, height: 600, title: draft.title, template: readTemplate(template), angle: draft.angle, tone: { top: 0.35, middle: 0.35, bottom: 0.35 } });
+  const secs = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : null;
+  return (
+    <div className="relative h-full w-full overflow-hidden">
+      <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-stone-500 via-zinc-600 to-stone-800" />
+      <div className="absolute inset-0 [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white">
+        Adding photo…{secs !== null ? ` ${secs}s` : ""}
+      </span>
+    </div>
+  );
 }
 
 /** Read-only preview of a finished pin from the one-step flow. */
-export function AutoPinCard({ store, draft, error, disabled, onRetry, design }: Props) {
+export function AutoPinCard({ store, draft, error, disabled, onRetry, design, template, startedAt }: Props) {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,7 +70,7 @@ export function AutoPinCard({ store, draft, error, disabled, onRetry, design }: 
             </button>
           </div>
         ) : (
-          <div className="flex h-full animate-pulse items-center justify-center text-xs text-zinc-500">Making image…</div>
+          <PendingPin draft={draft} template={template} startedAt={startedAt} />
         )}
       </div>
       <div className="flex flex-col gap-1.5 p-3">

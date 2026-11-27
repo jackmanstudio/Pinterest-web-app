@@ -44,6 +44,10 @@ interface AutoRun {
   drafts: PinDraft[];
   imageErrors: Record<string, string>;
   imagesDone: number;
+  /** Timestamps (ms) for the live counters and the "done in Xs" summary. */
+  startedAt?: number;
+  imagesStartedAt?: number;
+  finishedAt?: number;
   designs: Record<string, DesignReport>;
 }
 
@@ -230,7 +234,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     setError(null);
     setNotice(null);
     setBatch(null);
-    let run: AutoRun = { phase: "writing", idea: theIdea, result: null, drafts: [], imageErrors: {}, imagesDone: 0, designs: {} };
+    let run: AutoRun = { phase: "writing", idea: theIdea, result: null, drafts: [], imageErrors: {}, imagesDone: 0, designs: {}, startedAt: Date.now() };
     const update = (patch: Partial<AutoRun>) => {
       run = { ...run, ...patch };
       setAuto(run);
@@ -245,7 +249,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         workspace.id,
         result.drafts.map((d) => ({ ...d, idea: theIdea, batch_id: batchId, category_id: cat.id, source: result.source, link: cleanLink })),
       );
-      update({ phase: "images", drafts: saved });
+      update({ phase: "images", drafts: saved, imagesStartedAt: Date.now() });
       // Plan a board for each new pin in the background (spec 11). Failures never block pin making.
       autoPlanBoards(store, workspace.id, kind, saved).catch(() => {});
       setIdea("");
@@ -264,7 +268,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
             designs: r.design ? { ...run.designs, [r.draft.id]: r.design } : run.designs,
           }),
       );
-      update({ phase: "done" });
+      update({ phase: "done", finishedAt: Date.now() });
     } catch (e) {
       if (!run.drafts.length) setAuto(null);
       else update({ phase: "done" });
@@ -544,6 +548,11 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               {auto.phase === "images" && `Making images: ${auto.imagesDone} of ${auto.drafts.length} done…`}
               {auto.phase === "done" &&
                 `Done. ${auto.drafts.filter((d) => d.image_status === "ready").length} of ${auto.drafts.length} pins have images, saved as drafts in ${labelFromSlug(kind)}.`}
+              {auto.phase === "done" && auto.startedAt && auto.imagesStartedAt && auto.finishedAt && (
+                <span className="ml-1 text-zinc-500">
+                  Took {Math.round((auto.finishedAt - auto.startedAt) / 1000)}s (text {Math.round((auto.imagesStartedAt - auto.startedAt) / 1000)}s, images {Math.round((auto.finishedAt - auto.imagesStartedAt) / 1000)}s).
+                </span>
+              )}
             </span>
             {auto.result && <SourceBadge source={auto.result.source} />}
           </div>
@@ -552,12 +561,21 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               <strong>Demo output.</strong> Text comes from templates and images are placeholders until the AI keys are added on the server.
             </p>
           )}
-          {auto.drafts.length > 0 && (
+          {auto.drafts.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {auto.drafts.map((d) => (
-                <AutoPinCard key={d.id} store={store!} draft={d} design={auto.designs[d.id]} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} />
+                <AutoPinCard key={d.id} store={store!} draft={d} design={auto.designs[d.id]} error={auto.imageErrors[d.id]} onRetry={() => retryImage(d)} disabled={busy !== "idle"} template={brand?.pin_template} startedAt={auto.imagesStartedAt} />
               ))}
             </div>
+          ) : (
+            auto.phase !== "done" && (
+              // Pin-shaped placeholders right away, so the page never looks idle while the text is written.
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5" aria-hidden>
+                {Array.from({ length: count }, (_, i) => (
+                  <div key={i} className="aspect-[2/3] animate-pulse rounded-xl bg-gradient-to-br from-zinc-200 to-zinc-300" />
+                ))}
+              </div>
+            )
           )}
           {auto.phase === "done" && (
             <div className="flex flex-wrap gap-3">

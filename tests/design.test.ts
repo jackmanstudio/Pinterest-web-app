@@ -128,3 +128,28 @@ describe("HD quality check", async () => {
     expect([m.width, m.height]).toEqual([1000, 1500]);
   });
 });
+
+describe("fast pins", async () => {
+  const { bestPinImage, REMAKE_WITHIN_MS } = await import("@/lib/brand/server");
+  const { readTemplate } = await import("@/lib/brand/template");
+  const sharp = (await import("sharp")).default;
+  it("never waits for a second image when the first one was slow", async () => {
+    const flat = await sharp({ create: { width: 896, height: 1344, channels: 3, background: "#000000" } }).png().toBuffer();
+    let calls = 0;
+    const real = Date.now;
+    let fake = real();
+    Date.now = () => fake;
+    try {
+      const gen = async () => {
+        calls++;
+        fake += REMAKE_WITHIN_MS + 1;
+        return { bytes: new Uint8Array(flat), contentType: "image/png", extension: "png", source: "ai" as const, provider: "t", model: "t", est_cost_usd: 0 };
+      };
+      const { attempts } = await bestPinImage(gen, "A Simple Test Title For Pins", { template: readTemplate({}), logo: null });
+      expect(calls).toBe(1);
+      expect(attempts).toBe(1);
+    } finally {
+      Date.now = real;
+    }
+  });
+});

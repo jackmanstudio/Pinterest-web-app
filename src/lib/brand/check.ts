@@ -39,8 +39,8 @@ export function designReport(photo: PhotoStats | null, meta: DesignMeta | null, 
     checks.push({
       id: "resolution",
       question: "Is the image HD (no upscaling)?",
-      status: r >= 0.95 ? "pass" : r >= 0.6 ? "warn" : "fail",
-      detail: r >= 0.95 ? "Full HD source image." : `The source image was enlarged ${(1 / r).toFixed(1)}× to fit the pin; it may look soft.`,
+      status: r >= 0.85 ? "pass" : r >= 0.6 ? "warn" : "fail",
+      detail: r >= 0.85 ? "HD source image." : `The source image was enlarged ${(1 / r).toFixed(1)}× to fit the pin; it may look soft.`,
     });
   }
   if (photo) {

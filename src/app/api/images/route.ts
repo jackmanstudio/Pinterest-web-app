@@ -31,6 +31,7 @@ const Body = z.object({
 });
 
 export async function POST(request: Request) {
+  const tStart = Date.now();
   const limitedRes = rateLimited(request, "images");
   if (limitedRes) return limitedRes;
   const parsed = Body.safeParse(await request.json().catch(() => null));
@@ -70,10 +71,14 @@ export async function POST(request: Request) {
       prompt = draft.image_prompt;
       title = draft.title;
       angle = draft.angle;
-      art = await brandArtFor(ctx.db, workspaceId!);
-      const { data: b } = await ctx.db.from("brand_settings").select("image_style").eq("workspace_id", workspaceId).maybeSingle();
+      // Independent reads and the "pending" mark run together (one round trip instead of three).
+      const [brandArt, { data: b }] = await Promise.all([
+        brandArtFor(ctx.db, workspaceId!),
+        ctx.db.from("brand_settings").select("image_style").eq("workspace_id", workspaceId).maybeSingle(),
+        ctx.db.from("pin_drafts").update({ image_status: "pending" }).eq("id", draftId).eq("workspace_id", workspaceId),
+      ]);
+      art = brandArt;
       imageStyle = (b?.image_style as string | undefined) ?? "";
-      await ctx.db.from("pin_drafts").update({ image_status: "pending" }).eq("id", draftId).eq("workspace_id", workspaceId);
       markFailed = async () => {
         await ctx.db.from("pin_drafts").update({ image_status: "failed" }).eq("id", draftId).eq("workspace_id", workspaceId);
       };
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
       }
     }
     if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
+    const tPrep = Date.now();
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
     // Real images are always full size (1000×1500); only labelled placeholders are kept small.
     // AI pins are quality-checked; a weak photo (blurry, dark, low-res, headline hard to read) is remade once.
@@ -109,19 +115,18 @@ export async function POST(request: Request) {
     if (pagePhotoRaw) image = await brandPinImage(pagePhotoRaw, title, art, { angle });
     else ({ image, attempts } = await bestPinImage(generate, title, art, { angle }));
 
+    const tImage = Date.now();
     let imagePath: string;
     let imageUrl: string;
     if (ctx.mode === "supabase") {
       imagePath = `${workspaceId}/${draftId}-${Date.now()}.${image.extension}`;
       const up = await ctx.db.storage.from(IMAGE_BUCKET).upload(imagePath, image.bytes, { contentType: image.contentType, upsert: false });
       if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);
-      const upd = await ctx.db
-        .from("pin_drafts")
-        .update({ image_status: "ready", image_path: imagePath, image_source: image.source })
-        .eq("id", draftId)
-        .eq("workspace_id", workspaceId);
+      const [upd, signed] = await Promise.all([
+        ctx.db.from("pin_drafts").update({ image_status: "ready", image_path: imagePath, image_source: image.source }).eq("id", draftId).eq("workspace_id", workspaceId),
+        ctx.db.storage.from(IMAGE_BUCKET).createSignedUrl(imagePath, 60 * 60),
+      ]);
       if (upd.error) throw new Error(upd.error.message);
-      const signed = await ctx.db.storage.from(IMAGE_BUCKET).createSignedUrl(imagePath, 60 * 60);
       if (signed.error) throw new Error(signed.error.message);
       imageUrl = signed.data.signedUrl;
     } else {
@@ -134,7 +139,13 @@ export async function POST(request: Request) {
       workspace_id: workspaceId, workspace_kind: workspace, kind: "image", provider: image.provider, model: image.model, source: image.source,
       input_tokens: 0, output_tokens: 0, images: attempts, est_cost_usd: image.est_cost_usd * attempts, status: "ok", error: null,
     });
-    return NextResponse.json({ source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl, design: image.design, notice });
+    // Where the time went, so slow pins can be traced in the Vercel logs.
+    const timings = { prep_ms: tPrep - tStart, image_ms: tImage - tPrep, save_ms: Date.now() - tImage, total_ms: Date.now() - tStart, images: attempts };
+    console.info(JSON.stringify({ event: "image_timing", provider: image.provider, ...timings }));
+    return NextResponse.json(
+      { source: image.source, provider: image.provider, image_status: "ready", image_path: imagePath, image_url: imageUrl, design: image.design, notice, timings },
+      { headers: { "Server-Timing": `prep;dur=${timings.prep_ms}, image;dur=${timings.image_ms}, save;dur=${timings.save_ms}` } },
+    );
   } catch (err) {
     if (!(err instanceof HttpError && (err.status === 404 || err.status === 409))) await markFailed().catch(() => {});
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
