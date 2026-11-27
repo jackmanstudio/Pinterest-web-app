@@ -2,6 +2,7 @@ import type { DraftContent } from "@/lib/types";
 import { LIMITS } from "./validation";
 import { reviewDraft, type QualityCheck, type QualityContext } from "./quality";
 import { ensureSeoTitle, mainKeyword, specificTail, tidyTitle } from "./tidyTitle";
+import { GENERIC_PHRASES, splitIdea } from "@/lib/seo/keywords";
 
 /**
  * One-click fixes for the Pin score checks. Rule-based and predictable:
@@ -33,6 +34,12 @@ export interface FixResult {
 const LATIN = /^[\p{Script=Latin}\d\s\p{P}\p{S}]*$/u;
 const STOP = new Set(["the", "and", "for", "with", "your", "you", "this", "that", "are", "from", "into", "how", "what", "will", "can", "all", "our", "its", "a", "an", "to", "of", "in", "on", "is", "at", "by", "or"]);
 const CLAIMS = ["guaranteed", "guarantee", "100%", "miracle", "risk-free", "risk free", "get rich", "overnight results", "doctor recommended", "clinically proven"];
+const CLICHES = [
+  "elevate your style", "must-have", "must have", "game-changer", "game changer", "look no further", "next level",
+  "effortlessly chic", "you won't believe", "you wont believe", "unleash", "in today's world",
+];
+/** Keep at most this many uses of one word in the description (the check flags 4+). */
+const MAX_REPEAT = 3;
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const clean = (s: string) =>
@@ -40,6 +47,9 @@ const clean = (s: string) =>
     .replace(/\b([\p{L}\p{N}']+)(\s+\1\b)+/giu, "$1")
     .replace(/([!?])[!?]+/g, "$1")
     .replace(/[!?.]+\s*:/g, ":")
+    .replace(/([,;:])(\s*[,;:])+/g, "$1")
+    .replace(/(^|[.!?]\s+)[,;:]\s*/g, "$1")
+    .replace(/\b(and|or|with)\s+(?=[,.!?;:]|$)/gi, "")
     .replace(/\s+([,.!?:;])/g, "$1")
     .replace(/[ \t]{2,}/g, " ")
     .trim();
@@ -72,6 +82,34 @@ function topicWords(...parts: string[]): string[] {
         out.push(w);
       }
   return out;
+}
+
+const contentWords = (s: string) =>
+  s.toLowerCase().replace(/[^a-z0-9'\s-]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w) && w !== "it's");
+
+/** Drops extra uses of any word that repeats 4+ times, keeping the first few so the text still reads well. */
+function destuff(text: string): { text: string; words: string[] } {
+  const counts = new Map<string, number>();
+  for (const w of contentWords(text)) counts.set(w, (counts.get(w) ?? 0) + 1);
+  const stuffed = [...counts].filter(([, n]) => n > MAX_REPEAT).map(([w]) => w);
+  let out = text;
+  for (const w of stuffed) {
+    let seen = 0;
+    out = out.replace(new RegExp(`(^|[^a-z0-9'-])(${esc(w)})(?=[^a-z0-9'-]|$)`, "gi"), (m, pre: string) => (++seen <= MAX_REPEAT ? m : pre));
+  }
+  out = clean(out).replace(/(^|[.!?]\s+)([a-z])/g, (_m, a: string, b: string) => a + b.toUpperCase());
+  return { text: out, words: stuffed };
+}
+
+/** Moves the idea's main keyword to the start of a long title, where search and phones show it. */
+function keywordFirst(title: string, idea: string): string {
+  const primary = idea ? splitIdea(idea).head : "";
+  if (!primary) return title;
+  const at = title.toLowerCase().indexOf(primary);
+  if (at < 0 || at + primary.length <= 40) return title;
+  const rest = clean(title.slice(0, at) + " " + title.slice(at + primary.length)).replace(/^[,;:–—-]\s*|\s*[,;:–—-]$/g, "");
+  const lead = mainKeyword(primary) || primary;
+  return rest ? `${lead}: ${rest}` : lead;
 }
 
 export function normaliseLink(url?: string | null): string | null {
@@ -118,13 +156,25 @@ export function autoFixDraft(d: DraftContent, link: string | null | undefined, c
         }
       }
     }
+    if (english) {
+      const tg = removeClaims(title, [...GENERIC_PHRASES, ...CLICHES]);
+      if (tg !== title && tg.length >= 15) {
+        title = tg;
+        whyTitle.push("removed generic wording");
+      }
+      const tf = keywordFirst(title, idea);
+      if (tf !== title && tf.length <= LIMITS.title) {
+        title = tf;
+        whyTitle.push("main keyword moved to the start");
+      }
+    }
     title = clean(title);
     if (title.length > LIMITS.title) title = cutAt(title, LIMITS.title);
     title = title.charAt(0).toUpperCase() + title.slice(1);
     if (title !== t0) {
       if (t0.length < 40 && title.length > t0.length) whyTitle.push(`longer, with the main keyword (${title.length} characters)`);
       else if (t0.length > LIMITS.title) whyTitle.push(`shortened to ${title.length} characters`);
-      else whyTitle.push("cleaned up spelling, case and keyword");
+      else if (!whyTitle.length) whyTitle.push("cleaned up spelling, case and keyword");
     }
   }
   if (title !== d.title) changes.push({ field: "Title", before: d.title, after: title, why: whyTitle.join("; ") || "tidied" });
@@ -139,6 +189,13 @@ export function autoFixDraft(d: DraftContent, link: string | null | undefined, c
     whyDesc.push("moved hashtags to tags");
   }
   desc = removeClaims(clean(desc), strip);
+  if (english && desc) {
+    const dg = removeClaims(desc, [...GENERIC_PHRASES, ...CLICHES]);
+    if (dg !== desc) {
+      desc = dg;
+      whyDesc.push("removed generic wording");
+    }
+  }
   if (english) {
     if (!desc) {
       desc = `${title}.`;
@@ -158,6 +215,11 @@ export function autoFixDraft(d: DraftContent, link: string | null | undefined, c
         whyDesc.push("made longer for search");
       }
     }
+  }
+  const ds = destuff(desc);
+  if (ds.words.length) {
+    desc = ds.text;
+    whyDesc.push(`“${ds.words.join("”, “")}” no longer repeats ${MAX_REPEAT + 1}+ times`);
   }
   if (desc.length > LIMITS.description) {
     desc = cutAt(desc, LIMITS.description);

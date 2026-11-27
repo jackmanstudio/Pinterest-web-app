@@ -125,20 +125,20 @@ export function QualityScoreCard({ draft, ctx, fix }: { draft: DraftContent; ctx
 
           {fix?.result && <FixSummary result={fix.result} onUndo={fix.onUndo} />}
 
-          {fix && issues.length > 0 && (
+          <p className="text-[11.5px] leading-snug text-white/40">Automatic text checks only. Look at the image yourself; a good score does not guarantee reach.</p>
+        </div>
+      )}
+      {fix && issues.length > 0 && (fix.available || fix.busy || open) && (
             <button
               type="button"
               onClick={fix.onFix}
               disabled={fix.busy || !fix.available}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3 py-2 text-[13px] font-bold text-white shadow-[0_8px_20px_-10px_rgba(255,90,60,0.9)] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#e60023] to-[#ff7a45] px-3 py-2 text-[13px] font-bold text-white shadow-[0_8px_20px_-10px_rgba(255,90,60,0.9)] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
             >
               <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m15 4 5 5L9 20H4v-5z" /><path d="m13 6 5 5" /></svg>
-              {fix.busy ? "Fixing…" : fix.available ? "Fix issues" : "Nothing left to fix automatically"}
+              {fix.busy ? "Fixing…" : fix.available ? "Auto-fix & re-score" : "Nothing left to fix automatically"}
             </button>
           )}
-          <p className="text-[11.5px] leading-snug text-white/40">Automatic text checks only. Look at the image yourself; a good score does not guarantee reach.</p>
-        </div>
-      )}
     </div>
   );
 }
