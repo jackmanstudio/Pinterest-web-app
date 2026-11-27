@@ -12,6 +12,7 @@ import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import type { UsageEntry } from "@/lib/usage/ledger";
 import { estimateTextCost } from "@/lib/usage/pricing";
 import type { GenerateResponse } from "@/lib/types";
+import { errorResponse } from "@/lib/server/errors";
 
 // Non-English pins can take over a minute on the free text model.
 export const maxDuration = 150;
@@ -83,7 +84,6 @@ export async function POST(request: Request) {
     if (err instanceof ProviderError) {
       return NextResponse.json({ error: err.message, retryable: err.retryable }, { status: err.status });
     }
-    console.error("generate failed", err);
-    return NextResponse.json({ error: "Generation failed. Please retry.", retryable: true }, { status: 500 });
+    return errorResponse(err, request, "Generation failed. Please retry.");
   }
 }

@@ -23,6 +23,7 @@ import { estimateTextCost } from "@/lib/usage/pricing";
 import { WORKSPACE_NICHES, type Category } from "@/lib/types";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
 import { detectCategory } from "@/lib/categories/taxonomy";
+import { errorResponse } from "@/lib/server/errors";
 
 const s = (n: number) => z.string().max(n);
 const Body = z.object({
@@ -141,7 +142,6 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
     if (err instanceof BudgetExceededError) return NextResponse.json({ error: err.message }, { status: 402 });
-    console.error("board assign failed", err);
-    return NextResponse.json({ error: "Board assignment failed. Please retry." }, { status: 500 });
+    return errorResponse(err, request, "Board assignment failed. Please retry.");
   }
 }

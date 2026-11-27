@@ -8,6 +8,7 @@ import { PinterestApiError, type PinterestBoard } from "@/lib/pinterest/api";
 import { HttpError } from "@/lib/server/context";
 import { getAdminSupabase } from "@/lib/supabase/admin";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
+import { reportError } from "@/lib/server/errors";
 
 const Body = z.object({
   workspace: WorkspaceSlug,
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       void _skip;
       up = await admin.from("pinterest_boards").upsert(legacy, { onConflict: "workspace_id,board_id" });
     }
-    if (up.error) console.error("board saved on Pinterest but not locally", up.error.message);
+    if (up.error) await reportError(new Error(`Board saved on Pinterest but not locally: ${up.error.message}`), { route: "/api/pinterest/boards", method: "POST", status: 200, context: { code: up.error.code } });
     const audit = await admin.from("audit_events").insert({
       workspace_id: workspaceId,
       actor_id: ctx.mode === "supabase" ? ctx.user.id : null,
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
       target_id: board.id,
       details: { name: board.name, privacy: row.privacy },
     });
-    if (audit.error) console.error("audit insert failed", audit.error.message);
+    if (audit.error) await reportError(new Error(`Audit insert failed: ${audit.error.message}`), { route: "/api/pinterest/boards", method: "POST", status: 200 });
     return NextResponse.json({ board: { board_id: board.id, name: board.name, description: row.description, privacy: row.privacy } });
   } catch (err) {
     const msg = describePinterestError(err);

@@ -13,6 +13,7 @@ import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/li
 import { readTemplate } from "@/lib/brand/template";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { PhotoError, pagePhoto as fetchPagePhoto } from "@/lib/tools/pagePhoto";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({
   workspace: WorkspaceSlug,
@@ -148,7 +149,6 @@ export async function POST(request: Request) {
       })
       .catch(() => {});
     if (err instanceof ProviderError) return NextResponse.json({ error: err.message, retryable: err.retryable }, { status: err.status });
-    console.error("image generation failed", err);
-    return NextResponse.json({ error: "Image generation failed. Please retry.", retryable: true }, { status: 500 });
+    return errorResponse(err, request, "Image generation failed. Please retry.", { workspace, provider: provider.name });
   }
 }

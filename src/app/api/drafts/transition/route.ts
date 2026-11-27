@@ -13,6 +13,7 @@ import { publishBlockers, validateRunAt } from "@/lib/workflow/checks";
 import { runPublishJob } from "@/lib/workflow/runner";
 import { audit, supabaseRunnerDeps } from "@/lib/workflow/server";
 import { LIVE_ACTIONS, nextStatus, type WorkflowAction } from "@/lib/workflow/transitions";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({
   workspace: WorkspaceSlug,
@@ -134,7 +135,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: outcome.status === "failed" ? `Publishing failed: ${outcome.error}` : "Publishing is already in progress." }, { status: 502 });
   } catch (err) {
     if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
-    console.error("transition failed", err);
-    return NextResponse.json({ error: describePinterestError(err) }, { status: 500 });
+    return errorResponse(err, request, describePinterestError(err));
   }
 }
