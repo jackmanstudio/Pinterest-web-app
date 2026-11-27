@@ -6,6 +6,7 @@ import { SourceBadge } from "./DraftEditor";
 import { CopyButton, pinAsText } from "./CopyButton";
 import { downloadImage } from "@/lib/client/download";
 import type { DesignReport } from "@/lib/brand/check";
+import { toHashtag } from "@/lib/drafts/hashtag";
 
 interface Props {
   store: Store;
@@ -51,7 +52,7 @@ export function AutoPinCard({ store, draft, error, disabled, onRetry, design }: 
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{draft.angle}</p>
         <h3 className="text-sm font-semibold leading-snug">{draft.title}</h3>
         <p className="line-clamp-3 text-xs text-zinc-600">{draft.description}</p>
-        <p className="line-clamp-2 text-xs text-zinc-500">{draft.tags.map((t) => `#${t.replace(/\s+/g, "")}`).join(" ")}</p>
+        <p className="line-clamp-2 text-xs text-zinc-500">{draft.tags.map(toHashtag).filter(Boolean).join(" ")}</p>
         <div className="flex flex-wrap gap-1">
           <SourceBadge source={draft.source} />
           {draft.image_source && draft.image_status === "ready" && <SourceBadge source={draft.image_source} what="image" />}

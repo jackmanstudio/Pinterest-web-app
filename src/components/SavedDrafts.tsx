@@ -13,6 +13,7 @@ import { useTrendKeywords } from "@/lib/client/useTrendKeywords";
 import { downloadFile, downloadImage as saveImage } from "@/lib/client/download";
 import { autoFixDraft, type FixContext, type FixResult } from "@/lib/drafts/autofix";
 import { reviewDraft } from "@/lib/drafts/quality";
+import { WorkspaceError } from "./WorkspaceError";
 
 const pick = (d: PinDraft): DraftContent => ({
   angle: d.angle, concept: d.concept, title: d.title, description: d.description, tags: d.tags, alt_text: d.alt_text, image_prompt: d.image_prompt,
@@ -72,7 +73,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
   const visible = useMemo(() => (drafts ? filterDrafts(drafts, filter, childIds) : []), [drafts, filter, categories]); // eslint-disable-line react-hooks/exhaustive-deps
   const dupes = useMemo(() => libraryDuplicates(drafts ?? []), [drafts]);
 
-  if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
+  if (wsError) return <WorkspaceError error={wsError} />;
   if (!store || !workspace || !drafts) return <p className="text-zinc-500">Loading pin library…</p>;
 
   const replace = (u: PinDraft) => setDrafts((all) => all!.map((x) => (x.id === u.id ? u : x)));
