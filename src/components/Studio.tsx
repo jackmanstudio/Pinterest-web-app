@@ -1,7 +1,7 @@
 "use client";
 import { PageTitle } from "./PageTitle";
 import { autoPlanBoards } from "@/lib/client/boards";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { BrandSettings, Category, DraftContent, GenerateResponse, PinDraft, WorkspaceKind } from "@/lib/types";
 import { detectCategory } from "@/lib/categories/taxonomy";
@@ -85,9 +85,24 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [usePhotos, setUsePhotos] = useState(true);
 
+  // Shown under the address box, with its own Retry (the main error's Retry makes pins).
+  const [pageError, setPageError] = useState<string | null>(null);
+  // The main error box sits at the bottom of the form, below the fold on a laptop: bring it into view when it appears.
+  const errorBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (error) errorBox.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
+  // On a phone the results start far below the form: show progress as soon as a run starts.
+  const resultsRef = useRef<HTMLElement>(null);
+  const runKey = busy === "auto" ? "auto" : batch ? `text-${batch.id}` : null;
+  useEffect(() => {
+    if (runKey) setTimeout(() => resultsRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 50);
+  }, [runKey]);
+
   async function readPage() {
     setReading(true);
     setError(null);
+    setPageError(null);
     try {
       const res = await fetch("/api/tools/read-page", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: pageUrl }) });
       const body = await res.json().catch(() => ({}));
@@ -100,7 +115,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       setUsePhotos(p.images.length > 0);
     } catch (e) {
       setPage(null);
-      setError({ message: (e as Error).message, retryable: true });
+      setPageError((e as Error).message);
     } finally {
       setReading(false);
     }
@@ -330,6 +345,12 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
               <input id="page-url" type="url" inputMode="url" className="au-field h-11 w-full min-w-0 px-4 text-sm sm:flex-1" placeholder="https://yourblog.com/post or a product page" value={pageUrl} onChange={(e) => setPageUrl(e.target.value)} />
               <button disabled={reading || pageUrl.trim().length < 4} className="h-11 rounded-[0.875rem] bg-white/[0.1] px-5 text-sm font-semibold text-white ring-1 ring-white/15 hover:bg-white/[0.16] disabled:opacity-50">{reading ? "Reading…" : "Read page"}</button>
             </form>
+            {pageError && (
+              <div className="flex flex-wrap items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+                <span>{pageError}</span>
+                <button type="button" className="underline" onClick={readPage}>Retry</button>
+              </div>
+            )}
             {page && (
               <div className="flex flex-col gap-2 text-sm">
                 <p>
@@ -502,7 +523,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
         </div>
         <TrendIdeas kind={kind} niche={workspace.niche} store={store!} workspaceId={workspace.id} onPick={setIdea} />
         {error && (
-          <div className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
+          <div ref={errorBox} className="mt-3 flex items-center gap-3 rounded-md bg-red-50 p-3 text-sm text-red-800" role="alert">
             <span>{error.message}</span>
             {error.retryable && (
               <button className="underline" onClick={batch ? save : auto ? makeAll : generate}>Retry</button>
@@ -513,7 +534,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       </section>
 
       {auto && (
-        <section className="flex flex-col gap-4" aria-live="polite">
+        <section ref={resultsRef} className="flex scroll-mt-20 flex-col gap-4" aria-live="polite">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-lg font-semibold">“{auto.idea}”</h2>
             <span className="text-sm text-zinc-600">
@@ -565,7 +586,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
       )}
 
       {batch && (
-        <section className="flex flex-col gap-4">
+        <section ref={resultsRef} className="flex scroll-mt-20 flex-col gap-4">
           {batch.result.source === "demo" && (
             <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
               <strong>Demo output.</strong> No text AI key is configured, so these drafts come from fixed templates, not AI. Add

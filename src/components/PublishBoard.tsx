@@ -288,6 +288,13 @@ function PinCard({ kind, store, draft, pin, plan, onChanged }: { kind: Workspace
           {confirming === "approve" ? (
             <span className="flex flex-wrap items-center gap-2 text-sm">
               Approve this pin for publishing?
+              {(!url || !draft.description.trim()) && (
+                <span className="basis-full rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                  {!url ? "It has no image yet, and Pinterest needs one. " : ""}
+                  {!draft.description.trim() ? "It has no description. " : ""}
+                  Fix it in the Pin library first, or approve now and fix it before scheduling.
+                </span>
+              )}
               <button disabled={busy} onClick={() => act("approve")} className={`${btn} bg-emerald-700 text-white`}>Yes, approve</button>
               <button onClick={() => setConfirming(null)} className="text-sm underline">Cancel</button>
             </span>

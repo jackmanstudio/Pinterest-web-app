@@ -24,6 +24,8 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [filling, setFilling] = useState(false);
+  // Shown right under "Fill brand from my website", not at the bottom of the form.
+  const [siteMsg, setSiteMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [designKey, setDesignKey] = useState(0);
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
   /** Brand analysis from the website: suggestions only, saved when you click Save. */
   async function fillFromSite() {
     setFilling(true);
-    setMsg(null);
+    setSiteMsg(null);
     try {
       const res = await fetch("/api/tools/brand-from-site", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: brand!.website_url, workspace: kind }) });
       const s = await res.json().catch(() => ({}));
@@ -99,9 +101,9 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       setDesignKey((k) => k + 1);
       const kept = "Fields you had already filled were kept.";
       const base = filled.length ? `Filled from your site: ${filled.join(", ")}. ${kept} Check them, then Save.` : `Nothing new to fill: ${kept}`;
-      setMsg({ text: s.analysis_note ? `${base} ${s.analysis_note}` : base, ok: true });
+      setSiteMsg({ text: s.analysis_note ? `${base} ${s.analysis_note}` : base, ok: true });
     } catch (e) {
-      setMsg({ text: (e as Error).message, ok: false });
+      setSiteMsg({ text: (e as Error).message, ok: false });
     } finally {
       setFilling(false);
     }
@@ -113,7 +115,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       await store!.saveBrand(workspace!.id, next);
       if (displayName.trim() && displayName.trim() !== workspace!.name) await store!.renameWorkspace(workspace!.id, displayName);
       setBrand(next);
-      setMsg({ text: `${labelFromSlug(kind)} brand settings saved.`, ok: true });
+      setMsg({ text: `${displayName.trim() || workspace?.name || labelFromSlug(kind)} brand settings saved.`, ok: true });
     } catch (e) {
       setMsg({ text: (e as Error).message, ok: false });
     }
@@ -169,6 +171,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         <button type="button" onClick={fillFromSite} disabled={filling || !brand.website_url.trim()} className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium disabled:opacity-50">
           {filling ? "Reading your site…" : "Fill brand from my website"}
         </button>
+        {siteMsg && <p className={`text-sm ${siteMsg.ok ? "text-emerald-700" : "text-red-700"}`} role="status">{siteMsg.text}</p>}
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700">
           Focus keywords (comma separated)
           <input className={input} value={kw} onChange={(e) => setKw(e.target.value)} />

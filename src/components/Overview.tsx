@@ -102,6 +102,9 @@ export function Overview() {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return setAddErr("Give the account a name, e.g. your Pinterest username or niche.");
+    // Two accounts with the same name can't be told apart in the switcher or the delete prompt.
+    if (rows?.some((r) => r.workspace.name.trim().toLowerCase() === name.toLowerCase()))
+      return setAddErr(`You already have an account called “${name}”. Pick a different name, e.g. add the niche or country.`);
     setAdding(true);
     setAddErr(null);
     try {

@@ -1,4 +1,4 @@
-import { assertPublicHost } from "./urlCheck";
+import { assertPublicHost, HostNotFound } from "./urlCheck";
 
 export class FetchBlocked extends Error {}
 
@@ -40,7 +40,8 @@ export async function safeFetch(
   for (let hop = 0; hop <= 5; hop++) {
     try {
       await assertPublicHost(url.hostname);
-    } catch {
+    } catch (e) {
+      if (e instanceof HostNotFound) throw new FetchBlocked(`We couldn't find the website “${e.host}”. Check the address for a typo.`);
       throw new FetchBlocked("That address points to a private network and can't be read.");
     }
     const r = await fetchImpl(url, {
