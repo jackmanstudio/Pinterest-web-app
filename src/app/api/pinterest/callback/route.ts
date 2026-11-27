@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { pinterestContext } from "@/lib/pinterest/server";
+import { tokenEncryptionKey } from "@/lib/pinterest/config";
 import { STATE_COOKIE, verifyState } from "@/lib/pinterest/state";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { getRequestContext, HttpError } from "@/lib/server/context";
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
   try {
     const ctx = await getRequestContext();
     if (ctx.mode !== "supabase") throw new HttpError(503, "Supabase required");
-    const secret = process.env.TOKEN_ENCRYPTION_KEY ?? "";
+    const secret = tokenEncryptionKey() ?? "";
     const st = verifyState(raw, url.searchParams.get("state"), ctx.user.id, secret);
     if (!st || !isWorkspaceKind(st.workspace)) return back(null, "error=" + encodeURIComponent("Connection expired or invalid. Please try again."));
 

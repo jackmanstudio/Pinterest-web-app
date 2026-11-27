@@ -6,6 +6,8 @@
  *  - sandbox:   api-sandbox.pinterest.com (Trial apps: created content is
  *               visible only to you); production needs Standard access.
  */
+import { hkdfSync } from "node:crypto";
+
 export type PinterestEnv = "sandbox" | "production";
 
 /** Read-only scopes by default. */
@@ -33,6 +35,20 @@ export interface ConfigCheck {
 
 type Env = Record<string, string | undefined>;
 
+/**
+ * The key that encrypts stored Pinterest tokens: TOKEN_ENCRYPTION_KEY when set,
+ * otherwise one derived (HKDF-SHA256) from AUTH_COOKIE_SECRET so nobody has to
+ * make one by hand. Changing AUTH_COOKIE_SECRET then means reconnecting
+ * Pinterest. To switch to an explicit key later, put the derived one in
+ * TOKEN_ENCRYPTION_KEY_PREVIOUS (or just reconnect).
+ */
+export function tokenEncryptionKey(env: Env = process.env): string | null {
+  if (env.TOKEN_ENCRYPTION_KEY) return env.TOKEN_ENCRYPTION_KEY;
+  const seed = env.AUTH_COOKIE_SECRET;
+  if (!seed || seed.length < 32) return null;
+  return Buffer.from(hkdfSync("sha256", seed, "pin-ai-studio", "pinterest-token-key-v1", 32)).toString("base64");
+}
+
 export function pinterestEnv(env: Env = process.env): PinterestEnv {
   return env.PINTEREST_ENV === "production" ? "production" : "sandbox";
 }
@@ -42,12 +58,12 @@ export function checkPinterestConfig(env: Env = process.env): ConfigCheck {
     "PINTEREST_CLIENT_ID",
     "PINTEREST_CLIENT_SECRET",
     "PINTEREST_REDIRECT_URI",
-    "TOKEN_ENCRYPTION_KEY",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
   ];
   const missing = required.filter((k) => !env[k]);
+  if (!tokenEncryptionKey(env)) missing.splice(3, 0, "TOKEN_ENCRYPTION_KEY");
   return { ready: missing.length === 0, missing, env: pinterestEnv(env) };
 }
 
@@ -69,7 +85,7 @@ export function getPinterestConfig(env: Env = process.env): PinterestConfig {
     apiBase: `${host}/v5`,
     tokenUrl: `${host}/v5/oauth/token`,
     authorizeUrl: "https://www.pinterest.com/oauth/",
-    encryptionKey: env.TOKEN_ENCRYPTION_KEY!,
+    encryptionKey: tokenEncryptionKey(env)!,
   };
 }
 
