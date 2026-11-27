@@ -7,7 +7,7 @@ import { PALETTE_LABELS, PALETTES } from "@/lib/brand/design";
 /** Sample pins for the Designer-mix preview: one per creative angle. */
 const SAMPLES: { angle: string; title: string; bg: string }[] = [
   { angle: "How-to / tutorial", title: "Layering a Trench Coat: A Simple 4-Step Guide", bg: "from-stone-300 via-stone-500 to-stone-700" },
-  { angle: "List / roundup", title: "7 Autumn Outfits Worth Saving", bg: "from-emerald-900 via-stone-500 to-stone-300" },
+  { angle: "List / roundup", title: "7 Autumn Outfits in Camel and Cream", bg: "from-emerald-900 via-stone-500 to-stone-300" },
   { angle: "Inspiration / mood", title: "Soft Neutrals for Slow Weekends", bg: "from-rose-200 via-rose-400 to-stone-700" },
   { angle: "Problem → solution", title: "No More Boring Workwear: Easy Upgrades", bg: "from-stone-200 via-stone-600 to-zinc-900" },
   { angle: "Seasonal / timely", title: "Cosy Winter Layers You Will Love", bg: "from-slate-400 via-slate-700 to-slate-900" },

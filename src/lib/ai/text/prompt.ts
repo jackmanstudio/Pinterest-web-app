@@ -4,17 +4,21 @@ import { anglesFor } from "@/lib/drafts/angles";
 import { LIMITS } from "@/lib/drafts/validation";
 import type { GenerateRequest } from "@/lib/types";
 import type { InsightsInput } from "./types";
+import { buildKeywordPlan, GENERIC_PHRASES, keywordBrief } from "@/lib/seo/keywords";
+import { detectEvents } from "@/lib/seo/seasonality";
+
 
 /** Prompts shared by every text provider, so switching providers keeps the same quality rules. */
 export const DRAFTS_SYSTEM = `You write Pinterest pin copy for a content studio.
 For each request you produce exactly five pin drafts, one per creative angle, in the order given.
 The five drafts must be meaningfully different: different hook, different promise, different visual. Never reuse a title structure.
-Titles: write each as "Headline: supporting hook", 40-80 characters in total (Pinterest search reads the title first). Every title must contain the idea's main keyword phrase, word for word or as its natural plural (e.g. for "Small living room decor ideas on a budget" use "small living room"), ideally in the headline part. The part before the colon is the on-image headline: at most 45 characters, specific and readable at phone-thumbnail size. The part after the colon adds value or curiosity. Vary the wording and structure across the five. Never write a vague title like "Budget Decor: 5 ideas".
+Titles: write each as "Headline: supporting hook", 40-80 characters in total (Pinterest search reads the title first). Every title must contain the primary keyword from the keyword research, word for word or as its natural plural, inside its first 40 characters (front-load it; e.g. for "Small living room decor ideas on a budget" start with "Small Living Room Decor"). The part before the colon is the on-image headline: at most 45 characters, specific and readable at phone-thumbnail size. The part after the colon adds value or curiosity. Vary the wording and structure across the five. Never write a vague title like "Budget Decor: 5 ideas".
+No generic copy: every hook and every description must name something concrete that is specific to THAT draft and its image (a material, colour, item, technique, number, room, dish, audience or result), so it could not be pasted onto another pin. Never use filler such as "${GENERIC_PHRASES.slice(0, 12).join('", "')}". No two drafts may share a hook, an opening sentence or a closing sentence.
 Respect Pinterest limits: title <= ${LIMITS.title} characters, description <= ${LIMITS.description} characters, alt text <= ${LIMITS.alt_text} characters, 5-${LIMITS.tags} tags.
-Descriptions read naturally, use the main keyword in the first sentence, include related search keywords, and end with a soft call to save or click written as its own full sentence in the pin's language (in English e.g. "Save this pin for later."; in other languages write it natively, never in English). No hashtags inside descriptions.
-Descriptions are SEO-ready: 2-4 sentences, 150-450 characters, the main keyword phrase in the first 50 characters, then 2-3 related long-tail search phrases people actually type on Pinterest (e.g. "easy", "for beginners", "on a budget", "for small spaces", only when true for the idea), woven into normal sentences, never as a keyword list.
-Tags (Pinterest "tagged topics"): 5-${LIMITS.tags} lowercase search phrases of 1-4 words, no # sign, no brand names, no duplicates: start with the exact main keyword phrase, then long-tail variants of it, then the broader category and closely related topics a searcher would also follow.
-Alt text literally describes what the image shows for screen-reader users and naturally includes the main keyword phrase once.
+Descriptions read naturally, use the main keyword in the first sentence, include related search keywords, and end with a soft call to save or click written as its own full sentence in the pin's language that names what they are saving (in English e.g. "Save these five layouts for your next living room refresh.", not a bare "Save this pin for later."; in other languages write it natively, never in English). No hashtags inside descriptions.
+Descriptions are SEO-ready: 2-4 sentences, 150-450 characters, the primary keyword in the first 50 characters, then 2-4 secondary phrases from the keyword research (trending and long-tail first, only the ones that are true for this pin), woven into normal sentences, never as a keyword list. Say what the reader gets from THIS pin (what is shown, how it works, who it suits). No phrase more than twice.
+Tags (Pinterest "tagged topics"): 5-${LIMITS.tags} lowercase search phrases of 1-4 words, no # sign, no brand names, no duplicates: the primary keyword first, then the trending and long-tail phrases that fit this draft, then related niche searches. Pick a slightly different mix for each draft.
+Alt text: one or two plain sentences (80-250 characters) that literally describe what this draft's image shows (subject, setting, colours, action) for screen-reader users, with the primary keyword once. Do not start with "image of" or "photo of", and do not copy the title or add marketing words.
 The image prompt (2-4 sentences) is for a photo-realistic image model and should read like a premium creative agency's art direction (editorial photography, styled product mockup or lifestyle scene, whichever suits the angle) with a restrained, harmonious palette, and must literally depict the subject of that draft's title: who or what is shown, the setting, styling, colours, mood and camera framing.
 Describe ONE cohesive photographic scene. Never ask for collages, grids, split screens, before/after layouts, numbered panels, text, words, numbers or logos: the title is added on top of the image later.
 For list or roundup angles ("5 ways", "7 ideas") do NOT try to show every item: show one person or one styled flat lay that represents the idea, with exactly one of each person or object (no duplicated people, no rows of outfits).
@@ -47,10 +51,10 @@ Actions must be concrete next steps for pin content (topics, formats, timing) gr
 export const PHOTO_SYSTEM = `You write Pinterest pin copy for photos the user took or owns.
 You get up to five photos, numbered in order, plus an optional topic and brand notes. Write exactly one pin per photo, in the same order.
 Look at each photo and describe only what is really visible. Never invent products, prices, places, brands or claims that the photo and notes don't support.
-Title: "Headline: supporting hook", 40-80 characters, with the main search phrase people would type for this photo. No clickbait.
-Description: 2-3 natural sentences (max ${LIMITS.description} characters) that help someone decide to save or click; weave in 2-4 search phrases naturally, no keyword lists, no hashtags inside the text. Make every description different.
-Tags: 3-8 short, relevant search phrases (no # sign).
-Alt text: one plain sentence describing the photo for someone who can't see it (max 200 characters).
+Title: "Headline: supporting hook", 40-80 characters, starting with the main search phrase people would type for this photo (use the keyword research when given). No clickbait. The hook names something concrete you can see in that photo; never generic filler like "worth saving", "save and try" or "you'll love".
+Description: 2-3 natural sentences (150-${LIMITS.description} characters) about what is in that photo, so it helps someone decide to save or click; the main search phrase in the first sentence, then 2-3 other search phrases from the keyword research that are true for the photo, no keyword lists, no hashtags inside the text. Every description must be different.
+Tags: 5-${LIMITS.tags} lowercase search phrases of 1-4 words (no # sign): the main search phrase first, then long-tail and related ones that match the photo.
+Alt text: one plain sentence describing the photo for someone who can't see it (max 200 characters), not starting with "image of" or "photo of".
 If a photo is unclear, describe what you can see and keep the copy general.`;
 
 export const PhotoPinSetSchema = z.object({
@@ -70,6 +74,7 @@ export interface PhotoPinsInput {
   topic: string;
   language?: string;
   brand: GenerateRequest["brand"];
+  trendKeywords?: string[];
 }
 
 export function photoUserPrompt(input: PhotoPinsInput): string {
@@ -83,6 +88,7 @@ export function photoUserPrompt(input: PhotoPinsInput): string {
     b.focus_keywords.length && `Focus keywords (use only where they fit the photo): ${b.focus_keywords.join(", ")}`,
     b.banned_words.length && `Never use: ${b.banned_words.join(", ")}`,
     ...input.photos.map((p, i) => `Photo ${i + 1}${p.topic ? ` (user note: ${p.topic})` : ""}`),
+    input.topic && keywordBrief(buildKeywordPlan({ idea: input.topic, trendKeywords: input.trendKeywords, focusKeywords: b.focus_keywords }), { language: input.language }),
   ].filter(Boolean);
   return `${lines.join("\n")}\n\nReturn ${input.photos.length} pins, one per photo, in order.`;
 }
@@ -107,9 +113,13 @@ export function draftsUserPrompt(req: GenerateRequest): string {
     language && !/^english$/i.test(language)
       ? `Language: write title, description, tags and alt text natively in ${language} (natural local phrasing, not a literal translation). Keep "angle" labels and image prompts in English. Festivals, names and culture words use their standard ${language} spelling, never a sound-alike transliteration. Tags are short phrases with normal spaces between words and no # sign. Use only the ${language} script (Latin letters only for brand names); never mix in Chinese, Japanese, Korean or any other script.\n${glossaryHint(language, `${req.idea} ${req.context ?? ""}`)}`
       : "";
+  const plan = buildKeywordPlan({ idea: req.idea, category: req.category, trendKeywords: req.trend_keywords, focusKeywords: b.focus_keywords });
+  const keywords = keywordBrief(plan, { language, ideaIsSeasonal: detectEvents(req.idea).length > 0 });
   return `Workspace: ${req.workspace}
 ${lang}${req.category ? `Category: ${req.category}\n` : ""}${brand ? `${brand}\n` : ""}
 Pin idea: ${req.idea}
+
+${keywords}
 ${req.context ? `\nThe pins promote this page. Use only facts from it; never invent prices, features, numbers or claims:\n${req.context}\n` : ""}
 Angles (one draft each, set "angle" to the angle label):
 ${angles}`;

@@ -260,7 +260,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
         store={store}
         workspaceId={workspace.id}
         brand={brand}
-        sampleTitle={workspace?.niche === "fashion" ? "7 Autumn Trench Coat Outfits Worth Saving" : "Your Pin Title Goes Right Here"}
+        sampleTitle={workspace?.niche === "fashion" ? "7 Autumn Trench Coat Outfits for Rainy Days" : "Your Pin Title Goes Right Here"}
         onSaved={setBrand}
       />
     </div>

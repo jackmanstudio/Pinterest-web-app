@@ -1,6 +1,7 @@
 import type { DraftContent } from "@/lib/types";
 import { LIMITS } from "./validation";
 import { seasonTiming } from "@/lib/seo/seasonality";
+import { GENERIC_PHRASES, splitIdea } from "@/lib/seo/keywords";
 
 export type Severity = "ok" | "info" | "warning" | "error";
 
@@ -72,6 +73,13 @@ export function reviewDraft(d: DraftContent, ctx: QualityContext = {}): QualityR
     if (hits < (ideaKeys.length >= 3 ? Math.ceil(ideaKeys.length / 2) : 1)) add("SEO", "warning", "title-keyword", `Title doesn't use the main keyword from your idea (“${ideaKeys.slice(0, 3).join(" ")}”); people search with those words.`);
   }
   if (title && VAGUE_TITLES.test(title)) add("SEO", "warning", "title-vague", "Title is too vague to match a search; say what the pin is about.");
+  // The main keyword should sit in the first 40 characters: that is what shows in search and on phones.
+  const primary = ctx.idea ? splitIdea(ctx.idea).head : "";
+  const latin = /^[\p{Script=Latin}\d\s\p{P}\p{S}]+$/u.test(title);
+  if (title && primary && latin && title.toLowerCase().includes(primary) && title.toLowerCase().indexOf(primary) + primary.length > 40)
+    add("SEO", "info", "title-front", `Move “${primary}” to the start of the title; the first 40 characters matter most in search.`);
+  const generic = GENERIC_PHRASES.filter((g) => has(`${title} ${desc}`, g));
+  if (generic.length) add("SEO", "warning", "generic", `Generic wording: “${generic.slice(0, 3).join("”, “")}”. Name what this pin actually shows (item, colour, room, dish, result).`);
 
   // SEO: description
   if (!desc) add("SEO", "error", "desc-missing", "Add a description.");

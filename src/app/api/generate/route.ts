@@ -6,6 +6,7 @@ import { findNearDuplicates } from "@/lib/drafts/distinctness";
 import { tidyDrafts } from "@/lib/drafts/tidyTitle";
 import { fixDraftSpelling } from "@/lib/ai/text/glossary";
 import { cleanDrafts, draftsHaveStray } from "@/lib/ai/text/script";
+import { polishSeo } from "@/lib/seo/polish";
 import { GenerateRequestSchema } from "@/lib/drafts/validation";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
@@ -61,7 +62,16 @@ export async function POST(request: Request) {
       const again = await run().catch(() => null);
       if (again && !draftsHaveStray(again.drafts, lang)) result = again;
     }
-    result = { ...result, drafts: cleanDrafts(result.drafts, lang) };
+    result = {
+      ...result,
+      drafts: polishSeo(cleanDrafts(result.drafts, lang), {
+        idea: parsed.data.idea,
+        category: parsed.data.category,
+        trendKeywords: parsed.data.trend_keywords,
+        focusKeywords: parsed.data.brand.focus_keywords,
+        language: lang,
+      }),
+    };
 
     const cost = estimateTextCost(result.model, tokens.input, tokens.output);
     await ctx.ledger.record({ ...usageBase, model: result.model, input_tokens: tokens.input, output_tokens: tokens.output, est_cost_usd: cost, status: "ok", error: null });

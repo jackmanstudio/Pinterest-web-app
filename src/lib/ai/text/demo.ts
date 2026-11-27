@@ -2,6 +2,7 @@ import { PIN_ANGLES, anglesFor, type PinAngleKey } from "@/lib/drafts/angles";
 import { LIMITS } from "@/lib/drafts/validation";
 import type { DraftContent, GenerateRequest, GenerateResponse } from "@/lib/types";
 import type { TextProvider } from "./types";
+import { splitIdea } from "@/lib/seo/keywords";
 
 /**
  * Template-based stand-in used when no TEXT_AI_API_KEY is configured.
@@ -32,8 +33,10 @@ export const titleCase = (s: string) =>
 
 function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): DraftContent {
   const idea = req.idea.trim();
-  // Keep the idea short in titles so the angle-specific wording always fits.
-  const Idea = titleCase(clip(idea.split(/\s+/).slice(0, 6).join(" "), 40));
+  // The primary search phrase ("small living room decor"), so titles never end mid-phrase ("… Ideas on").
+  const primary = splitIdea(idea).head || idea.toLowerCase();
+  // The whole idea when it fits, else just the primary phrase (never cut mid-phrase).
+  const Idea = titleCase(idea.length <= 45 ? idea.replace(/[.!?]+$/, "") : clip(primary, 45));
   const brand = req.brand.brand_name || "our studio";
   const audience = req.brand.audience || "anyone who loves this look";
   const cat = req.category ? ` (${req.category})` : "";
@@ -44,35 +47,35 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
       concept: `Step-by-step guide showing how to recreate "${idea}" at home${cat}.`,
       title: `${Idea}: A Simple 4-Step Guide`,
       description: `Save this step-by-step guide to ${idea}. We break it into four simple steps ${audience} can follow today, with the small details that make the difference. More guides from ${brand}.`,
-      alt_text: `Overhead flat lay of the items needed for ${idea}, neatly arranged on light linen in soft window light.`,
+      alt_text: `Overhead flat lay of the items needed for ${primary}, neatly arranged on light linen in soft window light.`,
       image_prompt: `Overhead styled flat lay of everything needed for ${idea}, neatly arranged on a light linen surface, soft natural window light.`,
     },
     list: {
       concept: `A numbered roundup of 7 variations on "${idea}".`,
       title: /\b(ideas?|tips|outfits|looks|ways|recipes)\b/i.test(Idea) ? `7 Fresh ${Idea}` : `7 Fresh Ideas for ${Idea}`,
       description: `Seven fresh takes on ${idea}, from easy everyday options to standout statement versions. Pick your favourite and pin the rest for later. Curated by ${brand}.`,
-      alt_text: `A stylish person showing ${idea} on a sunlit city street, full-length.`,
+      alt_text: `A stylish person showing ${primary} on a sunlit city street, full-length.`,
       image_prompt: `A stylish person showcasing ${idea} on a sunlit city street, full-length shot, confident relaxed pose, cohesive neutral palette.`,
     },
     inspiration: {
       concept: `Mood-led hero image that sells the feeling of "${idea}".`,
-      title: `${Idea}: Calm, Everyday Inspiration`,
+      title: `${Idea}: A Mood Board in Warm, Natural Tones`,
       description: `Let this be your sign to try ${idea}. A calm, aspirational take for ${audience}, made to inspire your next board. Explore more moods from ${brand}.`,
-      alt_text: `Warm golden-hour photo with a soft background that captures the mood of ${idea}.`,
+      alt_text: `Warm golden-hour photo with a soft background that captures the mood of ${primary}.`,
       image_prompt: `Cinematic hero shot evoking ${idea}, shallow depth of field, warm golden-hour tones, calm and aspirational mood.`,
     },
     problem_solution: {
       concept: `Names a common frustration, then shows "${idea}" as the fix.`,
-      title: `${Idea} Without the Guesswork`,
+      title: `${Idea}: Common Mistakes and Easy Fixes`,
       description: `If you keep running into the same problem, ${idea} might be exactly what you need. Here is why it works and how to start without overthinking it. Tips from ${brand}.`,
-      alt_text: `Close-up detail of ${idea}, showing texture on a clean, bright background.`,
+      alt_text: `Close-up detail of ${primary}, showing texture on a clean, bright background.`,
       image_prompt: `Close-up detail shot of ${idea}, showing texture and craftsmanship, bright and fresh, clean background.`,
     },
     seasonal: {
       concept: `Frames "${idea}" as a must-try for ${season}.`,
-      title: new RegExp(season, "i").test(idea) ? `${Idea}: Save This for Later` : `${Idea} This ${titleCase(season)}`,
+      title: new RegExp(season, "i").test(idea) ? `${Idea}: What to Try First This Season` : `${Idea} This ${titleCase(season)}`,
       description: `${titleCase(season)} is the perfect moment for ${idea}. Pin this now so it is ready when you need it, and check back for more seasonal picks from ${brand}.`,
-      alt_text: `Cosy ${season} lifestyle scene featuring ${idea} with seasonal props and warm colours.`,
+      alt_text: `Cosy ${season} lifestyle scene featuring ${primary} with seasonal props and warm colours.`,
       image_prompt: `A cosy ${season} lifestyle scene centred on ${idea}, seasonal props and colours, warm editorial styling.`,
     },
   };

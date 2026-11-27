@@ -90,7 +90,7 @@ describe("POST /api/photo-pins", () => {
     const { POST } = await import("@/app/api/photo-pins/route");
     const ok = await (await POST(req({ workspace: "fashion", brand, topic: "winter outfits", photos: [{ jpeg }, { topic: "scarf", jpeg }] }))).json();
     expect(ok.basedOn).toBe("topic");
-    expect(ok.pins[1].alt_text).toBe("scarf");
+    expect(ok.pins[1].alt_text).toBe("Scarf");
     const none = await POST(req({ workspace: "fashion", brand, photos: [{ jpeg }] }));
     expect(none.status).toBe(422);
   });

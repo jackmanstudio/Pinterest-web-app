@@ -167,7 +167,7 @@ export function SavedDrafts({ kind }: { kind: WorkspaceKind }) {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: kind, idea: d.idea, category: catName(d.category_id) || undefined, brand }),
+        body: JSON.stringify({ workspace: kind, idea: d.idea, category: catName(d.category_id) || undefined, brand, trend_keywords: trendKeywords.length ? trendKeywords : undefined }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "Could not regenerate");

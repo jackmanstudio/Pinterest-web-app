@@ -182,6 +182,8 @@ export interface GenerateRequest {
   context?: string;
   /** Pin set: mixed angles (default), roundup, comparison, gift guide, curiosity. */
   style?: PinStyle;
+  /** Rising searches from the account's live Pinterest Trends snapshot (used for keyword research). */
+  trend_keywords?: string[];
 }
 
 export interface GenerateResponse {
