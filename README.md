@@ -84,6 +84,7 @@ Verified against the official Pinterest v5 docs and OpenAPI spec (Nov 2026).
 1. Create an app at <https://developers.pinterest.com/apps/> and wait for Trial access.
 2. Add the redirect URI exactly as in `PINTEREST_REDIRECT_URI` (e.g. `http://localhost:3000/api/pinterest/callback`, plus your production URL).
 3. Put the App ID / secret in `PINTEREST_CLIENT_ID` / `PINTEREST_CLIENT_SECRET`, generate `TOKEN_ENCRYPTION_KEY`, set `SUPABASE_SERVICE_ROLE_KEY`, and run migration `0003`.
+   Without `SUPABASE_SERVICE_ROLE_KEY`, Submit for review still works, but Approve, Schedule and Publish show a "server setting missing" message.
 4. Keep `PINTEREST_ENV=sandbox` while on Trial access (content you create is visible only to you). Switch to `production` after Pinterest grants Standard access, which requires a demo video of the OAuth flow.
 5. Note: apps registered after 14 Sep 2026 may get `PINNER_DATA_ACCESS_DENIED` for non-business accounts until Pinterest authorises access.
 
