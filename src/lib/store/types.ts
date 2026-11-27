@@ -49,6 +49,8 @@ export interface Store {
   getDraft(workspaceId: string, id: string): Promise<PinDraft>;
   /** Demo storage only: the server can't write browser storage, so the client records the image. */
   setImage(workspaceId: string, id: string, image: Pick<PinDraft, "image_status" | "image_path" | "image_source">): Promise<PinDraft>;
+  /** Uses the user's own photo (a JPEG made in the browser) as the draft's pin image. */
+  attachPhoto(workspaceId: string, id: string, jpeg: Blob): Promise<PinDraft>;
   /** A URL the browser can display for a draft's image. */
   imageUrl(draft: PinDraft): Promise<string | null>;
   /** Moves a draft through the approval workflow. Live actions need Supabase + Pinterest. */

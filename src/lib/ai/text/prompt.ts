@@ -43,6 +43,50 @@ In "evidence", name the metric(s) and value(s) you relied on. If the data is too
 Actions must be concrete next steps for pin content (topics, formats, timing) grounded in the evidence.`;
 
 
+/** Pin copy for the user's own photos: one pin per photo, describing what is really in it. */
+export const PHOTO_SYSTEM = `You write Pinterest pin copy for photos the user took or owns.
+You get up to five photos, numbered in order, plus an optional topic and brand notes. Write exactly one pin per photo, in the same order.
+Look at each photo and describe only what is really visible. Never invent products, prices, places, brands or claims that the photo and notes don't support.
+Title: "Headline: supporting hook", 40-80 characters, with the main search phrase people would type for this photo. No clickbait.
+Description: 2-3 natural sentences (max ${LIMITS.description} characters) that help someone decide to save or click; weave in 2-4 search phrases naturally, no keyword lists, no hashtags inside the text. Make every description different.
+Tags: 3-8 short, relevant search phrases (no # sign).
+Alt text: one plain sentence describing the photo for someone who can't see it (max 200 characters).
+If a photo is unclear, describe what you can see and keep the copy general.`;
+
+export const PhotoPinSetSchema = z.object({
+  pins: z.array(
+    z.object({
+      title: z.string().min(1).max(LIMITS.title),
+      description: z.string().min(1).max(LIMITS.description),
+      tags: z.array(z.string().min(1)).min(1).max(LIMITS.tags),
+      alt_text: z.string().min(1).max(LIMITS.alt_text),
+    }),
+  ),
+});
+export type PhotoPinText = z.infer<typeof PhotoPinSetSchema>["pins"][number];
+
+export interface PhotoPinsInput {
+  photos: { topic: string }[];
+  topic: string;
+  language?: string;
+  brand: GenerateRequest["brand"];
+}
+
+export function photoUserPrompt(input: PhotoPinsInput): string {
+  const b = input.brand;
+  const lines = [
+    input.topic && `Topic for all photos: ${input.topic}`,
+    input.language && input.language.toLowerCase() !== "english" && `Write in ${input.language}.`,
+    b.brand_name && `Brand: ${b.brand_name}`,
+    b.voice && `Voice: ${b.voice}`,
+    b.audience && `Audience: ${b.audience}`,
+    b.focus_keywords.length && `Focus keywords (use only where they fit the photo): ${b.focus_keywords.join(", ")}`,
+    b.banned_words.length && `Never use: ${b.banned_words.join(", ")}`,
+    ...input.photos.map((p, i) => `Photo ${i + 1}${p.topic ? ` (user note: ${p.topic})` : ""}`),
+  ].filter(Boolean);
+  return `${lines.join("\n")}\n\nReturn ${input.photos.length} pins, one per photo, in order.`;
+}
+
 export function draftsUserPrompt(req: GenerateRequest): string {
   const angles = anglesFor(req.style).map((a, i) => `${i + 1}. ${a.label}: ${a.brief}`).join("\n");
   const b = req.brand;
