@@ -19,7 +19,7 @@ export const DraftSetSchema = z.object({
   drafts: z.array(DraftContentSchema).length(5),
 });
 
-const BrandSchema = z.object({
+export const BrandSchema = z.object({
   brand_name: z.string().max(120),
   voice: z.string().max(500),
   audience: z.string().max(500),

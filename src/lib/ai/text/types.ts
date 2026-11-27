@@ -1,5 +1,5 @@
 import type { AiAssignment } from "@/lib/boards/automation";
-import type { BoardsPromptInput, BrandAnalysis } from "./prompt";
+import type { BoardsPromptInput, BrandAnalysis, PhotoPinsInput, PhotoPinText } from "./prompt";
 import type { GenerateRequest, GenerateResponse } from "@/lib/types";
 
 /**
@@ -18,6 +18,14 @@ export interface TextProvider {
   assignBoards?(input: BoardsPromptInput): Promise<BoardsOutput>;
   /** Brand voice, audience, keywords, image style and CTA from a website's text. */
   analyzeBrand?(pageText: string): Promise<BrandOutput>;
+  /** One pin's copy per photo, read from the photos themselves (needs a vision model). */
+  describePhotos?(input: PhotoPinsInput, images: { base64: string; mediaType: "image/jpeg" }[]): Promise<PhotoPinsOutput>;
+}
+
+export interface PhotoPinsOutput {
+  pins: PhotoPinText[];
+  model: string | null;
+  usage: { input_tokens: number; output_tokens: number };
 }
 
 export interface BrandOutput {

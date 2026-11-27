@@ -136,6 +136,19 @@ export class SupabaseStore implements Store {
     // The server route already wrote the image; just re-read the row.
     return this.getDraft(workspaceId, id);
   }
+  async attachPhoto(workspaceId: string, id: string, jpeg: Blob) {
+    // Storage policies only allow paths inside the user's own workspace folder.
+    const path = `${workspaceId}/${id}/upload-${Date.now()}.jpg`;
+    const up = await this.db.storage.from(IMAGE_BUCKET).upload(path, jpeg, { contentType: "image/jpeg", upsert: false });
+    if (up.error) throw new Error(up.error.message);
+    const { error } = await this.db
+      .from("pin_drafts")
+      .update({ image_status: "ready", image_path: path, image_source: "manual" })
+      .eq("id", id)
+      .eq("workspace_id", workspaceId);
+    if (error) throw new Error(error.message);
+    return this.getDraft(workspaceId, id);
+  }
   async uploadLogo(workspaceId: string, file: File) {
     const ext = file.type === "image/png" ? "png" : "jpg";
     const path = `${workspaceId}/brand/logo-${Date.now()}.${ext}`;
