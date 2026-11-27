@@ -35,10 +35,22 @@ export function isPrivateAddress(ip: string): boolean {
   return true;
 }
 
+/** The domain name doesn't resolve (typo, or the site no longer exists). */
+export class HostNotFound extends Error {
+  constructor(readonly host: string) {
+    super(`host not found: ${host}`);
+  }
+}
+
 export async function assertPublicHost(host: string) {
   const h = host.replace(/^\[|\]$/g, "");
   if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h.endsWith(".local")) throw new Error("private host");
-  const addrs = isIP(h) ? [{ address: h }] : await lookup(h, { all: true });
+  let addrs: { address: string }[];
+  try {
+    addrs = isIP(h) ? [{ address: h }] : await lookup(h, { all: true });
+  } catch {
+    throw new HostNotFound(h);
+  }
   if (!addrs.length || addrs.some((a) => isPrivateAddress(a.address))) throw new Error("private host");
 }
 
@@ -102,7 +114,9 @@ export async function checkUrl(raw: string, pinTitle = "", fetchImpl: typeof fet
     const msg = (e as Error).message;
     res.reachable = false;
     res.messages.push(
-      msg === "private host"
+      e instanceof HostNotFound
+        ? `The website “${e.host}” wasn't found. Check the address for a typo.`
+        : msg === "private host"
         ? "This address points to a private or local network, so it was not checked."
         : (e as Error).name === "TimeoutError"
           ? "The page did not answer within 8 seconds."
