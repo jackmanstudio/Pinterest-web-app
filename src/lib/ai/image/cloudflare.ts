@@ -1,8 +1,11 @@
 import { ProviderError } from "@/lib/ai/text/types";
 import type { GeneratedImage, ImageProvider } from "./types";
 
-/** 2:3 portrait; both sides are multiples of 16 and inside the model's 256–1920 range. */
-export const CLOUDFLARE_PIN_SIZE = { width: 768, height: 1152 } as const;
+/**
+ * 2:3 portrait, HD: at least Pinterest's 1000×1500, so the pin is never upscaled.
+ * Both sides are multiples of 16 and inside the model's 256–1920 range.
+ */
+export const CLOUDFLARE_PIN_SIZE = { width: 1024, height: 1536 } as const;
 
 interface Options {
   accountId: string;
@@ -20,7 +23,7 @@ function sniff(bytes: Uint8Array): { contentType: string; extension: string } {
 
 /**
  * Cloudflare Workers AI adapter, default model FLUX.2 [klein] 4B (commercial use
- * allowed; Workers AI's free daily allocation covers roughly 60 pin images).
+ * allowed; Workers AI's free daily allocation covers roughly 50–60 HD pin images).
  * REST: POST /accounts/{id}/ai/run/{model} with multipart form fields.
  */
 export class CloudflareImageProvider implements ImageProvider {

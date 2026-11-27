@@ -92,8 +92,8 @@ describe("Cloudflare image adapter", () => {
     const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.cloudflare.com/client/v4/accounts/acc/ai/run/@cf/black-forest-labs/flux-2-klein-4b");
     const form = init.body as FormData;
-    expect(form.get("width")).toBe("768");
-    expect(form.get("height")).toBe("1152");
+    expect(form.get("width")).toBe("1024");
+    expect(form.get("height")).toBe("1536");
     expect(String(form.get("prompt"))).toContain("macro chart");
     expect(img).toMatchObject({ contentType: "image/png", extension: "png", est_cost_usd: 0 });
   });

@@ -9,7 +9,7 @@ import { getRequestContext, HttpError, workspaceFor } from "@/lib/server/context
 import type { WorkspaceNiche } from "@/lib/types";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
-import { brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
+import { bestPinImage, brandArtFor, brandPinImage, logoFromDataUrl, type BrandArt } from "@/lib/brand/server";
 import { readTemplate } from "@/lib/brand/template";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { PhotoError, pagePhoto as fetchPagePhoto } from "@/lib/tools/pagePhoto";
@@ -101,13 +101,13 @@ export async function POST(request: Request) {
     }
     if (!source) await assertWithinBudget(ctx.ledger, provider.source === "ai");
     // Headline, palette, brand and logo are drawn on the server, then saved as one JPEG and self-checked.
-    const attempts = source ? 0 : 1;
-    // Quick retries only (pins are made in parallel, so long waits here hold the whole batch).
-    const raw = pagePhotoRaw ?? (await withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE), 2, 400));
     // Real images are always full size (1000×1500); only labelled placeholders are kept small.
-    // A weak photo is no longer remade automatically (that doubled the wait); the design check
-    // flags it and "Retry image" makes a new one.
-    const image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle });
+    // AI pins are quality-checked; a weak photo (blurry, dark, low-res, headline hard to read) is remade once.
+    const generate = () => withRetry(() => provider.generate(fullPrompt, PIN_IMAGE_SIZE), 2, 400);
+    let attempts = 0;
+    let image: Awaited<ReturnType<typeof brandPinImage>>;
+    if (pagePhotoRaw) image = await brandPinImage(pagePhotoRaw, title, art, { angle });
+    else ({ image, attempts } = await bestPinImage(generate, title, art, { angle }));
 
     let imagePath: string;
     let imageUrl: string;

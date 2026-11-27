@@ -13,7 +13,7 @@ import { checkPinterestConfig, getPinterestConfig } from "@/lib/pinterest/config
 import { ConnectionRepo } from "@/lib/pinterest/connections";
 import { describePinterestError } from "@/lib/pinterest/sync";
 import { EMPTY_BRAND, isWorkspaceNiche, type BrandSettings } from "@/lib/types";
-import { brandArtFor, brandPinImage } from "@/lib/brand/server";
+import { bestPinImage, brandArtFor, brandPinImage } from "@/lib/brand/server";
 import { buildImagePrompt } from "@/lib/ai/image/prompt";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
 import type { UsageEntry, UsageLedger } from "@/lib/usage/ledger";
@@ -354,12 +354,13 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
           const fromPage = photos.length ? await pagePhoto(photos[i % photos.length]).catch(() => null) : null;
           if (!fromPage) await assertWithinBudget(ledger, true);
           const prompt = buildImagePrompt({ title: d.title, scene: d.image_prompt, kind: ws.niche, overlay: art.template.style, angle: d.angle, palette: art.template.palette, imageStyle: brand.image_style });
-          const img = await brandPinImage(fromPage ?? (await withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE))), d.title, art, { angle: d.angle });
+          const best = fromPage ? null : await bestPinImage(() => withRetry(() => images.generate(prompt, PIN_IMAGE_SIZE)), d.title, art, { angle: d.angle });
+          const img = best ? best.image : await brandPinImage(fromPage!, d.title, art, { angle: d.angle });
           const path = `${ws.workspace_id}/${d.id}-${Date.now()}.${img.extension}`;
           const up = await admin.storage.from(IMAGE_BUCKET).upload(path, img.bytes, { contentType: img.contentType, upsert: false });
           if (up.error) throw new Error(`Storage upload failed: ${up.error.message}`);
           await admin.from("pin_drafts").update({ image_status: "ready", image_path: path, image_source: img.source }).eq("id", d.id);
-          await ledger.record({ workspace_id: ws.workspace_id, kind: "image", provider: img.provider, model: img.model, source: img.source, input_tokens: 0, output_tokens: 0, images: fromPage ? 0 : 1, est_cost_usd: img.est_cost_usd, status: "ok", error: null });
+          await ledger.record({ workspace_id: ws.workspace_id, kind: "image", provider: img.provider, model: img.model, source: img.source, input_tokens: 0, output_tokens: 0, images: best?.attempts ?? 0, est_cost_usd: img.est_cost_usd * (best?.attempts ?? 0), status: "ok", error: null });
           made++;
         } catch (err) {
           await admin.from("pin_drafts").update({ image_status: "failed" }).eq("id", d.id);
