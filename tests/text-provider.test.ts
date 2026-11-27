@@ -14,6 +14,7 @@ describe("getTextProvider", () => {
 });
 
 import { CloudflareTextProvider, normalizeDrafts } from "@/lib/ai/text/cloudflare";
+import { PIN_ANGLES } from "@/lib/drafts/angles";
 
 describe("Cloudflare text provider", () => {
   const draft = (i: number) => ({
@@ -41,8 +42,23 @@ describe("Cloudflare text provider", () => {
     const sent = JSON.parse(init.body as string);
     expect(sent.response_format.type).toBe("json_schema");
     expect(sent.messages[1].content).toContain("linen outfits");
-    expect(r).toMatchObject({ source: "ai", usage: { input_tokens: 900, output_tokens: 1200 } });
+    // One call per pin, all in parallel; usage is summed.
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
+    expect(r).toMatchObject({ source: "ai", usage: { input_tokens: 4500, output_tokens: 6000 } });
     expect(r.drafts).toHaveLength(5);
+    expect(r.drafts.map((d) => d.angle)).toEqual(PIN_ANGLES.map((a) => a.label));
+  });
+  it("writes only the pins asked for, one parallel call each, each told its own angle", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ success: true, result: { response: { drafts: [draft(1)] } } }), { status: 200 }));
+    const p = new CloudflareTextProvider({ accountId: "acc", apiToken: "tok", fetchImpl: fetchImpl as unknown as typeof fetch });
+    const r = await p.generateDrafts({ workspace: "fashion", idea: "linen outfits", count: 3, brand: { brand_name: "", voice: "", audience: "", website_url: "", focus_keywords: [], banned_words: [] } });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(r.drafts).toHaveLength(3);
+    const prompts = fetchImpl.mock.calls.map((c) => JSON.parse(((c as unknown as [string, RequestInit])[1].body) as string).messages[1].content as string);
+    expect(prompts[0]).toMatch(/Write ONE draft for this angle/);
+    expect(new Set(prompts).size).toBe(3);
+    const system = JSON.parse(((fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1].body) as string).messages[0].content as string;
+    expect(system).toMatch(/exactly one pin draft/);
   });
   it("asks for a retry when the reply is unusable", async () => {
     const p = new CloudflareTextProvider({ accountId: "a", apiToken: "t", fetchImpl: (async () => new Response(JSON.stringify({ success: true, result: { response: "not json" } }))) as unknown as typeof fetch });

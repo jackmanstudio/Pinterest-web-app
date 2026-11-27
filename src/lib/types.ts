@@ -184,6 +184,8 @@ export interface GenerateRequest {
   style?: PinStyle;
   /** Rising searches from the account's live Pinterest Trends snapshot (used for keyword research). */
   trend_keywords?: string[];
+  /** How many pins to write (1-5); only that many are generated. Default 5. */
+  count?: number;
 }
 
 export interface GenerateResponse {

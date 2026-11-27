@@ -42,6 +42,8 @@ export const GenerateRequestSchema = z.object({
   style: z.enum(PIN_STYLE_KEYS as [PinStyle, ...PinStyle[]]).optional(),
   /** Rising searches from the account's live Pinterest Trends snapshot. */
   trend_keywords: z.array(z.string().trim().max(80)).max(50).optional(),
+  /** How many pins to write; only that many are generated (fewer = faster). */
+  count: z.number().int().min(1).max(5).optional(),
 });
 
 /** Turn "a, b,  c" into ["a","b","c"] (trimmed, deduped, no empties). */

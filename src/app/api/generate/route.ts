@@ -45,6 +45,8 @@ export async function POST(request: Request) {
     const tokens = { input: 0, output: 0 };
     const run = async () => {
       const r = await provider.generateDrafts(parsed.data);
+      // Providers that always write five (demo, Claude) are trimmed to the number asked for.
+      if (parsed.data.count) r.drafts = r.drafts.slice(0, parsed.data.count);
       const lang = parsed.data.language || parsed.data.brand.language;
       r.drafts = fixDraftSpelling(tidyDrafts(r.drafts, parsed.data.idea, lang), lang);
       tokens.input += r.usage?.input_tokens ?? 0;
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
       }),
     };
 
+    console.info(JSON.stringify({ event: "text_timing", provider: provider.name, pins: result.drafts.length, total_ms: Date.now() - started, output_tokens: tokens.output }));
     const cost = estimateTextCost(result.model, tokens.input, tokens.output);
     await ctx.ledger.record({ ...usageBase, model: result.model, input_tokens: tokens.input, output_tokens: tokens.output, est_cost_usd: cost, status: "ok", error: null });
 
