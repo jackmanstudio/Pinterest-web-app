@@ -2,10 +2,11 @@ import { ProviderError } from "@/lib/ai/text/types";
 import type { GeneratedImage, ImageProvider } from "./types";
 
 /**
- * 2:3 portrait, HD: at least Pinterest's 1000×1500, so the pin is never upscaled.
+ * 2:3 portrait. 896×1344 is about 25% fewer pixels than 1024×1536 (so faster to make);
+ * the pin is enlarged only 1.12× to 1000×1500 with a Lanczos resize and gentle sharpening.
  * Both sides are multiples of 16 and inside the model's 256–1920 range.
  */
-export const CLOUDFLARE_PIN_SIZE = { width: 1024, height: 1536 } as const;
+export const CLOUDFLARE_PIN_SIZE = { width: 896, height: 1344 } as const;
 
 interface Options {
   accountId: string;
@@ -50,7 +51,7 @@ export class CloudflareImageProvider implements ImageProvider {
         method: "POST",
         headers: { Authorization: `Bearer ${this.opts.apiToken}` },
         body: form,
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(45_000),
       });
     } catch (e) {
       throw new ProviderError(`Image provider unreachable: ${(e as Error).message}`, 502, true);

@@ -49,15 +49,22 @@ export async function brandPinImage(
  * If the photo fails, one new image is made and the better-scoring pin is kept, so a weak
  * pin is never delivered without a second try. Returns how many images were generated.
  */
+/** A second image is only tried when the first took less than this. */
+export const REMAKE_WITHIN_MS = 10_000;
+
 export async function bestPinImage(
   generate: () => Promise<GeneratedImage>,
   title: string,
   art: BrandArt,
   opts: { angle?: string } = {},
 ): Promise<{ image: GeneratedImage & { design: DesignReport }; attempts: number }> {
+  const t0 = Date.now();
   const raw = await generate();
   let image = await brandPinImage(raw, title, art, { demo: raw.source === "demo", angle: opts.angle });
-  if (raw.source !== "ai" || !image.design.retryPhoto) return { image, attempts: 1 };
+  // Speed first: remake only a clearly broken photo (blurry or badly lit), and only when the first one
+  // came back fast, so a pin never waits for two slow generations.
+  const broken = image.design.checks.some((c) => (c.id === "sharp" || c.id === "exposure") && c.status === "fail");
+  if (raw.source !== "ai" || !broken || Date.now() - t0 > REMAKE_WITHIN_MS) return { image, attempts: 1 };
   const second = await generate()
     .then((r) => brandPinImage(r, title, art, { angle: opts.angle }))
     .catch(() => null);
