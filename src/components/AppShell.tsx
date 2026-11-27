@@ -85,8 +85,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const ADD = "/overview?add=1";
   // No account yet: still show every page, and remember which one was picked so the
   // add-account form can open it right after the account is made.
-  const at = (sub: string) => (kind ? `/w/${kind}${sub ? `/${sub}` : ""}` : `${ADD}&next=${sub || "studio"}`);
-  const section = inWorkspace ? (seg[3] ?? "") : null;
+  const at = (sub: string) => (kind ? `/w/${kind}${sub ? `/${sub}` : ""}` : `/start/${sub || "studio"}`);
+  const onStart = seg[1] === "start";
+  const section = inWorkspace ? (seg[3] ?? "") : onStart ? (seg[2] === "studio" ? "" : (seg[2] ?? null)) : null;
 
   const signOut = async () => {
     if (!isSupabaseConfigured) {
@@ -159,7 +160,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         {noAccounts && (
           <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[12px] leading-snug text-white/60">
-            Add an account to open these pages. Each page opens right after.
+            No account yet. Every page below works: open one and add your account there.
           </p>
         )}
         {GROUPS.map((g) => (
