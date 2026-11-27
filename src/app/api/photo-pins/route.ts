@@ -5,7 +5,7 @@ import { getTextProvider } from "@/lib/ai/text";
 import { ProviderError } from "@/lib/ai/text/types";
 import type { PhotoPinText } from "@/lib/ai/text/prompt";
 import { BrandSchema } from "@/lib/drafts/validation";
-import { PHOTO_LIMITS } from "@/lib/photos/validate";
+import { PHOTO_LIMITS, photoTopic } from "@/lib/photos/validate";
 import { getRequestContext, HttpError, workspaceIdFor } from "@/lib/server/context";
 import { errorResponse } from "@/lib/server/errors";
 import { assertWithinBudget, BudgetExceededError } from "@/lib/usage/budget";
@@ -14,6 +14,7 @@ import { estimateTextCost } from "@/lib/usage/pricing";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
 
 export const maxDuration = 120;
+
 
 const Body = z.object({
   workspace: WorkspaceSlug,
@@ -62,16 +63,23 @@ export async function POST(request: Request) {
       ({ pins, model, usage } = r);
       basedOn = "photo";
     } else {
-      // This text model can't see images: write from the topic/notes, and say so in the UI.
-      const idea = (b.topic || b.photos.find((p) => p.topic)?.topic || "").trim();
-      if (idea.length < 3) throw new HttpError(422, "This AI can't look at photos. Type a topic (for example “winter outfits”) so it can write the pins.");
-      const r = await provider.generateDrafts({ workspace: b.workspace, idea, brand: b.brand, language: b.language });
-      model = r.model;
-      usage = r.usage ?? usage;
-      pins = b.photos.map((p, i) => {
-        const d = r.drafts[i % r.drafts.length];
-        return { title: d.title, description: d.description, tags: d.tags, alt_text: p.topic || b.topic || d.alt_text };
-      });
+      // This text model can't see images: write from each photo's own topic (or the shared one), and say so in the UI.
+      const topics = b.photos.map((p) => photoTopic(p.topic, b.topic));
+      if (topics.some((t) => !t)) throw new HttpError(422, "This AI can't look at photos. Type a topic (for example “winter outfits”) so it can write the pins.");
+      const byTopic = new Map<string, number[]>();
+      topics.forEach((t, i) => byTopic.set(t!, [...(byTopic.get(t!) ?? []), i]));
+      pins = new Array(b.photos.length);
+      // One request per distinct topic, side by side (a batch has at most 5 photos).
+      const results = await Promise.all([...byTopic].map(async ([idea, idx]) => ({ idx, r: await provider.generateDrafts({ workspace: b.workspace, idea, brand: b.brand, language: b.language }) })));
+      for (const { idx, r } of results) {
+        model = r.model;
+        usage = { input_tokens: usage.input_tokens + (r.usage?.input_tokens ?? 0), output_tokens: usage.output_tokens + (r.usage?.output_tokens ?? 0) };
+        idx.forEach((photoIndex, j) => {
+          const d = r.drafts[j % r.drafts.length];
+          const p = b.photos[photoIndex];
+          pins[photoIndex] = { title: d.title, description: d.description, tags: d.tags, alt_text: p.topic || b.topic || d.alt_text };
+        });
+      }
       basedOn = "topic";
     }
 

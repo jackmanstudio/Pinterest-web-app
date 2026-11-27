@@ -3,6 +3,7 @@ import { getRequestContext, HttpError } from "@/lib/server/context";
 import { rateLimited } from "@/lib/server/rateLimit";
 import { audit } from "@/lib/workflow/server";
 import { getAdminSupabase } from "@/lib/supabase/admin";
+import { errorResponse } from "@/lib/server/errors";
 
 /** Downloads everything the signed-in user owns as JSON (no OAuth tokens). */
 export async function GET(request: Request) {
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
       headers: { "Content-Type": "application/json", "Content-Disposition": `attachment; filename="pinterest-ai-studio-export-${new Date().toISOString().slice(0, 10)}.json"` },
     });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not export your data.");
   }
 }

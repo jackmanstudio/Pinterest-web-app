@@ -46,3 +46,20 @@ export function topicFromFileName(name: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/** Message for photos left out because the same photo was already added, or null. */
+export function duplicateNotice(names: string[]): string | null {
+  if (!names.length) return null;
+  const list = names.slice(0, 3).join(", ") + (names.length > 3 ? ` and ${names.length - 3} more` : "");
+  return `${names.length === 1 ? "This photo is" : "These photos are"} already in the list, so ${names.length === 1 ? "it was" : "they were"} not added again: ${list}.`;
+}
+
+/**
+ * The topic a photo's text is written from when the AI can't see photos: the
+ * "topic for all photos" when one is typed, else the photo's own topic. Null
+ * when neither has 3+ letters.
+ */
+export function photoTopic(own: string, shared: string): string | null {
+  const t = shared.trim().length >= 3 ? shared.trim() : own.trim();
+  return t.length >= 3 ? t : null;
+}

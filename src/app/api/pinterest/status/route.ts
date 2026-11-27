@@ -3,6 +3,7 @@ import { checkPinterestConfig } from "@/lib/pinterest/config";
 import { pinterestContext } from "@/lib/pinterest/server";
 import { HttpError } from "@/lib/server/context";
 import { isWorkspaceKind } from "@/lib/types";
+import { errorResponse } from "@/lib/server/errors";
 
 /** Safe connection info + synced boards/pins for one workspace. Never returns tokens. */
 export async function GET(request: Request) {
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
       pin_total: pins.count ?? 0,
     });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not load the Pinterest status.");
   }
 }

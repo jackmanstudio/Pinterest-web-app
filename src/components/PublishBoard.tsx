@@ -3,7 +3,7 @@ import { PageTitle } from "./PageTitle";
 import { useCallback, useEffect, useState } from "react";
 import type { Store } from "@/lib/store";
 import { STATUS_LABELS, type AuditEvent, type DraftStatus, type PinDraft, type WorkspaceKind } from "@/lib/types";
-import { publishBlockers } from "@/lib/workflow/checks";
+import { publishBlockers, validateRunAt } from "@/lib/workflow/checks";
 import { recommendBoard } from "@/lib/publishing/boards";
 import { boardChecks, METHOD_LABELS, type BoardPlan } from "@/lib/boards/automation";
 import { draftFacts, loadBoardSource } from "@/lib/client/boards";
@@ -300,6 +300,12 @@ function PinCard({ kind, store, draft, pin, plan, onChanged, addBoard, canCreate
       : [];
 
   async function act(action: WorkflowAction) {
+    // Check the picked time here too, so an empty or past time gets a clear message.
+    const runAtIso = action === "schedule" ? (runAt ? new Date(runAt) : null) : null;
+    if (action === "schedule") {
+      const problem = runAtIso && !Number.isNaN(runAtIso.getTime()) ? validateRunAt(runAtIso.toISOString()) : "Pick a valid date and time.";
+      if (problem) return setMsg({ ok: false, text: problem });
+    }
     setBusy(true);
     setMsg(null);
     try {
@@ -307,7 +313,7 @@ function PinCard({ kind, store, draft, pin, plan, onChanged, addBoard, canCreate
         note: action === "request_changes" ? note || undefined : undefined,
         boardId: boardId || undefined,
         boardName: board?.name,
-        runAt: action === "schedule" ? new Date(runAt).toISOString() : undefined,
+        runAt: runAtIso ? runAtIso.toISOString() : undefined,
       });
       setConfirming(null);
       await onChanged();

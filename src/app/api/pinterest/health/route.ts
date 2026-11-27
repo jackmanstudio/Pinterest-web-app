@@ -10,6 +10,7 @@ import { readWorkerRuns, workerState } from "@/lib/server/workerRuns";
 import { getAdminSupabase, hasAdminSupabase } from "@/lib/supabase/admin";
 import { isWorkspaceKind } from "@/lib/types";
 import { WorkspaceSlug } from "@/lib/workspaces/schema";
+import { errorResponse } from "@/lib/server/errors";
 
 function tokenState(expiresAt: string | null | undefined, now = Date.now()): "ok" | "expiring" | "expired" | "unknown" {
   if (!expiresAt) return "unknown";
@@ -82,8 +83,8 @@ export async function GET(request: Request) {
       })),
     });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: err instanceof HttpError ? err.message : "Could not load the check." }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not load the check.");
   }
 }
 

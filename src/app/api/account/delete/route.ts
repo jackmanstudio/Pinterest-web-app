@@ -5,6 +5,7 @@ import { getRequestContext, HttpError } from "@/lib/server/context";
 import { log } from "@/lib/server/log";
 import { rateLimited } from "@/lib/server/rateLimit";
 import { getAdminSupabase } from "@/lib/supabase/admin";
+import { errorResponse } from "@/lib/server/errors";
 
 const Body = z.object({ confirm: z.literal("DELETE MY ACCOUNT"), password: z.string().max(200).optional() });
 
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
     await ctx.db.auth.signOut();
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    return NextResponse.json({ error: (err as Error).message }, { status });
+    if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
+    return errorResponse(err, request, "Could not delete the account.");
   }
 }
