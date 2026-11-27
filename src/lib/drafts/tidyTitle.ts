@@ -102,7 +102,7 @@ export function ensureSeoTitle(title: string, idea: string, max = 100): string {
     if (k.length > head.trim().length && `${k}: ${hook}`.length <= max) t = `${k}: ${hook}`;
   }
   if (t.length < MIN_TITLE) {
-    const extra = t.includes(":") ? " to Save and Try" : ": Ideas Worth Saving";
+    const extra = t.includes(":") ? " to Save and Try" : /\bideas?\b/i.test(t) ? ": Worth Saving and Trying" : ": Ideas Worth Saving";
     if ((t + extra).length <= max) t = t + extra;
   }
   return t;

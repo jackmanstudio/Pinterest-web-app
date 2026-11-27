@@ -10,6 +10,7 @@ import { readTemplate } from "@/lib/brand/template";
 import { defaultCategories } from "@/lib/categories/taxonomy";
 
 import { LANGUAGES } from "@/lib/brand/languages";
+import { WorkspaceError } from "./WorkspaceError";
 const IMAGE_STYLES = ["Editorial photography", "Lifestyle photography", "Flat lay", "Studio product shot", "Illustration", "Minimal still life", "Moody film photography"];
 
 export function Settings({ kind }: { kind: WorkspaceKind }) {
@@ -38,7 +39,7 @@ export function Settings({ kind }: { kind: WorkspaceKind }) {
       .catch((e: Error) => setMsg({ text: e.message, ok: false }));
   }, [store, workspace]);
 
-  if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
+  if (wsError) return <WorkspaceError error={wsError} />;
   if (!store || !workspace || !brand) return <p className="text-zinc-500">Loading settings…</p>;
 
   const input = "w-full rounded-md border border-zinc-300 px-3 py-2 text-sm";

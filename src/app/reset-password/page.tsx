@@ -27,7 +27,8 @@ export default function ResetPasswordPage() {
       router.replace("/login?reset=1");
     } catch (err) {
       const e2 = err as Error & { fields?: Record<string, string> };
-      setError(e2.message);
+      // No recovery session: the page was opened without a valid (or with a used/expired) email link.
+      setError(/sign in required|not signed in|session/i.test(e2.message) ? "This reset link has expired or was already used. Use “Need a new link?” below to get a fresh one." : e2.message);
       setFields(e2.fields ?? {});
       setBusy(false);
     }

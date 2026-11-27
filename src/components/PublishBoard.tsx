@@ -11,6 +11,7 @@ import { ACTION_LABELS, type WorkflowAction } from "@/lib/workflow/transitions";
 import { spreadTimes } from "@/lib/planning/spread";
 import { SourceBadge } from "./DraftEditor";
 import { useWorkspace } from "./useWorkspace";
+import { WorkspaceError } from "./WorkspaceError";
 
 interface Board { board_id: string; name: string; description?: string | null; privacy?: string | null }
 interface PinterestInfo {
@@ -72,7 +73,7 @@ export function PublishBoard({ kind }: { kind: WorkspaceKind }) {
     };
   }, [store, workspace, kind]);
 
-  if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
+  if (wsError) return <WorkspaceError error={wsError} />;
   if (!store || !workspace || !drafts) return <p className="text-zinc-500">Loading…</p>;
 
   const live = drafts.filter((d) => !d.archived_at);

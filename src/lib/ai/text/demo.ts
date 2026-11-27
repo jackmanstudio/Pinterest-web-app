@@ -49,7 +49,7 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
     },
     list: {
       concept: `A numbered roundup of 7 variations on "${idea}".`,
-      title: `7 Fresh Ideas for ${Idea}`,
+      title: /\b(ideas?|tips|outfits|looks|ways|recipes)\b/i.test(Idea) ? `7 Fresh ${Idea}` : `7 Fresh Ideas for ${Idea}`,
       description: `Seven fresh takes on ${idea}, from easy everyday options to standout statement versions. Pick your favourite and pin the rest for later. Curated by ${brand}.`,
       alt_text: `A stylish person showing ${idea} on a sunlit city street, full-length.`,
       image_prompt: `A stylish person showcasing ${idea} on a sunlit city street, full-length shot, confident relaxed pose, cohesive neutral palette.`,
@@ -85,11 +85,10 @@ function demoDraft(key: PinAngleKey, label: string, req: GenerateRequest): Draft
   const tags = [
     kw,
     key === "how_to" ? `${kw} guide` : key === "seasonal" ? `${season} ${kw}` : `${kw} ${tail}`,
-    `${kw} ideas`,
+    /\bideas?\b/.test(kw) ? "" : `${kw} ideas`,
     req.category ? req.category.toLowerCase() : "",
     ...req.brand.focus_keywords.slice(0, 3).map((k) => k.toLowerCase()),
-    `${req.workspace} ideas`,
-  ].filter((t) => t && t.length <= 60);
+  ].filter((t) => t && t.length <= 60 && !/\bideas ideas\b/.test(t));
   return {
     angle: label,
     concept: base.concept,
@@ -121,6 +120,6 @@ function styleDraft(a: { key: string; label: string; brief: string; demo?: strin
     description: clip(`${a.brief.replace(/\.$/, "")} for ${idea}. Save this pin so you have it when you need it. More ideas from ${brand}.`, LIMITS.description),
     alt_text: clip(`Photo of ${idea}: ${shot}.`, LIMITS.alt_text),
     image_prompt: `Editorial photo of ${idea}: ${shot}, restrained palette, soft natural light.`,
-    tags: [...new Set([...idea.toLowerCase().split(/\s+/).filter((w) => w.length > 3).slice(0, 3), a.key.split("_")[0], req.workspace])].slice(0, LIMITS.tags),
+    tags: [...new Set([idea.toLowerCase(), ...idea.toLowerCase().split(/\s+/).filter((w) => w.length > 3).slice(0, 3), a.key.split("_")[0]])].slice(0, LIMITS.tags),
   };
 }

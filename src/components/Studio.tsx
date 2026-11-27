@@ -17,6 +17,7 @@ import { TrendIdeas } from "./TrendIdeas";
 import { downloadImage } from "@/lib/client/download";
 import { pageContext, type PageInfo } from "@/lib/tools/pageExtract";
 import { PIN_STYLES, PIN_STYLE_KEYS, type PinStyle } from "@/lib/drafts/angles";
+import { WorkspaceError } from "./WorkspaceError";
 
 /** "" → null (no link); a valid http(s) URL → itself; anything else → false. */
 function normalizeLink(raw: string): string | null | false {
@@ -295,7 +296,7 @@ export function Studio({ kind }: { kind: WorkspaceKind }) {
     }
   }
 
-  if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
+  if (wsError) return <WorkspaceError error={wsError} />;
   if (!workspace) return <p className="text-zinc-500">Loading workspace…</p>;
 
   return (

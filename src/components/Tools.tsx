@@ -10,6 +10,7 @@ import { AMAZON_STORES, DEFAULT_AFFILIATE, addDisclosure, applyAmazonTag, looksA
 import { CopyButton } from "./CopyButton";
 import { downloadFile } from "@/lib/client/download";
 import { useWorkspace } from "./useWorkspace";
+import { WorkspaceError } from "./WorkspaceError";
 
 const card = "flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-5 shadow-sm";
 const input = "rounded-md border border-zinc-300 px-2 py-1.5 text-sm";
@@ -26,7 +27,7 @@ export function Tools({ kind }: { kind: WorkspaceKind }) {
     }).catch(() => {});
   }, [store, workspace]);
 
-  if (error) return <p className="text-red-700">Could not load workspace: {error}</p>;
+  if (error) return <WorkspaceError error={error} />;
   if (!store || !workspace) return <p className="text-zinc-500">Loading tools…</p>;
   return (
     <div className="flex flex-col gap-6">

@@ -114,7 +114,7 @@ export function autoFixDraft(d: DraftContent, link: string | null | undefined, c
         if (title.length < 40 && k) {
           const hasK = plain.toLowerCase().includes(k.toLowerCase());
           const options = [hasK ? "" : `${k}: ${plain}`, `${k} Ideas: ${plain}`, `${plain}: ${k} Ideas Worth Saving`, `${k}: Easy Ideas Worth Saving`];
-          title = options.find((o) => o.length >= 40 && o.length <= 80) ?? title;
+          title = options.find((o) => o.length >= 40 && o.length <= 80 && !/\bideas?\b.*\bideas?\b/i.test(o)) ?? title;
         }
       }
     }

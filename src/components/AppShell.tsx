@@ -133,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         }}
         className="w-full appearance-none truncate rounded-xl bg-gradient-to-r from-[#e60023] to-[#ff7a45] py-2 pl-3 pr-8 text-[13px] font-bold text-white shadow-[0_6px_20px_-6px_rgba(255,90,60,0.7)] outline-none ring-1 ring-white/10 focus-visible:ring-2 focus-visible:ring-white/70"
       >
-        {!options.some((w) => w.kind === kind) && <option value="">{kind ? labelFromSlug(kind) : "Choose account"}</option>}
+        {!options.some((w) => w.kind === kind) && <option value="">{kind ? (workspaces === null ? labelFromSlug(kind) : "Account not found") : "Choose account"}</option>}
         {options.map((w) => (
           <option key={w.kind} value={w.kind} className="bg-[#1a1426] text-white">
             {w.name}
@@ -191,8 +191,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   const current = GROUPS.flatMap((g) => g.items).find((it) => it.section === section);
-  const kindName = (kind && workspaces?.find((w) => w.kind === kind)?.name) || (kind ? labelFromSlug(kind) : "");
+  const kindName = (kind && workspaces?.find((w) => w.kind === kind)?.name) || (kind ? (workspaces === null ? labelFromSlug(kind) : "Account not found") : "");
   const crumb: [string, string] | null = inWorkspace && current ? [kindName, current.label] : null;
+  const tabTitle = crumb ? `${crumb[1]} · ${crumb[0]} · Pinterest AI Studio` : null;
+  // Account pages share one layout, so name the browser tab after the section and account.
+  useEffect(() => {
+    if (tabTitle) document.title = tabTitle;
+  }, [tabTitle]);
 
   const bottom: { href: string; label: string; icon: IconName; active: boolean }[] = [
     { href: "/dashboard", label: "Home", icon: "home", active: path === "/dashboard" },

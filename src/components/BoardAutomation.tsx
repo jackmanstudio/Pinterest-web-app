@@ -29,6 +29,7 @@ import { toCsv } from "@/lib/tools/csv";
 import { downloadFile } from "@/lib/client/download";
 import { type Category, type PinDraft, type WorkspaceKind } from "@/lib/types";
 import { useWorkspace } from "./useWorkspace";
+import { WorkspaceError } from "./WorkspaceError";
 
 /** One editable row: a pin or a bulk keyword with its board. */
 interface Row {
@@ -103,7 +104,7 @@ export function BoardAutomation({ kind }: { kind: WorkspaceKind }) {
   const boards = src?.boards ?? [];
   const settingsDirty = JSON.stringify(settings) !== savedSettings;
 
-  if (wsError) return <p className="text-red-700">Could not load workspace: {wsError}</p>;
+  if (wsError) return <WorkspaceError error={wsError} />;
   if (!store || !workspace || !src || !drafts) return <p className="text-zinc-500">Loading…</p>;
 
   async function saveSettings(next = settings) {
