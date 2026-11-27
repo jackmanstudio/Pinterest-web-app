@@ -113,7 +113,7 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
                 <li key={m}>{m}</li>
               ))}
             </ul>
-            <p className="mt-2 text-zinc-600">See “Connect Pinterest” in the README for the developer-portal steps.</p>
+            <SetupHelper missing={data.config.missing} />
           </div>
         )}
 
@@ -210,6 +210,66 @@ export function PinterestPanel({ kind }: { kind: WorkspaceKind }) {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+/** Random 32 bytes, base64: the format TOKEN_ENCRYPTION_KEY needs. Made in this browser, never sent anywhere. */
+function randomKey(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes));
+}
+
+/** Copy-ready values for the Vercel settings, so nobody has to run a terminal command. */
+function SetupHelper({ missing }: { missing: string[] }) {
+  const redirect = typeof window === "undefined" ? "" : `${window.location.origin}/api/pinterest/callback`;
+  const [keys, setKeys] = useState<{ name: string; value: string }[]>([]);
+  const [copied, setCopied] = useState<string | null>(null);
+  const rows = [
+    ...(missing.includes("PINTEREST_REDIRECT_URI") ? [{ name: "PINTEREST_REDIRECT_URI", value: redirect }] : []),
+    { name: "PINTEREST_ENV", value: "sandbox" },
+    { name: "PINTEREST_ENABLE_PUBLISHING", value: "true" },
+    ...keys,
+  ];
+  async function copy(name: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(name);
+    } catch {
+      setCopied(null);
+    }
+  }
+  return (
+    <div className="mt-3 flex flex-col gap-2 border-t border-zinc-200 pt-3">
+      <p className="text-zinc-600">
+        Get the App ID and App secret from{" "}
+        <a className="underline" href="https://developers.pinterest.com/apps/" target="_blank" rel="noreferrer">developers.pinterest.com/apps</a>{" "}
+        (Redirect URI there: <span className="font-mono text-xs">{redirect}</span>). Add them in Vercel as PINTEREST_CLIENT_ID and PINTEREST_CLIENT_SECRET, with these:
+      </p>
+      <ul className="flex flex-col gap-1">
+        {rows.map((r) => (
+          <li key={r.name} className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-mono font-semibold">{r.name}</span>
+            <span className="min-w-0 max-w-full truncate font-mono text-zinc-600">{r.value}</span>
+            <button onClick={() => copy(r.name, r.value)} className="rounded border border-zinc-300 px-2 py-0.5">{copied === r.name ? "Copied" : "Copy"}</button>
+          </li>
+        ))}
+      </ul>
+      {keys.length === 0 && (
+        <button
+          onClick={() =>
+            setKeys([
+              // Never offer a new token key when one is set: that would lock out connected accounts.
+              ...(missing.includes("TOKEN_ENCRYPTION_KEY") ? [{ name: "TOKEN_ENCRYPTION_KEY", value: randomKey() }] : []),
+              { name: "CRON_SECRET", value: randomKey().replace(/[^A-Za-z0-9]/g, "") },
+            ])
+          }
+          className="self-start rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+        >
+          {missing.includes("TOKEN_ENCRYPTION_KEY") ? "Make TOKEN_ENCRYPTION_KEY and CRON_SECRET" : "Make a CRON_SECRET"}
+        </button>
+      )}
+      {keys.length > 0 && <p className="text-xs text-zinc-500">Made in your browser only. Copy each into Vercel now; a new one is made if you reload.</p>}
     </div>
   );
 }
