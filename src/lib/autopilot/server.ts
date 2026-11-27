@@ -222,7 +222,6 @@ export function serverReadiness(env: Record<string, string | undefined> = proces
   const pc = checkPinterestConfig(env);
   if (!pc.ready) out.push(`Pinterest isn't configured on the server (missing ${pc.missing.join(", ")}).`);
   if (env.PINTEREST_ENABLE_PUBLISHING !== "true") out.push("Set PINTEREST_ENABLE_PUBLISHING=true.");
-  if (!env.CRON_SECRET) out.push("Set CRON_SECRET and a scheduler that calls /api/cron/autopilot every hour.");
   return out;
 }
 
@@ -237,7 +236,7 @@ export function supabaseAutopilotDeps(admin: SupabaseClient): AutopilotDeps {
     },
 
     async readinessProblems(ws) {
-      const out = serverReadiness().filter((p) => !p.startsWith("Set CRON_SECRET"));
+      const out = serverReadiness();
       if (out.length) return out;
       const repo = new ConnectionRepo(admin, getPinterestConfig().encryptionKey);
       const info = await repo.info(ws.workspace_id);
